@@ -11,6 +11,8 @@ import Governance from './pages/Governance'
 import Insights from './pages/Insights'
 import Playbook from './pages/Playbook'
 import ClickInsights from './pages/ClickInsights'
+import UsabilityTests from './pages/UsabilityTests'
+import TestEditor from './pages/TestEditor'
 
 export default function App() {
   return (
@@ -29,6 +31,9 @@ export default function App() {
             <Route path="insights" element={<Insights />} />
             <Route path="playbook" element={<Playbook />} />
             <Route path="console/insights" element={<ClickInsights />} />
+            <Route path="console/tests" element={<UsabilityTests />} />
+            <Route path="console/tests/:id" element={<UsabilityTests />} />
+            <Route path="console/tests/:id/edit" element={<TestEditor />} />
             <Route path="*" element={<Overview />} />
           </Route>
         </Routes>

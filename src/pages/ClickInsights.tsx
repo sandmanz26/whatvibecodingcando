@@ -1,14 +1,18 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, Flame, MousePointerClick, RefreshCw, Trash2, Ban, CircleSlash, Pin } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronRight, Flame, MousePointerClick, RefreshCw, Trash2, Ban, CircleSlash, Pin, Eye } from 'lucide-react'
 import { Empty, Modal, Switch } from '../components/ui'
 import { analyze, applyFilters, pct, type ElementRow, type Filters } from '../tools/insights/analyze'
-import { clearEvents, loadEvents, type Loaded } from '../tools/insights/store'
+import { clearEvents, layoutOf, loadEvents, type Loaded } from '../tools/insights/store'
+import { DEVICES, ScreenViewer, type Device } from '../tools/insights/ScreenViewer'
+import { ConsoleNav } from './ConsoleNav'
 import { flushNow } from '../tools/insights/tracker'
 import { setFlag, useFlag, TOOLS_API } from '../tools/shared'
 
-/** Opens a screen of the app in a new tab with the heatmap overlay. */
-function openHeatmap(page: string, extra = '') {
-  window.open(`${window.location.pathname}${window.location.search}#${page}?heatmap${extra}`, '_blank', 'noopener')
+function busiestLayout(events: Loaded['events'], page: string): Device {
+  const n: Record<Device, number> = { mobile: 0, tablet: 0, desktop: 0 }
+  events.forEach((e) => { if (e.type === 'click' && e.page === page) n[layoutOf(e.vw)]++ })
+  const [top, count] = Object.entries(n).sort((x, y) => y[1] - x[1])[0]
+  return count > 0 ? (top as Device) : 'desktop'
 }
 
 function TapSpots({ row }: { row: ElementRow }) {
@@ -27,6 +31,8 @@ export default function ClickInsights() {
   const [filters, setFilters] = useState<Filters>({ days: 'all', page: 'all', layout: 'all' })
   const [open, setOpen] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [view, setView] = useState<{ page: string | null; device: Device | null; mode: 'dots' | 'elements'; focus: string | null }>({ page: null, device: null, mode: 'dots', focus: null })
+  const viewerRef = useRef<HTMLElement>(null)
 
   const refresh = useCallback(async () => {
     flushNow()
@@ -40,8 +46,17 @@ export default function ClickInsights() {
   const a = useMemo(() => analyze(scoped), [scoped])
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setFilters((f) => ({ ...f, [k]: v }))
 
+  // Viewer defaults: the busiest screen, at the layout most of its taps came from.
+  const viewPage = view.page ?? a.screens.find((s) => s.taps > 0)?.page ?? a.screens[0]?.page ?? '/'
+  const viewDevice: Device = view.device ?? (filters.layout !== 'all' ? filters.layout : busiestLayout(scoped, viewPage))
+  const showOnScreen = (page: string, mode: 'dots' | 'elements', focus: string | null = null, device: Device | null = null) => {
+    setView({ page, device, mode, focus })
+    viewerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <main className="page">
+      <ConsoleNav />
       <div className="page-head">
         <div>
           <h1>Click insights</h1>
@@ -65,7 +80,7 @@ export default function ClickInsights() {
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
             <div>
               <h3 className="row" style={{ gap: 8 }}><Pin size={15} /> Review pins</h3>
-              <p className="muted" style={{ fontSize: 12.5 }}>A floating pen button for dropping notes on any screen. Shows below 500 px wide (the mobile layout).</p>
+              <p className="muted" style={{ fontSize: 12.5 }}>A floating pen button for dropping numbered notes on any screen, at any width.</p>
             </div>
             <Switch checked={pinsOn} onChange={() => setFlag('reviewPins', !pinsOn)} label="Review pins" />
           </div>
@@ -108,6 +123,30 @@ export default function ClickInsights() {
         </div>
       ) : (
         <div className="stack gap-16">
+          <section className="card" ref={viewerRef} style={{ scrollMarginTop: 72 }}>
+            <div className="card-head">
+              <div><h2 className="row" style={{ gap: 8 }}><Eye size={16} /> Screen viewer</h2><p>The real screen at a device width, with every tap drawn where it landed</p></div>
+              <div className="row wrap">
+                <select className="select" style={{ width: 170, height: 30 }} value={viewPage} onChange={(e) => setView((v) => ({ ...v, page: e.target.value, focus: null }))} aria-label="Screen">
+                  {a.screens.map((s) => <option key={s.page} value={s.page}>{s.page} · {s.taps} taps</option>)}
+                </select>
+                <div className="seg" role="group" aria-label="Device">
+                  {(Object.keys(DEVICES) as Device[]).map((d) => <button key={d} aria-pressed={viewDevice === d} onClick={() => setView((v) => ({ ...v, device: d }))}>{d[0].toUpperCase() + d.slice(1)}</button>)}
+                </div>
+                <div className="seg" role="group" aria-label="Show">
+                  <button aria-pressed={view.mode === 'dots'} onClick={() => setView((v) => ({ ...v, mode: 'dots' }))}>Tap dots</button>
+                  <button aria-pressed={view.mode === 'elements'} onClick={() => setView((v) => ({ ...v, mode: 'elements' }))}>Elements</button>
+                </div>
+              </div>
+            </div>
+            <div className="card-body">
+              <ScreenViewer page={viewPage} device={viewDevice} mode={view.mode} focus={view.focus} />
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Only taps made at the same layout are drawn ({DEVICES[viewDevice].label} px) — a phone’s taps over a desktop layout would point at the wrong things. Scroll inside the frame to see the whole page.
+              </p>
+            </div>
+          </section>
+
           <div className="grid g-2">
             <section className="card">
               <div className="card-head"><div><h2>Screens</h2><p>Views and taps per page</p></div></div>
@@ -122,7 +161,7 @@ export default function ClickInsights() {
                         <td className="r num">{s.taps}</td>
                         <td className="r">
                           <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
-                            <button className="btn sm" onClick={() => openHeatmap(s.page)}>Heatmap <ExternalLink size={12} /></button>
+                            <button className="btn sm" onClick={() => showOnScreen(s.page, 'dots')}>Heatmap</button>
                             <button className="btn sm ghost" onClick={() => set('page', s.page)}>Elements</button>
                           </div>
                         </td>
@@ -148,14 +187,14 @@ export default function ClickInsights() {
                       <tr key={p.key}>
                         <td>
                           <div style={{ fontWeight: 550 }}>{p.label}</div>
-                          <div className="muted mono" style={{ fontSize: 11.5 }}>{p.page} · {p.section}</div>
+                          <div className="muted" style={{ fontSize: 12 }}><span className="mono">{p.page}</span> · {p.section} · {p.zone}</div>
                         </td>
                         <td className="r" style={{ whiteSpace: 'nowrap', fontSize: 12.5 }}>
                           {p.nothing > 0 && <span className="row" style={{ gap: 4, justifyContent: 'flex-end' }}><CircleSlash size={12} /> {p.nothing}</span>}
                           {p.rage > 0 && <span className="row" style={{ gap: 4, justifyContent: 'flex-end' }}><Flame size={12} /> {p.rage}</span>}
                           {p.dead > 0 && <span className="row" style={{ gap: 4, justifyContent: 'flex-end' }}><Ban size={12} /> {p.dead}</span>}
                         </td>
-                        <td className="r"><button className="btn sm ghost" onClick={() => openHeatmap(p.page, `=elements&el=${encodeURIComponent(p.sel)}`)}>Show <ExternalLink size={12} /></button></td>
+                        <td className="r"><button className="btn sm ghost" onClick={() => showOnScreen(p.page, 'elements', p.sel)}>Show</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -169,7 +208,7 @@ export default function ClickInsights() {
             <div className="card-body" style={{ overflowX: 'auto', paddingTop: 8 }}>
               <table className="table">
                 <thead>
-                  <tr><th></th><th>Element</th><th>Kind</th><th>Section</th><th className="r">Taps</th><th className="r">Did nothing</th><th className="r">Rage</th><th className="r">Median time to tap</th><th className="r">Median scroll</th><th></th></tr>
+                  <tr><th></th><th>Element</th><th>Kind</th><th>Where</th><th className="r">Taps</th><th className="r">Did nothing</th><th className="r">Rage</th><th className="r">Median time to tap</th><th className="r">Median scroll</th><th></th></tr>
                 </thead>
                 <tbody>
                   {a.elements.slice(0, 80).map((e) => (
@@ -178,13 +217,13 @@ export default function ClickInsights() {
                         <td style={{ width: 24 }}>{open === e.key ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
                         <td><div style={{ fontWeight: 550 }}>{e.label}</div>{filters.page === 'all' && <div className="muted mono" style={{ fontSize: 11.5 }}>{e.page}</div>}</td>
                         <td className="secondary">{e.kind}</td>
-                        <td className="secondary">{e.section}</td>
+                        <td className="secondary">{e.section}<div className="muted" style={{ fontSize: 12 }}>{e.zone} of page</div></td>
                         <td className="r num">{e.taps}</td>
                         <td className="r num">{pct(e.nothing, e.taps)}%</td>
                         <td className="r num">{e.rage || '—'}</td>
                         <td className="r num">{(e.medianMs / 1000).toFixed(1)} s</td>
                         <td className="r num">{Math.round(e.medianScroll)}%</td>
-                        <td className="r"><button className="btn sm ghost" onClick={(ev) => { ev.stopPropagation(); openHeatmap(e.page, `=elements&el=${encodeURIComponent(e.sel)}`) }}>Show on screen</button></td>
+                        <td className="r"><button className="btn sm ghost" onClick={(ev) => { ev.stopPropagation(); showOnScreen(e.page, 'elements', e.sel) }}>Show on screen</button></td>
                       </tr>
                       {open === e.key && (
                         <tr>
@@ -209,6 +248,26 @@ export default function ClickInsights() {
             </div>
           </section>
 
+          <div className="grid g-2">
+          <section className="card">
+            <div className="card-head"><div><h2>Areas</h2><p>Which part of the screen gets tapped — named by the section it sits in</p></div></div>
+            <div className="card-body" style={{ paddingTop: 8 }}>
+              <table className="table">
+                <thead><tr><th>Area</th><th>Usually</th><th className="r">Taps</th><th className="r">Share</th><th className="r">Problems</th></tr></thead>
+                <tbody>
+                  {a.areas.slice(0, 12).map((ar) => (
+                    <tr key={ar.area}>
+                      <td><div style={{ fontWeight: 550 }}>{ar.area}</div><div className="muted" style={{ fontSize: 12 }}>{ar.elements} element{ar.elements === 1 ? '' : 's'}</div></td>
+                      <td className="secondary">{ar.zone}</td>
+                      <td className="r num">{ar.taps}</td>
+                      <td className="r"><div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}><span className="ar-bar"><i style={{ width: `${pct(ar.taps, a.taps)}%` }} /></span><span className="num" style={{ minWidth: 34 }}>{pct(ar.taps, a.taps)}%</span></div></td>
+                      <td className="r num">{ar.problems || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
           <section className="card">
             <div className="card-head"><div><h2>Paths</h2><p>Most common moves from one screen to the next</p></div></div>
             <div className="card-body" style={{ paddingTop: 8 }}>
@@ -222,6 +281,7 @@ export default function ClickInsights() {
               </table>
             </div>
           </section>
+          </div>
         </div>
       )}
 

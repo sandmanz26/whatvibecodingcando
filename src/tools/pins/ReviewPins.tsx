@@ -2,25 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { PenLine, X, Plus, List, Download, Upload, Trash2, EyeOff } from 'lucide-react'
-import { APP, isConsole, readJSON, useFlag, writeJSON } from '../shared'
+import { APP, isConsole, isEmbedded, readJSON, useFlag, writeJSON } from '../shared'
 import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, readingOrder, toTxt, txtFileName, type PinNote } from './format'
 import { STATUS_TEXT, usePinSync } from './useSync'
 
-const MOBILE_QUERY = '(max-width: 499px)'
 const BUTTON_KEY = `${APP}.reviewPins.button`
 const BTN = 40
 const TAP_SLOP = 5
-
-function useMedia(query: string) {
-  const [on, setOn] = useState(() => window.matchMedia(query).matches)
-  useEffect(() => {
-    const m = window.matchMedia(query)
-    const sync = () => setOn(m.matches)
-    m.addEventListener('change', sync)
-    return () => m.removeEventListener('change', sync)
-  }, [query])
-  return on
-}
 
 function useViewport() {
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight })
@@ -65,10 +53,9 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 /** Floating review button — mounted app-wide, visible only when its flag is on. */
 export function ReviewPins() {
   const on = useFlag('reviewPins')
-  const narrow = useMedia(MOBILE_QUERY)
   const { pathname } = useLocation()
   const [hidden, setHidden] = useState(false)
-  if (!on || !narrow || hidden || isConsole(pathname)) return null
+  if (!on || hidden || isConsole(pathname) || isEmbedded) return null
   return <Pins onHide={() => setHidden(true)} />
 }
 

@@ -51,10 +51,17 @@ Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags
 - **Recorded:** screen views (with the previous screen), and taps. A tap stores its position, the control's visible name (its aria-label or own text, max 100 chars), its kind, its section, a selector to find it again, where on the element it landed, its aria state, time since the screen opened, scroll depth, rage (3+ taps within 1 s and 40 px), dead (not a control), and its effect within 0.7 s (navigated / changed / nothing).
 - **Never recorded:** anything typed, field values, names, emails, or page content. For a field we keep only its placeholder, name or type. The session id is random, per tab (sessionStorage), and not linked to a user.
 - **Defaults:** on in development; **off in production builds until the product owner decides on consent** (banner / privacy policy).
-- **Where to review:** `#/console/insights` (screens, problem taps, elements, paths). Add `?heatmap` (dots) or `?heatmap=elements` (outlined elements; `&el=<selector>` focuses one) to any screen URL. Only taps from the same page *and* layout bucket are drawn (mobile < 640 px, tablet < 1024 px, desktop).
+- **Where to review:** `#/console/insights`. The **Screen viewer** shows the real app inside the console at a mobile, tablet or desktop width, with every tap drawn where it landed (as dots, or as labelled element outlines). Below it are screens, problem taps, elements (each with *where*: its area plus its third of the page, e.g. “Sidebar · top-left”), **areas**, and paths. Add `?heatmap` (dots) or `?heatmap=elements` (outlined elements; `&el=<selector>` focuses one) to any screen URL. Only taps from the same page *and* layout bucket are drawn (mobile < 640 px, tablet < 1024 px, desktop).
+
+### Usability tests (task-based)
+- Find them at `#/console/tests`. Each test has tasks. A task has a prompt, a start page, a time limit, and a success rule: *reach a page* (a trailing `*` matches any page below it) or *tap an element*. You pick the element by clicking it on the real screen.
+- Share the test link (`#/<start>?test=<id>`). The participant gets an intro, then one task at a time with a timer at the bottom of the screen. They can give up at any point.
+- Recorded per task: the outcome (success, timed out, gave up), time on task, taps (position and control name only), the pages visited, and whether the first click was right (it hit the target, or it moved toward the target page). The participant name is an optional nickname.
+- Results show success rate, median time, average taps, direct success (no backtracking), first-click accuracy, the most common first clicks, and every tap drawn on the real screen (green = hit the target, red = missed).
+- Results are stored in the browser where the test was taken (`skillhouse.tests`, `skillhouse.tests.sessions`).
 
 ### Review pins
-- A draggable 40 px pen button, shown only below 500 px wide (the mobile layout). Tap it to add numbered notes anywhere, see all notes, save or open a `.txt`, delete all, or hide the tool until reload. Pins scroll with the page: x is a % of the current width; y is `scrollY + y% × viewport height at placement`.
+- A draggable 40 px pen button, shown at every screen width (hidden on the console and inside its screen viewer). Tap it to add numbered notes anywhere, see all notes, save or open a `.txt`, delete all, or hide the tool until reload. Pins scroll with the page: x is a % of the current width; y is `scrollY + y% × viewport height at placement`.
 - The `.txt` export is human-readable and lossless. Importing merges notes by id, and the file wins.
 
 ### Storage and sync

@@ -2,7 +2,7 @@
  * Click insights tracker — records screen views and taps.
  * See the privacy rules at the top of ./store.ts; they apply to everything here.
  */
-import { TOOL_DOM, TOOLS_API, currentPath, currentQuery, isConsole } from '../shared'
+import { TOOL_DOM, TOOLS_API, currentPath, currentQuery, isConsole, isEmbedded } from '../shared'
 import { appendLocal, type ClickEvent, type ClickKind, type InsightEvent } from './store'
 
 const CONTROL = 'a, button, [role=button], [role=tab], [role=link], [role=switch], [role=checkbox], [role=menuitem], [role=option], input, select, textarea, label, summary'
@@ -28,16 +28,16 @@ function sessionId() {
 }
 
 /** Should taps and views be recorded right now? */
-const paused = () => isConsole(currentPath()) || currentQuery().has('heatmap')
+const paused = () => isEmbedded || isConsole(currentPath()) || currentQuery().has('heatmap')
 
 function visible(el: Element) {
   const r = el.getBoundingClientRect()
   return r.width > 0 && r.height > 0
 }
 
-function firstVisible(sel: string): Element | null {
+function firstVisible(sel: string, doc: Document = document): Element | null {
   try {
-    for (const el of document.querySelectorAll(sel)) if (visible(el)) return el
+    for (const el of doc.querySelectorAll(sel)) if (visible(el)) return el
   } catch { /* invalid selector */ }
   return null
 }
@@ -53,11 +53,11 @@ export function selectorFor(el: Element): string {
   if (aria) tries.push(`${tag}[aria-label="${cssEscape(aria)}"]`)
   const href = el.getAttribute('href')
   if (tag === 'a' && href) tries.push(`a[href="${cssEscape(href)}"]`)
-  for (const s of tries) if (s.length <= 300 && firstVisible(s) === el) return s
+  for (const s of tries) if (s.length <= 300 && firstVisible(s, el.ownerDocument) === el) return s
 
   const parts: string[] = []
   let node: Element | null = el
-  while (node && node !== document.body && parts.length < 10) {
+  while (node && node !== el.ownerDocument.body && parts.length < 10) {
     const t = node.tagName.toLowerCase()
     const parent: Element | null = node.parentElement
     const same = parent ? Array.from(parent.children).filter((c) => c.tagName === node!.tagName) : []
@@ -77,7 +77,8 @@ function labelFor(el: Element): string {
     const f = el as HTMLInputElement
     return clip(squash(f.placeholder) || squash(f.name) || `${el.tagName.toLowerCase()}${f.type ? `[${f.type}]` : ''}`, 100)
   }
-  const text = squash((el as HTMLElement).innerText ?? el.textContent)
+  // First line only: a card's name, not the content inside it.
+  const text = squash(((el as HTMLElement).innerText ?? el.textContent ?? '').split('\n').find((l) => l.trim()))
   return clip(text || squash(el.getAttribute('title')) || el.tagName.toLowerCase(), 100)
 }
 
@@ -123,6 +124,13 @@ function stateFor(el: Element) {
   }
   if ((el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true') s.disabled = 'true'
   return Object.keys(s).length ? s : undefined
+}
+
+/** For pickers: the control a tap on `target` would be recorded as, with its selector and name. */
+export function describeTarget(target: Element) {
+  const control = target.closest(CONTROL)
+  const el = control ?? target
+  return { el, sel: selectorFor(el), label: control ? labelFor(control) : `(not a control) ${target.tagName.toLowerCase()}` }
 }
 
 let installed: (() => void) | null = null

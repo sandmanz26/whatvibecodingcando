@@ -75,7 +75,10 @@ export const CONSOLE_PREFIX = '/console'
 export const isConsole = (path: string) => path === CONSOLE_PREFIX || path.startsWith(CONSOLE_PREFIX + '/')
 
 /** Elements owned by either tool — never recorded, never reacted to. */
-export const TOOL_DOM = '[data-insights-ignore], [data-review-pins]'
+export const TOOL_DOM = '[data-insights-ignore], [data-review-pins], [data-usability-test]'
+
+/** True inside the console's screen viewer (an iframe of the app). Tools stay quiet there. */
+export const isEmbedded = window.self !== window.top
 
 export const readJSON = <T,>(key: string, fallback: T): T => {
   try {

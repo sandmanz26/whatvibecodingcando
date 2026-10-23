@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, PencilRuler, Command, Lightbulb, MousePointerClick, PenLine } from 'lucide-react'
+import { ArrowRight, LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, PencilRuler, Command, Lightbulb, MousePointerClick, PenLine, ListChecks } from 'lucide-react'
 import { useStore } from '../store/store'
 
 const CAPABILITIES = [
@@ -11,7 +11,8 @@ const CAPABILITIES = [
   { icon: ShieldCheck, to: '/governance', title: 'Policy engine', body: 'Rules re-evaluate the whole catalog live; most issues fix in one click.', tryIt: 'Enable “Least-privilege access” and watch catalog health drop.' },
   { icon: LineChart, to: '/insights', title: 'ROI what-if', body: 'Sliders turn usage into a business case with your own assumptions.', tryIt: 'Drop “Trust in minutes saved” to 50% — is it still worth it?' },
   { icon: MousePointerClick, to: '/console/insights', title: 'Click insights', body: 'Which screens people open, what they tap, and where they get stuck — with heatmaps. Nothing typed is ever recorded.', tryIt: 'Tap around the app, then open Click insights and press “Heatmap” on a screen.' },
-  { icon: PenLine, to: '/console/insights', title: 'Review pins', body: 'Reviewers drop numbered notes on any screen and export them as a .txt.', tryIt: 'Turn on Review pins, narrow the window below 500 px and tap the pen button.' },
+  { icon: PenLine, to: '/console/insights', title: 'Review pins', body: 'Reviewers drop numbered notes on any screen and export them as a .txt.', tryIt: 'Turn on Review pins and tap the pen button in the corner.' },
+  { icon: ListChecks, to: '/console/tests', title: 'Usability testing', body: 'Timed, task-based tests: success rate, time on task, first-click accuracy and every tap on the real screen.', tryIt: 'Open Usability tests, press “Try it”, do the three tasks, then read the results.' },
   { icon: Command, to: '/', title: 'Power-user UX', body: '⌘K palette, dark mode, keyboard-friendly — table stakes, built in minutes.', tryIt: 'Press ⌘K / Ctrl+K and type “view as”.' },
 ]
 
@@ -52,7 +53,7 @@ export default function Playbook() {
         </div>
       </section>
 
-      <h2 style={{ marginBottom: 12 }}>Ten management patterns in this demo</h2>
+      <h2 style={{ marginBottom: 12 }}>Eleven management patterns in this demo</h2>
       <div className="grid g-2">
         {CAPABILITIES.map((c) => (
           <Link key={c.title} to={c.to} className="card card-body skill-card" style={{ gap: 8 }}>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import {
   LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Search, Moon, Sun,
-  Lightbulb, RotateCcw, Layers, X, CircleAlert, ChevronRight, MousePointerClick,
+  Lightbulb, RotateCcw, Layers, X, CircleAlert, ChevronRight, MousePointerClick, ListChecks,
 } from 'lucide-react'
 import { useStore } from '../store/store'
 import { evaluate } from '../lib/logic'
@@ -10,6 +10,7 @@ import { Avatar, Modal } from './ui'
 import { CommandPalette } from './CommandPalette'
 import { HeatmapOverlay, InsightsTracker } from '../tools/insights/InsightsTools'
 import { ReviewPins } from '../tools/pins/ReviewPins'
+import { UsabilityRunner } from '../tools/tests/Runner'
 
 function useTheme() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -90,6 +91,7 @@ export function Layout() {
         <div className="nav-label">Demo</div>
         {nav('/playbook', 'Playbook', Sparkles)}
         {nav('/console/insights', 'Click insights', MousePointerClick)}
+        {nav('/console/tests', 'Usability tests', ListChecks)}
 
         <div className="sidebar-foot">
           <div className="card" style={{ padding: 10 }}>
@@ -140,7 +142,7 @@ export function Layout() {
                 <span className="here">{crumbSkill.title}</span>
               </>
             ) : (
-              <span className="here">{parts[1] === 'new' ? 'New skill' : TITLES[section] ?? 'Overview'}</span>
+              <span className="here">{parts[1] === 'new' ? 'New skill' : section === 'console' && parts[1] === 'tests' ? 'Usability tests' : TITLES[section] ?? 'Overview'}</span>
             )}
           </nav>
           <div className="spacer" />
@@ -154,6 +156,7 @@ export function Layout() {
       <InsightsTracker />
       <HeatmapOverlay />
       <ReviewPins />
+      <UsabilityRunner />
 
       {palette && <CommandPalette onClose={() => setPalette(false)} toggleTheme={toggleTheme} />}
 

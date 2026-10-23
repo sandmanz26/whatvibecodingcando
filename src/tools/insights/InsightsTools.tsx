@@ -5,6 +5,10 @@ import { X } from 'lucide-react'
 import { isConsole, useFlag } from '../shared'
 import { installTracker, trackView } from './tracker'
 import { layoutOf, loadEvents, type ClickEvent } from './store'
+import { taskTapsAsClicks } from '../tests/store'
+
+/** Message the heatmap posts to the console's screen viewer when embedded. */
+export interface HeatmapStats { type: 'skillhouse:heatmap'; taps: number; missing: number; layout: string; page: string }
 
 /** Installs the tracker while the flag is on and reports route changes to it. */
 export function InsightsTracker() {
@@ -36,6 +40,10 @@ export function HeatmapOverlay() {
   const active = q.has('heatmap') && !isConsole(pathname)
   const mode = q.get('heatmap') === 'elements' ? 'elements' : 'dots'
   const focus = q.get('el')
+  // Inside the console's screen viewer the console owns the controls, so the bar and notices are hidden.
+  const embed = q.has('embed')
+  // task=<testId>:<taskId> draws a usability task's taps instead of everyday click data.
+  const task = q.get('task')
 
   const [clicks, setClicks] = useState<ClickEvent[] | null>(null)
   const [vw, setVw] = useState(window.innerWidth)
@@ -46,9 +54,14 @@ export function HeatmapOverlay() {
   useEffect(() => {
     if (!active) return
     let live = true
-    void loadEvents().then((d) => live && setClicks(d.events.filter((e): e is ClickEvent => e.type === 'click')))
+    if (task) {
+      const [testId, taskId] = task.split(':')
+      setClicks(taskTapsAsClicks(testId, taskId))
+    } else {
+      void loadEvents().then((d) => live && setClicks(d.events.filter((e): e is ClickEvent => e.type === 'click')))
+    }
     return () => { live = false }
-  }, [active])
+  }, [active, task])
 
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth)
@@ -98,6 +111,12 @@ export function HeatmapOverlay() {
   }, [active, mode, groups, focus])
 
   useEffect(() => {
+    if (!active || !embed || clicks === null || window.parent === window) return
+    const msg: HeatmapStats = { type: 'skillhouse:heatmap', taps: here.length, missing, layout: layoutOf(vw), page: pathname }
+    window.parent.postMessage(msg, window.location.origin)
+  }, [active, embed, clicks, here.length, missing, vw, pathname])
+
+  useEffect(() => {
     if (!active || !focus || clicks === null) return
     const t = window.setTimeout(() => firstVisible(focus)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
     return () => window.clearTimeout(t)
@@ -124,10 +143,10 @@ export function HeatmapOverlay() {
       {boxes.filter((b) => mode === 'elements' || b.sel === focus).map((b) => (
         <div key={b.sel} className={`hm-box ${tone(b)} ${b.sel === focus ? 'focus' : ''}`} aria-hidden
           style={{ left: b.rect.left, top: b.rect.top, width: b.rect.width, height: b.rect.height }}>
-          {b.taps > 0 && mode === 'elements' && <span>{b.taps}</span>}
+          {b.taps > 0 && mode === 'elements' && <span title={b.label}>{b.taps}<em>{b.label.length > 26 ? b.label.slice(0, 25) + '…' : b.label}</em></span>}
         </div>
       ))}
-      <div className="hm-bar" role="toolbar" aria-label="Heatmap">
+      {!embed && <div className="hm-bar" role="toolbar" aria-label="Heatmap">
         <b className="num">{here.length}</b>
         <span>tap{here.length === 1 ? '' : 's'} · {layoutOf(vw)}</span>
         <div className="seg" role="group" aria-label="Heatmap mode">
@@ -137,8 +156,8 @@ export function HeatmapOverlay() {
         {mode === 'elements' && missing > 0 && <span className="hm-missing">{missing} not on this layout</span>}
         {mode === 'elements' && <span className="hm-legend"><i className="good" />works <i className="meh" />some idle <i className="bad" />mostly idle</span>}
         <button className="btn ghost sm icon" onClick={close} aria-label="Close heatmap"><X size={14} /></button>
-      </div>
-      {clicks !== null && here.length === 0 && (
+      </div>}
+      {!embed && clicks !== null && here.length === 0 && (
         <div className="hm-empty">No taps recorded on {pathname} at {layoutOf(vw)} width.</div>
       )}
     </div>,

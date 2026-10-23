@@ -20,6 +20,14 @@ export function applyFilters(events: InsightEvent[], f: Filters, now = Date.now(
     (f.layout === 'all' || layoutOf(e.vw) === f.layout))
 }
 
+/** Plain-language position of a tap: which third of the screen, across and down the page. */
+export function zoneOf(x: number, y: number, docH: number) {
+  const v = y / Math.max(1, docH)
+  const row = v < 0.33 ? 'top' : v < 0.66 ? 'middle' : 'bottom'
+  const col = x < 33 ? 'left' : x < 66 ? 'center' : 'right'
+  return row === 'middle' && col === 'center' ? 'center' : `${row}-${col}`
+}
+
 export interface ElementRow {
   key: string
   page: string
@@ -38,6 +46,8 @@ export interface ElementRow {
   w: number
   h: number
   states: string[]
+  /** where on the page it usually sits, e.g. "top-left" */
+  zone: string
 }
 
 export function analyze(events: InsightEvent[]) {
@@ -78,6 +88,7 @@ export function analyze(events: InsightEvent[]) {
       w: median(g.map((c) => c.ew)),
       h: median(g.map((c) => c.eh)),
       states: [...states],
+      zone: zoneOf(median(g.map((c) => c.x)), median(g.map((c) => c.y)), median(g.map((c) => c.docH))),
     }
   }).sort((a, b) => b.taps - a.taps)
 
@@ -85,6 +96,26 @@ export function analyze(events: InsightEvent[]) {
     .map((e) => ({ ...e, score: e.nothing + e.rage + e.dead }))
     .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score)
+
+  // Areas: the named part of the screen a tap landed in (sidebar, a card, a dialog…).
+  const areaMap = new Map<string, { area: string; taps: number; elements: Set<string>; zones: Map<string, number>; problems: number }>()
+  clicks.forEach((c) => {
+    const k = c.section
+    const a = areaMap.get(k) ?? { area: k, taps: 0, elements: new Set<string>(), zones: new Map<string, number>(), problems: 0 }
+    a.taps++
+    a.elements.add(c.label)
+    const z = zoneOf(c.x, c.y, c.docH)
+    a.zones.set(z, (a.zones.get(z) ?? 0) + 1)
+    if ((c.fx === 'nothing' && c.kind !== 'field') || c.rage || c.dead) a.problems++
+    areaMap.set(k, a)
+  })
+  const areas = [...areaMap.values()].map((a) => ({
+    area: a.area,
+    taps: a.taps,
+    elements: a.elements.size,
+    problems: a.problems,
+    zone: [...a.zones.entries()].sort((x, y) => y[1] - x[1])[0][0],
+  })).sort((x, y) => y.taps - x.taps)
 
   const pathMap = new Map<string, number>()
   views.forEach((v) => { if (v.from) pathMap.set(`${v.from} → ${v.page}`, (pathMap.get(`${v.from} → ${v.page}`) ?? 0) + 1) })
@@ -97,6 +128,7 @@ export function analyze(events: InsightEvent[]) {
     problemTaps: clicks.filter((c) => (c.fx === 'nothing' && c.kind !== 'field') || c.rage || c.dead).length,
     screens: [...screens.entries()].map(([page, n]) => ({ page, views: n, taps: clicks.filter((c) => c.page === page).length })).sort((a, b) => b.views - a.views || b.taps - a.taps),
     elements,
+    areas,
     problems,
     paths,
   }
