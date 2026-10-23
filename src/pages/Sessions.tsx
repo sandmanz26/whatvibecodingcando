@@ -103,7 +103,7 @@ export function StepDrawer({ steps, index, onMove, onClose, title }: { steps: St
             <button className="btn ghost sm icon" onClick={onClose} aria-label="Close"><X size={15} /></button>
           </div>
         </div>
-        <ScreenViewer key={`${step.page}-${device}`} page={step.page} device={device} mode="dots" dot={{ x: step.x ?? 50, y: step.y ?? 0 }} focus={step.sel} maxHeight={Math.max(360, window.innerHeight - 220)} />
+        <ScreenViewer key={`${step.page}-${device}`} page={step.page} device={device} mode="dots" dot={{ x: step.x ?? 50, y: step.y ?? 0, ex: step.ex, ey: step.ey }} focus={step.sel} maxHeight={Math.max(360, window.innerHeight - 220)} />
         <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Shown at the width it was tapped at ({DEVICES[device].label} px). Use ← → to step through the session.</p>
       </aside>
     </>

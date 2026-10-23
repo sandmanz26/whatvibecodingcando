@@ -19,7 +19,7 @@ interface Props {
   mode: 'dots' | 'elements' | 'pick'
   focus?: string | null
   /** draw a single tap (x % of width, y page px) instead of every tap */
-  dot?: { x: number; y: number }
+  dot?: { x: number; y: number; ex?: number; ey?: number }
   /** testId:taskId — draw a usability task's taps instead of everyday clicks */
   task?: string
   onPick?: (p: Picked) => void
@@ -48,7 +48,7 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
   const heat = mode === 'pick' ? [] : [
     `heatmap${mode === 'elements' ? '=elements' : ''}`,
     focus ? `el=${encodeURIComponent(focus)}` : '', task ? `task=${encodeURIComponent(task)}` : '',
-    dot ? `dot=${dot.x},${dot.y}` : '',
+    dot ? `dot=${[dot.x, dot.y, ...(dot.ex !== undefined ? [dot.ex, dot.ey ?? 50] : [])].join(',')}` : '',
   ].filter(Boolean)
   const hash = `${page}?${[...heat, 'embed'].join('&')}`
   const openHash = heat.length ? `${page}?${heat.join('&')}` : page

@@ -4,11 +4,11 @@ import { Home, Library, Inbox, PenLine, MousePointerClick, Search, X, CircleAler
 import { useStore } from '../store/store'
 import { can } from '../lib/logic'
 import { CommandPalette } from '../components/CommandPalette'
-import { Face, Mark } from './bits'
+import { Mark } from './bits'
 import './v2.css'
 
 export function V2Shell() {
-  const { me, members, skills, dispatch, toast, toasts, dismiss } = useStore()
+  const { me, skills, toasts, dismiss } = useStore()
   const [palette, setPalette] = useState(false)
   const { pathname } = useLocation()
 
@@ -44,21 +44,6 @@ export function V2Shell() {
           {nav('/v2/write', 'Write a skill', PenLine)}
           <div className="v2-nav-group">Research</div>
           {nav('/console/insights', 'Clicks and tests', MousePointerClick, undefined, true)}
-          <div className="v2-side-foot">
-            <label className="v2-me">
-              <Face member={me} />
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <select aria-label="Viewing as" value={me.id} onChange={(e) => {
-                  dispatch({ type: 'setUser', id: e.target.value })
-                  const m = members.find((x) => x.id === e.target.value)!
-                  toast(`Now viewing as ${m.name} (${m.role})`)
-                }}>
-                  {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-                <small>{me.role} · {me.title}</small>
-              </span>
-            </label>
-          </div>
         </aside>
 
         <header className="v2-top">

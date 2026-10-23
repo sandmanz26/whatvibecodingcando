@@ -44,13 +44,17 @@ export function HeatmapOverlay() {
   const embed = q.has('embed')
   // task=<testId>:<taskId> draws a usability task's taps instead of everyday click data.
   const task = q.get('task')
-  // dot=x,y draws one tap (a step of a session) instead of every tap on the screen.
-  const dot = q.get('dot')?.split(',').map(Number) as [number, number] | undefined
+  // dot=x,y[,ex,ey] draws one tap (a step of a session) instead of every tap on the screen.
+  const dot = q.get('dot')?.split(',').map(Number) as [number, number, number?, number?] | undefined
 
   const [clicks, setClicks] = useState<ClickEvent[] | null>(null)
   const [vw, setVw] = useState(window.innerWidth)
   const [docH, setDocH] = useState(0)
   const [boxes, setBoxes] = useState<Box[]>([])
+  // Where each tapped element is now, in the viewport. Taps are drawn on their element, not at old
+  // page coordinates: those drift when the layout differs (fixed-width sidebars, renamed menus) or
+  // when part of the page doesn't scroll (a sticky sidebar).
+  const [rects, setRects] = useState<Map<string, DOMRect>>(new Map())
   const [missing, setMissing] = useState(0)
 
   useEffect(() => {
@@ -90,18 +94,19 @@ export function HeatmapOverlay() {
     if (!active) return
     const measure = () => {
       setDocH(document.documentElement.scrollHeight)
-      if (mode !== 'elements' && !focus) return
       const found: Box[] = []
+      const now = new Map<string, DOMRect>()
       let lost = 0
       groups.forEach((g, sel) => {
         const el = firstVisible(sel)
-        if (el) found.push({ sel, ...g, rect: el.getBoundingClientRect() })
+        if (el) { const rect = el.getBoundingClientRect(); now.set(sel, rect); found.push({ sel, ...g, rect }) }
         else lost++
       })
       if (focus && !groups.has(focus)) {
         const el = firstVisible(focus)
-        if (el) found.push({ sel: focus, label: 'Selected element', taps: 0, nothing: 0, rect: el.getBoundingClientRect() })
+        if (el) { const rect = el.getBoundingClientRect(); now.set(focus, rect); found.push({ sel: focus, label: 'Selected element', taps: 0, nothing: 0, rect }) }
       }
+      setRects(now)
       setBoxes(found)
       setMissing(lost)
     }
@@ -110,7 +115,7 @@ export function HeatmapOverlay() {
     window.addEventListener('scroll', measure, true)
     window.addEventListener('resize', measure)
     return () => { window.clearInterval(t); window.removeEventListener('scroll', measure, true); window.removeEventListener('resize', measure) }
-  }, [active, mode, groups, focus])
+  }, [active, groups, focus])
 
   useEffect(() => {
     if (!active || !embed || clicks === null || window.parent === window) return
@@ -143,12 +148,27 @@ export function HeatmapOverlay() {
 
   return createPortal(
     <div data-insights-ignore>
-      {mode === 'dots' && (
-        <div className="hm-dots" style={{ height: docH }} aria-hidden>
-          {dot ? <i className="one" style={{ left: `${dot[0]}%`, top: dot[1] }} />
-            : here.map((c, i) => <i key={i} style={{ left: `${c.x}%`, top: c.y }} />)}
-        </div>
-      )}
+      {mode === 'dots' && (() => {
+        const onEl = (sel: string | null | undefined, ex = 50, ey = 50) => {
+          const r = sel ? rects.get(sel) : undefined
+          return r ? { left: r.left + (ex / 100) * r.width, top: r.top + (ey / 100) * r.height } : null
+        }
+        const one = dot ? onEl(focus, dot[2] ?? 50, dot[3] ?? 50) : null
+        return (
+          <>
+            {/* Taps whose element is on screen: fixed, re-measured on every scroll. */}
+            <div className="hm-fixed" aria-hidden>
+              {dot ? (one && <i className="one" style={one} />)
+                : here.map((c, i) => { const p = onEl(c.sel, c.ex, c.ey); return p ? <i key={i} style={p} /> : null })}
+            </div>
+            {/* Taps whose element is gone: where they were on the page, as a fallback. */}
+            <div className="hm-dots" style={{ height: docH }} aria-hidden>
+              {dot ? (!one && <i className="one" style={{ left: `${dot[0]}%`, top: dot[1] }} />)
+                : here.map((c, i) => (rects.has(c.sel) ? null : <i key={i} className="stale" style={{ left: `${c.x}%`, top: c.y }} />))}
+            </div>
+          </>
+        )
+      })()}
       {boxes.filter((b) => mode === 'elements' || b.sel === focus).map((b) => (
         <div key={b.sel} className={`hm-box ${tone(b)} ${b.sel === focus ? 'focus' : ''}`} aria-hidden
           style={{ left: b.rect.left, top: b.rect.top, width: b.rect.width, height: b.rect.height }}>

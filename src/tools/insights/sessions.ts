@@ -23,6 +23,9 @@ export interface Step {
   /** for drawing the tap on the real screen */
   x?: number
   y?: number
+  /** where on the element (%), so the tap is drawn on it even when the layout differs */
+  ex?: number
+  ey?: number
   sel?: string
   vw: number
 }
@@ -60,7 +63,7 @@ export function buildSessions(events: InsightEvent[]): Session[] {
       return {
         at, t: e.t, kind: 'tap', page: e.page, label: e.label, what: e.kind,
         where: `${e.section} · ${zoneOf(e.x, e.y, e.docH)}`, effect: effectText(e), flags,
-        x: e.x, y: e.y, sel: e.sel, vw: e.vw,
+        x: e.x, y: e.y, ex: e.ex, ey: e.ey, sel: e.sel, vw: e.vw,
       }
     })
     const pages: string[] = []

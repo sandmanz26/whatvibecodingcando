@@ -192,3 +192,7 @@ html[data-ut-running] .rp-root { display: none; }
 @media (min-width: 861px) {
   .rp-sheet { left: auto; right: 16px; top: 16px; bottom: 16px; width: 380px; max-height: none; border-radius: 14px; border: 1px solid var(--line-strong, #ddd); }
 }
+.hm-fixed { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; overflow: hidden; }
+.hm-fixed i { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: rgba(235, 104, 52, 0.32); box-shadow: 0 0 0 1px rgba(235, 104, 52, 0.25); }
+.hm-fixed i.one { width: 28px; height: 28px; margin: -14px 0 0 -14px; background: rgba(235, 104, 52, 0.55); box-shadow: 0 0 0 3px #fff, 0 0 0 5px rgba(235, 104, 52, 0.9); animation: hm-pulse 1.6s ease-out infinite; }
+.hm-dots i.stale { background: rgba(140, 140, 136, 0.28); box-shadow: 0 0 0 1px rgba(140, 140, 136, 0.4); }

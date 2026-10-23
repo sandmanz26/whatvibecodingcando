@@ -1,26 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import {
-  LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Search, Moon, Sun,
-  RotateCcw, Layers, X, CircleAlert, ChevronRight, MousePointerClick, ListChecks,
+  LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Search,
+  Layers, X, CircleAlert, ChevronRight, MousePointerClick, ListChecks,
 } from 'lucide-react'
 import { useStore } from '../store/store'
 import { evaluate } from '../lib/logic'
-import { Avatar, Modal } from './ui'
 import { CommandPalette } from './CommandPalette'
-
-function useTheme() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const t = document.documentElement.dataset.theme
-    if (t === 'light' || t === 'dark') return t
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  })
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    try { localStorage.setItem('skillhouse:theme', theme) } catch { /* ignore */ }
-  }, [theme])
-  return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))] as const
-}
+import { useTheme } from '../lib/theme'
 
 const TITLES: Record<string, string> = {
   '': 'Overview',
@@ -34,10 +21,9 @@ const TITLES: Record<string, string> = {
 }
 
 export function Layout() {
-  const { skills, members, policies, me, dispatch, toasts, dismiss, skill, toast } = useStore()
-  const [theme, toggleTheme] = useTheme()
+  const { skills, members, policies, toasts, dismiss, skill } = useStore()
+  const [, toggleTheme] = useTheme()
   const [palette, setPalette] = useState(false)
-  const [confirmReset, setConfirmReset] = useState(false)
   const loc = useLocation()
 
   const violations = useMemo(() => evaluate(skills, members, policies), [skills, members, policies])
@@ -89,32 +75,6 @@ export function Layout() {
         {nav('/console/tests', 'Usability tests', ListChecks)}
         {nav('/playbook', 'Demo guide', Sparkles)}
 
-        <div className="sidebar-foot">
-          <label className="row viewas" htmlFor="viewas" title="Switch person to see permissions change">
-            <Avatar member={me} />
-            <span style={{ minWidth: 0, flex: 1 }}>
-              <select
-                id="viewas"
-                aria-label="Viewing as"
-                value={me.id}
-                onChange={(e) => {
-                  dispatch({ type: 'setUser', id: e.target.value })
-                  const m = members.find((x) => x.id === e.target.value)!
-                  toast(`Now viewing as ${m.name} (${m.role})`)
-                }}
-              >
-                {(['Admin', 'Maintainer', 'Member', 'Viewer'] as const).map((r) => (
-                  <optgroup key={r} label={r}>
-                    {members.filter((m) => m.role === r).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-              <small>{me.role}</small>
-            </span>
-            <button className="btn ghost sm icon" onClick={(e) => { e.preventDefault(); toggleTheme() }} aria-label="Toggle theme">{theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}</button>
-            <button className="btn ghost sm icon" onClick={(e) => { e.preventDefault(); setConfirmReset(true) }} aria-label="Reset demo data" title="Reset demo data"><RotateCcw size={14} /></button>
-          </label>
-        </div>
       </aside>
 
       <div className="main">
@@ -143,17 +103,6 @@ export function Layout() {
 
       {palette && <CommandPalette onClose={() => setPalette(false)} toggleTheme={toggleTheme} />}
 
-      {confirmReset && (
-        <Modal
-          title="Reset demo data?"
-          description="Every change you made — new skills, approvals, roles, policies — goes back to the original seed. Your theme and lens settings stay."
-          onClose={() => setConfirmReset(false)}
-          footer={<>
-            <button className="btn" onClick={() => setConfirmReset(false)}>Keep my changes</button>
-            <button className="btn primary" onClick={() => { dispatch({ type: 'reset' }); setConfirmReset(false); toast('Demo data reset') }}>Reset data</button>
-          </>}
-        />
-      )}
 
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (
