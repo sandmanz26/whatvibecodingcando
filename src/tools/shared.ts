@@ -71,6 +71,25 @@ export function currentQuery(): URLSearchParams {
   return new URLSearchParams(i >= 0 ? h.slice(i + 1) : '')
 }
 
+/** Tool parameters that ride on the app's URL; never part of what a participant was looking at. */
+const TOOL_PARAMS = new Set(['heatmap', 'el', 'dot', 'task', 'embed', 'test', 'fivesec', 'gaze', 'w'])
+
+/**
+ * The screen's filters and tabs (e.g. "scope=shared&team=cs"), so a replay shows the same rows.
+ * Free text is dropped: no search box contents, no value that isn't a short token.
+ */
+export function safeQuery(q: URLSearchParams = currentQuery()): string {
+  const out = new URLSearchParams()
+  q.forEach((v, k) => {
+    if (TOOL_PARAMS.has(k) || k === 'q' || k === 'search') return
+    if (/^[\w-]{1,40}$/.test(v)) out.set(k, v)
+  })
+  return out.toString()
+}
+
+/** The app's main page, where a recorded session starts counting. */
+export const isMainPage = (path: string) => path === '/' || path === '/v2'
+
 export const CONSOLE_PREFIX = '/console'
 export const isConsole = (path: string) => path === CONSOLE_PREFIX || path.startsWith(CONSOLE_PREFIX + '/')
 

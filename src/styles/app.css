@@ -593,4 +593,11 @@ html[data-ut-running] .dock { display: none; }
 /* ---------- research console: apart from the product ---------- */
 .research { min-height: 100%; background: var(--page); }
 .research-bar { gap: 14px; }
+.research-bar .seg { overflow-x: auto; max-width: 100%; flex-wrap: nowrap; }
 .research-mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; }
+
+.dock-rec { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.7); font: inherit; font-size: 12.5px; white-space: nowrap; }
+.dock-rec i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.45); }
+.dock-rec.on { color: #fff; cursor: pointer; }
+.dock-rec.on i { background: #ff5a4f; box-shadow: 0 0 0 3px rgba(255, 90, 79, 0.25); }
+.dock-rec.on:hover { background: rgba(255, 255, 255, 0.16); }

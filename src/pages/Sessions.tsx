@@ -3,8 +3,8 @@ import { ArrowLeft, ArrowRight, Ban, CircleSlash, Download, Flame, MousePointerC
 import { Empty, Modal, Switch } from '../components/ui'
 import { DEVICES, ScreenViewer, type Device } from '../tools/insights/ScreenViewer'
 import { clearEvents, layoutOf, loadEvents, type ClickEvent, type Loaded } from '../tools/insights/store'
-import { flushNow } from '../tools/insights/tracker'
-import { buildSessions, clock, loadNotes, saveNote, sessionCsv, TAGS, type Session, type Step } from '../tools/insights/sessions'
+import { endSession, flushNow } from '../tools/insights/tracker'
+import { buildSessions, clock, ENDED, loadNotes, saveNote, sessionCsv, TAGS, type Session, type Step } from '../tools/insights/sessions'
 import { setFlag, useFlag } from '../tools/shared'
 
 const FLAG: Record<Step['flags'][number], { icon: React.ReactNode; text: string }> = {
@@ -102,8 +102,8 @@ export function StepDrawer({ steps, index, onMove, onClose, title }: { steps: St
             <button className="btn ghost sm icon" onClick={onClose} aria-label="Close"><X size={15} /></button>
           </div>
         </div>
-        <ScreenViewer key={`${step.page}-${device}`} page={step.page} device={device} mode="dots" dot={{ x: step.x ?? 50, y: step.y ?? 0, ex: step.ex, ey: step.ey }} focus={step.sel} maxHeight={Math.max(360, window.innerHeight - 220)} />
-        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Shown at the width it was tapped at ({DEVICES[device].label} px). Use ← → to step through the session.</p>
+        <ScreenViewer key={`${step.page}-${step.query}-${step.vw}`} page={step.page} query={step.query} device={device} size={{ w: step.vw, h: step.vh ?? DEVICES[device].h }} mode="dots" dot={{ x: step.x ?? 50, y: step.y ?? 0, ex: step.ex, ey: step.ey }} focus={step.sel} maxHeight={Math.max(360, window.innerHeight - 220)} />
+        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Shown at the exact window it was tapped in ({step.vw} × {step.vh ?? DEVICES[device].h} px){step.query ? <>, with the same filters (<span className="mono">{step.query}</span>)</> : null}. Use ← → to step through the session.</p>
       </aside>
     </>
   )
@@ -168,10 +168,10 @@ export default function Sessions() {
       <div className="page-head">
         <div>
           <h1>Sessions</h1>
-          <p>What each person tapped, in order, and which screens they went through. Nothing they type is recorded.</p>
+          <p>What each person tapped, in order, and which screens they went through. A session starts counting when the main page opens, and ends when the tab closes, the participant presses End session, it sits idle for 30 minutes, or recording stops. Recording carries on into the next session until you stop it. Nothing anyone types is recorded.</p>
         </div>
         <div className="actions">
-          <label className="row" style={{ gap: 8, fontSize: 13 }}><Switch checked={recording} onChange={() => setFlag('insights', !recording)} label="Record sessions" /> Recording {recording ? 'on' : 'off'}</label>
+          <label className="row" style={{ gap: 8, fontSize: 13 }}><Switch checked={recording} onChange={() => { if (recording) endSession('stopped'); setFlag('insights', !recording) }} label="Record sessions" /> Recording {recording ? 'on' : 'off'}</label>
           <button className="btn" onClick={() => void refresh()}><RefreshCw size={14} /> Refresh</button>
           <button className="btn ghost danger" onClick={() => setConfirm(true)} disabled={!data?.events.length} aria-label="Delete all sessions"><Trash2 size={14} /></button>
         </div>
@@ -194,7 +194,7 @@ export default function Sessions() {
               return (
                 <button key={s.sid} className={`ses-row ${open?.sid === s.sid ? 'on' : ''}`} onClick={() => { setSid(s.sid); setStep(null); setNotesVer((v) => v + 1) }}>
                   <span className="row" style={{ justifyContent: 'space-between' }}><b>Session {s.n}</b><span className="muted num">{clock(s.ms)}</span></span>
-                  <span className="muted">{when(s.start)} · {s.layout}</span>
+                  <span className="muted">{when(s.start)} · {s.layout} · {s.ended ? ENDED[s.ended] : <span style={{ color: 'var(--good-ink)' }}>In progress</span>}</span>
                   <span className="muted">{s.pages.length} screen{s.pages.length === 1 ? '' : 's'} · {s.taps} tap{s.taps === 1 ? '' : 's'}{s.problems ? <span style={{ color: 'var(--critical-ink)' }}> · {s.problems} stuck</span> : null}</span>
                   {note?.tags.length ? <span className="row wrap" style={{ gap: 4 }}>{note.tags.map((t) => <span key={t} className="badge" style={{ height: 20 }}>{t}</span>)}</span> : null}
                 </button>
@@ -208,7 +208,7 @@ export default function Sessions() {
                 <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <h2 style={{ fontSize: 17 }}>Session {open.n}</h2>
-                    <p className="muted" style={{ fontSize: 13 }}>{when(open.start)} · {clock(open.ms)} long · {open.layout}, {open.vw}px wide · {open.taps} taps</p>
+                    <p className="muted" style={{ fontSize: 13 }}>{when(open.start)} · {clock(open.ms)} long · {open.layout}, {open.vw}px wide · {open.taps} taps · {open.ended ? ENDED[open.ended] : 'in progress'}</p>
                   </div>
                   <div className="row">
                     <button className="btn sm primary" onClick={() => { const i = open.steps.findIndex((s) => s.kind === 'tap'); if (i >= 0) setStep(i) }} disabled={!open.taps}><MousePointerClick size={13} /> Replay taps</button>

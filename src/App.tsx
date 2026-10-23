@@ -12,6 +12,12 @@ import Projects, { ProjectDetail } from './pages/Projects'
 import Teams from './pages/Teams'
 import Health from './pages/Health'
 import { ResearchLayout } from './components/ResearchLayout'
+import FiveSecond from './pages/FiveSecond'
+import FakeDoorsPage from './pages/FakeDoorsPage'
+import EyeTracking from './pages/EyeTracking'
+import { FiveSecRunner } from './tools/fivesec/Runner'
+import { FakeDoors } from './tools/doors/FakeDoors'
+import { GazeRunner } from './tools/gaze/GazeRunner'
 import Sessions from './pages/Sessions'
 import UsabilityTests from './pages/UsabilityTests'
 import TestEditor from './pages/TestEditor'
@@ -55,6 +61,10 @@ export default function App() {
             <Route path="tests" element={<UsabilityTests />} />
             <Route path="tests/:id" element={<UsabilityTests />} />
             <Route path="tests/:id/edit" element={<TestEditor />} />
+            <Route path="fivesec" element={<FiveSecond />} />
+            <Route path="fivesec/:id" element={<FiveSecond />} />
+            <Route path="doors" element={<FakeDoorsPage />} />
+            <Route path="gaze" element={<EyeTracking />} />
           </Route>
         </Routes>
         {/* Research tools sit around both versions of the app. */}
@@ -62,6 +72,9 @@ export default function App() {
         <HeatmapOverlay />
         <ReviewPins />
         <UsabilityRunner />
+        <FiveSecRunner />
+        <FakeDoors />
+        <GazeRunner />
         <VersionSwitch />
       </HashRouter>
     </StoreProvider>

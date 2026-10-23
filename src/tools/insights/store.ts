@@ -5,7 +5,8 @@
  * - Never record what is typed into a field, field values, names, emails or
  *   page content. For a field we record only its placeholder / name / type.
  * - The session id is random, per browser tab (sessionStorage), and not linked
- *   to any user.
+ *   to any user. A session starts counting on the app's main page and ends when
+ *   the tab closes, the participant ends it, it sits idle, or recording stops.
  * - Labels are a control's visible name (aria-label, else its own text, max
  *   100 chars) — never the surrounding content.
  * - Production builds default to OFF until the product owner decides on
@@ -17,6 +18,8 @@ interface Base {
   t: string
   sid: string
   page: string
+  /** the screen's filters and tabs, never free text — see safeQuery() */
+  query?: string
   vw: number
   vh: number
 }
@@ -53,7 +56,15 @@ export interface ClickEvent extends Base {
   to?: string
 }
 
-export type InsightEvent = ViewEvent | ClickEvent
+/** Why a session ended. 'closed' is withdrawn if the same tab carries on (a reload). */
+export type EndReason = 'ended' | 'closed' | 'idle' | 'stopped'
+
+export interface EndEvent extends Base {
+  type: 'end'
+  reason: EndReason
+}
+
+export type InsightEvent = ViewEvent | ClickEvent | EndEvent
 
 export const LOCAL_KEY = `${APP}.insights.clicks`
 const LOCAL_MAX = 3000

@@ -16,7 +16,7 @@ interface Props {
   page: string
   device: Device
   /** 'dots' / 'elements' draw a heatmap; 'pick' lets the designer choose an element. */
-  mode: 'dots' | 'elements' | 'pick'
+  mode: 'dots' | 'elements' | 'gaze' | 'pick'
   focus?: string | null
   /** draw a single tap (x % of width, y page px) instead of every tap */
   dot?: { x: number; y: number; ex?: number; ey?: number }
@@ -25,18 +25,24 @@ interface Props {
   onPick?: (p: Picked) => void
   /** viewer height cap in px; the frame scales down to fit */
   maxHeight?: number
+  /** the screen's filters and tabs, so the same rows are on screen */
+  query?: string
+  /** exact window size to render at (a replay uses the participant's own) */
+  size?: { w: number; h: number }
+  /** first clicks of a 5-second test instead of everyday clicks */
+  fivesec?: string
 }
 
 const appUrl = (hash: string) => `${window.location.pathname}${window.location.search}#${hash}`
 
 /** The real app in an iframe at a device width, scaled to fit, with a heatmap or a picker on top. */
-export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, maxHeight = 620 }: Props) {
+export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, maxHeight = 620, query, size, fivesec }: Props) {
   const wrap = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [width, setWidth] = useState(800)
   const [stats, setStats] = useState<HeatmapStats | null>(null)
   const [pickNav, setPickNav] = useState(false)
-  const d = DEVICES[device]
+  const d = size ? { ...size, label: `${size.w} px` } : DEVICES[device]
 
   useLayoutEffect(() => {
     if (!wrap.current) return
@@ -46,12 +52,12 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
   }, [])
 
   const heat = mode === 'pick' ? [] : [
-    `heatmap${mode === 'elements' ? '=elements' : ''}`,
-    focus ? `el=${encodeURIComponent(focus)}` : '', task ? `task=${encodeURIComponent(task)}` : '',
+    `heatmap${mode === 'dots' ? '' : `=${mode}`}`,
+    focus ? `el=${encodeURIComponent(focus)}` : '', task ? `task=${encodeURIComponent(task)}` : '', fivesec ? `fivesec=${encodeURIComponent(fivesec)}` : '',
     dot ? `dot=${[dot.x, dot.y, ...(dot.ex !== undefined ? [dot.ex, dot.ey ?? 50] : [])].join(',')}` : '',
   ].filter(Boolean)
-  const hash = `${page}?${[...heat, 'embed'].join('&')}`
-  const openHash = heat.length ? `${page}?${heat.join('&')}` : page
+  const hash = `${page}?${[query, ...heat, 'embed'].filter(Boolean).join('&')}`
+  const openHash = `${page}${[query, ...heat].filter(Boolean).length ? `?${[query, ...heat].filter(Boolean).join('&')}` : ''}`
 
   useEffect(() => {
     const on = (e: MessageEvent) => {
@@ -128,14 +134,14 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
           </>
         ) : (
           <span className="muted">
-            {stats ? <><b className="num" style={{ color: 'var(--ink)' }}>{stats.taps}</b> tap{stats.taps === 1 ? '' : 's'} on <span className="mono">{stats.page}</span> at {stats.layout} width{mode === 'elements' && stats.missing > 0 ? ` · ${stats.missing} element${stats.missing === 1 ? '' : 's'} not on this layout` : ''}</> : 'Loading screen…'}
+            {stats ? <><b className="num" style={{ color: 'var(--ink)' }}>{stats.taps}</b> {stats.unit ?? 'tap'}{stats.taps === 1 ? '' : 's'} on <span className="mono">{stats.page}</span> at {stats.layout} width{mode === 'elements' && stats.missing > 0 ? ` · ${stats.missing} element${stats.missing === 1 ? '' : 's'} not on this layout` : ''}</> : 'Loading screen…'}
           </span>
         )}
         <span className="muted num" style={{ marginLeft: 'auto' }}>{Math.round(scale * 100)}%</span>
         <a className="btn sm ghost" href={appUrl(openHash)} target="_blank" rel="noopener">Open <ExternalLink size={12} /></a>
       </div>
       <div className="sv-stage" ref={wrap} style={{ height: d.h * scale }}>
-        <div className={`sv-device ${device}`} style={{ width: d.w * scale, height: d.h * scale }}>
+        <div className={`sv-device ${size ? 'exact' : device}`} style={{ width: d.w * scale, height: d.h * scale }}>
           <iframe
             ref={frame}
             title={`App screen ${page} at ${d.label}`}

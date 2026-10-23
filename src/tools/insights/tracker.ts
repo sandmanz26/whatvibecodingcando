@@ -2,8 +2,8 @@
  * Click insights tracker — records screen views and taps.
  * See the privacy rules at the top of ./store.ts; they apply to everything here.
  */
-import { TOOL_DOM, TOOLS_API, currentPath, currentQuery, isConsole, isEmbedded } from '../shared'
-import { appendLocal, type ClickEvent, type ClickKind, type InsightEvent } from './store'
+import { TOOL_DOM, TOOLS_API, currentPath, currentQuery, isConsole, isEmbedded, isMainPage, safeQuery } from '../shared'
+import { appendLocal, type ClickEvent, type ClickKind, type EndReason, type InsightEvent } from './store'
 
 const CONTROL = 'a, button, [role=button], [role=tab], [role=link], [role=switch], [role=checkbox], [role=menuitem], [role=option], input, select, textarea, label, summary'
 const FIELD_TAGS = new Set(['INPUT', 'SELECT', 'TEXTAREA'])
@@ -16,16 +16,22 @@ const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…'
 const squash = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim()
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-function sessionId() {
-  const key = 'skillhouse.insights.sid'
-  try {
-    let id = sessionStorage.getItem(key)
-    if (!id) { id = Math.random().toString(36).slice(2, 12); sessionStorage.setItem(key, id) }
-    return id
-  } catch {
-    return 'no-session'
-  }
+/* ---------- the session: one participant, one run through the app ---------- */
+
+const SID_KEY = 'skillhouse.insights.sid'
+const SEEN_KEY = 'skillhouse.insights.seen'
+const CLOSING_KEY = 'skillhouse.insights.closing'
+const IDLE_MS = 30 * 60 * 1000
+export const SESSION_EVENT = 'skillhouse:session'
+
+const ss = {
+  get: (k: string) => { try { return sessionStorage.getItem(k) } catch { return null } },
+  set: (k: string, v: string) => { try { sessionStorage.setItem(k, v) } catch { /* ignore */ } },
+  del: (k: string) => { try { sessionStorage.removeItem(k) } catch { /* ignore */ } },
 }
+
+/** 'active' while a session is counting; 'waiting' until the participant reaches the main page. */
+export const sessionState = (): 'active' | 'waiting' => (ss.get(SID_KEY) ? 'active' : 'waiting')
 
 /** Should taps and views be recorded right now? */
 // Also paused while someone is choosing an element to comment on: those clicks aren't use of the app.
@@ -129,9 +135,27 @@ function stateFor(el: Element) {
   return Object.keys(s).length ? s : undefined
 }
 
+/**
+ * The control a tap landed on. Besides real controls, anything the app made clickable counts —
+ * a table row or card with a click handler shows a pointer cursor — so it isn't logged as a dead tap.
+ */
+function controlOf(target: Element): Element | null {
+  const real = target.closest(CONTROL)
+  if (real) return real
+  // The cursor is inherited, so climb to the outermost element that still shows it: the row, not the cell.
+  if (getComputedStyle(target).cursor !== 'pointer') return null
+  let node = target
+  for (let i = 0; i < 8; i++) {
+    const up = node.parentElement
+    if (!up || up === document.body || getComputedStyle(up).cursor !== 'pointer') break
+    node = up
+  }
+  return node
+}
+
 /** For pickers: the control a tap on `target` would be recorded as, with its selector and name. */
 export function describeTarget(target: Element) {
-  const control = target.closest(CONTROL)
+  const control = controlOf(target)
   const el = control ?? target
   return { el, sel: selectorFor(el), label: control ? labelFor(control) : `(not a control) ${target.tagName.toLowerCase()}` }
 }
@@ -139,17 +163,25 @@ export function describeTarget(target: Element) {
 let installed: (() => void) | null = null
 let viewHook: ((path: string) => void) | null = null
 let flushHook: (() => void) | null = null
+let endHook: ((reason: EndReason) => void) | null = null
 
 /** Record a screen view. Called by the router integration on every route change. */
 export const trackView = (path: string) => viewHook?.(path)
 /** Push whatever is queued (used before reviewing data in this browser). */
 export const flushNow = () => flushHook?.()
+/**
+ * Close the current session. Recording carries on: the next session starts when the
+ * participant is back on the main page. 'stopped' is for when recording is switched off.
+ */
+export const endSession = (reason: EndReason = 'ended') => endHook?.(reason)
 
 /** Installs once; returns an uninstall function. */
 export function installTracker(): () => void {
   if (installed) return installed
 
-  const sid = sessionId()
+  let sid = ss.get(SID_KEY)
+  // The tab was reloaded, not closed: the session goes on (the 'closed' mark is withdrawn by later events).
+  if (ss.get(CLOSING_KEY)) ss.del(CLOSING_KEY)
   let queue: InsightEvent[] = []
   let serverOff = !TOOLS_API
   let active = true
@@ -159,7 +191,32 @@ export function installTracker(): () => void {
   // Taps still being watched for an effect; a new tap closes them so effects aren't misattributed.
   const watching: (() => void)[] = []
 
-  const base = () => ({ t: new Date().toISOString(), sid, page: currentPath(), vw: window.innerWidth, vh: window.innerHeight })
+  const notify = () => window.dispatchEvent(new Event(SESSION_EVENT))
+  const base = (id: string) => {
+    const query = safeQuery()
+    return { t: new Date().toISOString(), sid: id, page: currentPath(), ...(query ? { query } : {}), vw: window.innerWidth, vh: window.innerHeight }
+  }
+
+  const end = (reason: EndReason, at?: number) => {
+    if (!sid) return
+    queue.push({ type: 'end', ...base(sid), ...(at ? { t: new Date(at).toISOString() } : {}), reason })
+    sid = null
+    ss.del(SID_KEY)
+    notify()
+  }
+
+  /** The session this event belongs to — or none yet: counting starts on the main page. */
+  const gate = (path: string): string | null => {
+    const seen = Number(ss.get(SEEN_KEY) ?? 0)
+    if (sid && seen && Date.now() - seen > IDLE_MS) end('idle', seen)
+    if (!sid && isMainPage(path)) {
+      sid = Math.random().toString(36).slice(2, 12)
+      ss.set(SID_KEY, sid)
+      notify()
+    }
+    if (sid) ss.set(SEEN_KEY, String(Date.now()))
+    return sid
+  }
 
   const send = async (batch: InsightEvent[]) => {
     if (serverOff) return appendLocal(batch)
@@ -192,17 +249,22 @@ export function installTracker(): () => void {
     lastPath = path
     viewStart = performance.now()
     if (paused()) { flush(); return }
-    queue.push({ type: 'view', ...base(), page: path, ...(from ? { from } : {}) })
+    const id = gate(path)
+    if (!id) return
+    queue.push({ type: 'view', ...base(id), page: path, ...(from ? { from } : {}) })
   }
   flushHook = flush
+  endHook = (reason) => { watching.splice(0).forEach((finish) => finish()); end(reason); flush() }
 
   const onClick = (e: MouseEvent) => {
     if (paused() || !(e.target instanceof Element)) return
     const target = e.target
     if (target.closest(TOOL_DOM)) return
+    const id = gate(currentPath())
+    if (!id) return
     watching.splice(0).forEach((finish) => finish())
 
-    const control = target.closest(CONTROL)
+    const control = controlOf(target)
     const el = control ?? target
     const r = el.getBoundingClientRect()
     const now = performance.now()
@@ -216,7 +278,7 @@ export function installTracker(): () => void {
     const href = control?.tagName === 'A' ? control.getAttribute('href') ?? undefined : undefined
     const ev: ClickEvent = {
       type: 'click',
-      ...base(),
+      ...base(id),
       x: round1((e.clientX / window.innerWidth) * 100),
       y: Math.round(e.clientY + window.scrollY),
       docH,
@@ -266,9 +328,14 @@ export function installTracker(): () => void {
   }
 
   const onHide = () => { if (document.visibilityState === 'hidden') beacon() }
+  // Closing the tab ends the session. A reload fires this too; the same tab then carries on.
+  const onLeave = () => {
+    if (sid) { const keep = sid; end('closed'); ss.set(SID_KEY, keep); sid = keep; ss.set(CLOSING_KEY, '1') }
+    beacon()
+  }
   document.addEventListener('click', onClick, true)
   document.addEventListener('visibilitychange', onHide)
-  window.addEventListener('pagehide', beacon)
+  window.addEventListener('pagehide', onLeave)
   const timer = window.setInterval(flush, FLUSH_MS)
 
   installed = () => {
@@ -277,11 +344,12 @@ export function installTracker(): () => void {
     flush()
     document.removeEventListener('click', onClick, true)
     document.removeEventListener('visibilitychange', onHide)
-    window.removeEventListener('pagehide', beacon)
+    window.removeEventListener('pagehide', onLeave)
     window.clearInterval(timer)
     installed = null
     viewHook = null
     flushHook = null
+    endHook = null
   }
   return installed
 }

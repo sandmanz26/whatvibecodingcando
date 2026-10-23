@@ -43,6 +43,9 @@ export interface TaskTap {
   label: string
   sel: string
   hit: boolean
+  /** where on the element (%), so the tap is drawn where it landed */
+  ex?: number
+  ey?: number
 }
 
 export type Outcome = 'success' | 'timeout' | 'gave_up'
@@ -106,7 +109,7 @@ export function taskTapsAsClicks(testId: string, taskId: string): ClickEvent[] {
     .map((t) => ({
       type: 'click' as const, t: '', sid: t.sid, page: t.page, vw: t.vw, vh: 0,
       x: t.x, y: t.y, docH: t.docH, label: t.label, tag: '', kind: 'button' as const, section: '',
-      sel: t.sel, ex: 50, ey: 50, ew: 0, eh: 0, ms: t.t, sy: 0,
+      sel: t.sel, ex: t.ex ?? 50, ey: t.ey ?? 50, ew: 0, eh: 0, ms: t.t, sy: 0,
       // In task maps, "idle" colouring marks taps that missed the target.
       fx: t.hit ? 'changed' as const : 'nothing' as const,
     }))

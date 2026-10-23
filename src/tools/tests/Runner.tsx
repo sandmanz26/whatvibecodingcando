@@ -119,12 +119,15 @@ export function UsabilityRunner() {
     const onClick = (e: MouseEvent) => {
       const r = runRef.current
       if (!r || !(e.target instanceof Element) || e.target.closest(TOOL_DOM)) return
-      const { sel, label } = describeTarget(e.target)
+      const { el, sel, label } = describeTarget(e.target)
+      const box = el.getBoundingClientRect()
       const hit = task.success.kind === 'element' && hitsElement(e.target, task.success.sel)
       const tap: TaskTap = {
         t: Date.now() - r.startedAt, page: window.location.hash.replace(/^#/, '').split('?')[0] || '/',
         x: Math.round((e.clientX / window.innerWidth) * 1000) / 10, y: Math.round(e.clientY + window.scrollY),
         docH: document.documentElement.scrollHeight, vw: window.innerWidth, label, sel, hit,
+        ex: box.width ? Math.round(((e.clientX - box.left) / box.width) * 1000) / 10 : 50,
+        ey: box.height ? Math.round(((e.clientY - box.top) / box.height) * 1000) / 10 : 50,
       }
       const next = { ...r, taps: [...r.taps, tap] }
       runRef.current = next

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { GripVertical, Moon, Sun, MessageSquarePlus, MessagesSquare, FlaskConical } from 'lucide-react'
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
-import { getFlag, isConsole, isEmbedded, readJSON, setFlag, writeJSON } from '../tools/shared'
+import { getFlag, isConsole, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
+import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
 import { useTheme } from '../lib/theme'
 
 const POS_KEY = 'skillhouse.dock'
@@ -34,6 +35,13 @@ export function VersionSwitch() {
   const nav = useNavigate()
   const [theme, toggleTheme] = useTheme()
   const ref = useRef<HTMLDivElement>(null)
+  const recording = useFlag('insights')
+  const [session, setSession] = useState(sessionState)
+  useEffect(() => {
+    const sync = () => setSession(sessionState())
+    window.addEventListener(SESSION_EVENT, sync)
+    return () => window.removeEventListener(SESSION_EVENT, sync)
+  }, [])
   const [pos, setPos] = useState<{ x: number; y: number }>(() => readJSON(POS_KEY, { x: 16, y: window.innerHeight - (window.innerWidth <= 860 ? 140 : 72) }))
 
   const clamp = useCallback((p: { x: number; y: number }) => {
@@ -81,6 +89,9 @@ export function VersionSwitch() {
     <>
       <div ref={ref} className="dock" style={{ left: pos.x, top: pos.y }} role="toolbar" aria-label="Research tools" data-insights-ignore>
         <button className="dock-grip" onPointerDown={startDrag} onKeyDown={keyMove} aria-label="Move the dock (drag, or use arrow keys)" title="Drag to move"><GripVertical size={15} /></button>
+        {recording && (session === 'active'
+          ? <button className="dock-rec on" onClick={() => endSession('ended')} title="Recording this session. End it here; the next one starts on the main page."><i /> End session</button>
+          : <span className="dock-rec" title="Recording is on. A session starts counting when the main page opens."><i /> Starts on home</span>)}
         <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
         <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
         <div className="dock-seg" role="group" aria-label="App version">
