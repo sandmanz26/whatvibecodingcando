@@ -598,3 +598,6 @@ html[data-ut-running] .dock { display: none; }
 .src-kv dt, .src-kv dd { margin: 0; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .src-kv dt { color: var(--ink-3); }
 .src-kv dd { text-align: right; word-break: break-word; }
+.dock-comment { height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: #eb6834; color: #fff; font: inherit; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.dock-comment:hover { background: #d95926; }
+@media (max-width: 640px) { .dock-comment { padding: 0 10px; font-size: 0; gap: 0; } .dock-comment svg { margin: 0; } }

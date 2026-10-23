@@ -9,6 +9,8 @@ import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, toTxt, txtFileName, type PinNote 
 import { STATUS_TEXT, usePinSync } from './useSync'
 
 const BUTTON_KEY = `${APP}.reviewPins.button`
+/** Fire with detail 'start' (comment mode) or 'list' (open the list) from anywhere in the app. */
+export const COMMENT_EVENT = 'skillhouse:comments'
 const BTN = 44
 const TAP_SLOP = 5
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
@@ -155,6 +157,26 @@ function Comments({ onHide }: { onHide: () => void }) {
     }
   }, [placing, pathname, me.name, notes.length, setNotes])
 
+  // Other entry points: the dock's Comment button and list (a window event), and the C key.
+  useEffect(() => {
+    const onEvent = (e: Event) => {
+      const what = (e as CustomEvent<'start' | 'list'>).detail
+      setMenu(false); setOpenId(null)
+      if (what === 'list') setList('open')
+      else { setList(null); setPlacing(true) }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'c' || e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement
+      if (t.closest('input, textarea, select, [contenteditable="true"]')) return
+      e.preventDefault()
+      setMenu(false); setList(null); setOpenId(null); setPlacing(true)
+    }
+    window.addEventListener(COMMENT_EVENT, onEvent)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener(COMMENT_EVENT, onEvent); window.removeEventListener('keydown', onKey) }
+  }, [])
+
   // Esc closes whatever is open: confirm → card → list → menu → comment mode.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -261,18 +283,22 @@ function Comments({ onHide }: { onHide: () => void }) {
       <button
         className={`rp-fab ${placing ? 'placing' : ''}`}
         style={{ left: btn.x, top: btn.y }}
-        aria-label={placing ? 'Stop commenting' : 'Comments'}
-        aria-expanded={menu}
-        title={placing ? 'Stop commenting' : 'Comments'}
+        aria-label={placing ? 'Stop commenting' : 'Comment on something (C)'}
+        title={placing ? 'Stop commenting (Esc)' : 'Comment on something — or press C'}
         {...dragHandlers(
           (e) => setBtn(clamp({ x: e.clientX - BTN / 2, y: e.clientY - BTN / 2 })),
-          () => { if (placing) { setPlacing(false); setHover(null) } else { setOpenId(null); setList(null); setMenu((m) => !m) } },
+          // One click starts commenting; the ⋯ button beside it holds everything else.
+          () => { setMenu(false); setOpenId(null); setList(null); if (placing) { setPlacing(false); setHover(null) } else setPlacing(true) },
           () => setBtn((b: { x: number; y: number }) => { writeJSON(BUTTON_KEY, b); return b }),
         )}
       >
         {placing ? <X size={18} /> : <MessageSquare size={18} />}
         {!placing && here.length > 0 && <span className="rp-badge">{here.length}</span>}
       </button>
+      {!placing && (
+        <button className="rp-more" style={{ left: Math.max(4, btn.x - 30), top: btn.y + BTN / 2 - 13 }} aria-label="More comment options" aria-expanded={menu}
+          title="All comments, export, import" onClick={() => { setOpenId(null); setList(null); setMenu((m) => !m) }}>⋯</button>
+      )}
 
       {menu && (
         <div className="rp-menu" style={menuStyle} role="menu">

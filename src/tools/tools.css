@@ -196,3 +196,5 @@ html[data-ut-running] .rp-root { display: none; }
 .hm-fixed i { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: rgba(235, 104, 52, 0.32); box-shadow: 0 0 0 1px rgba(235, 104, 52, 0.25); }
 .hm-fixed i.one { width: 28px; height: 28px; margin: -14px 0 0 -14px; background: rgba(235, 104, 52, 0.55); box-shadow: 0 0 0 3px #fff, 0 0 0 5px rgba(235, 104, 52, 0.9); animation: hm-pulse 1.6s ease-out infinite; }
 .hm-dots i.stale { background: rgba(140, 140, 136, 0.28); box-shadow: 0 0 0 1px rgba(140, 140, 136, 0.4); }
+.rp-more { position: fixed; width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; background: var(--surface, #fff); color: var(--ink, #111); box-shadow: 0 2px 10px rgba(0,0,0,.2); font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.rp-more:hover { background: var(--surface-2, #f3f3f3); }

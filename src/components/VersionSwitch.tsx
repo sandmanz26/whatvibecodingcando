@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { GripVertical, Moon, Sun, RotateCcw } from 'lucide-react'
-import { isEmbedded, readJSON, writeJSON } from '../tools/shared'
+import { GripVertical, Moon, Sun, RotateCcw, MessageSquarePlus, MessagesSquare } from 'lucide-react'
+import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
+import { getFlag, isConsole, isEmbedded, readJSON, setFlag, writeJSON } from '../tools/shared'
 import { useStore } from '../store/store'
 import { useTheme } from '../lib/theme'
 import { Avatar, Modal } from './ui'
@@ -73,6 +74,13 @@ export function VersionSwitch() {
     setPos(next); writeJSON(POS_KEY, next)
   }
 
+  // Comments may have been switched off in this browser earlier; the button turns them back on.
+  const comment = (what: 'start' | 'list') => {
+    const fire = () => window.dispatchEvent(new CustomEvent(COMMENT_EVENT, { detail: what }))
+    if (getFlag('reviewPins')) fire()
+    else { setFlag('reviewPins', true); window.setTimeout(fire, 80) }
+  }
+
   if (isEmbedded || new URLSearchParams(search).has('heatmap')) return null
   const v2 = pathname === '/v2' || pathname.startsWith('/v2/')
 
@@ -95,6 +103,12 @@ export function VersionSwitch() {
             <small>{me.role}</small>
           </span>
         </label>
+        {!isConsole(pathname) && (
+          <>
+            <button className="dock-comment" onClick={() => comment('start')} title="Comment on any element — or press C"><MessageSquarePlus size={15} /> Comment</button>
+            <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
+          </>
+        )}
         <div className="dock-seg" role="group" aria-label="App version">
           <button aria-pressed={!v2} onClick={() => v2 && nav(counterpart(pathname, false))}>v1 <span>Classic</span></button>
           <button aria-pressed={v2} onClick={() => !v2 && nav(counterpart(pathname, true))}>v2 <span>Shelf</span></button>
