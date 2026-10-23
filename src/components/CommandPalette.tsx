@@ -38,7 +38,7 @@ export function CommandPalette({ onClose, toggleTheme, v2 = false }: { onClose: 
       { id: 'lens', group: 'Actions', label: lens ? 'Hide demo lens' : 'Show demo lens', icon: <Lightbulb size={15} />, run: () => { setLens(!lens); onClose() } },
       { id: 'insights', group: 'Tools', label: `${getFlag('insights') ? 'Stop' : 'Start'} recording clicks`, icon: <MousePointerClick size={15} />, run: () => { setFlag('insights', !getFlag('insights')); toast(`Click recording ${getFlag('insights') ? 'on' : 'off'}`); onClose() } },
       { id: 'pins', group: 'Tools', label: `Turn review pins ${getFlag('reviewPins') ? 'off' : 'on'}`, icon: <PenLine size={15} />, run: () => { setFlag('reviewPins', !getFlag('reviewPins')); toast(`Review pins ${getFlag('reviewPins') ? 'on — tap the pen button in the corner' : 'off'}`); onClose() } },
-      { id: 'p-c', group: 'Pages', label: 'Click insights', icon: <MousePointerClick size={15} />, run: go('/console/insights') },
+      { id: 'p-c', group: 'Pages', label: 'Sessions (research)', icon: <MousePointerClick size={15} />, run: go('/console/insights') },
       { id: 'p-o', group: 'Pages', label: 'Overview', icon: <LayoutGrid size={15} />, run: go('/') },
       { id: 'p-l', group: 'Pages', label: 'Skill library', icon: <Library size={15} />, run: go('/skills') },
       { id: 'p-p', group: 'Pages', label: 'Review pipeline', icon: <KanbanSquare size={15} />, run: go('/pipeline') },

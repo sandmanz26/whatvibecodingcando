@@ -5,7 +5,7 @@ import { MousePointerClick, ListChecks } from 'lucide-react'
 export function ConsoleNav() {
   return (
     <nav className="seg" aria-label="Research tools" style={{ marginBottom: 16 }}>
-      <NavLink to="/console/insights" className={({ isActive }) => (isActive ? 'on' : '')}><MousePointerClick size={13} /> Click insights</NavLink>
+      <NavLink to="/console/insights" className={({ isActive }) => (isActive ? 'on' : '')}><MousePointerClick size={13} /> Sessions</NavLink>
       <NavLink to="/console/tests" className={({ isActive }) => (isActive ? 'on' : '')}><ListChecks size={13} /> Usability tests</NavLink>
     </nav>
   )

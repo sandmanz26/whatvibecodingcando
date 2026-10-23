@@ -1,5 +1,5 @@
 /**
- * Review pins — data shape, validation and the .txt export/import format.
+ * Comments (review pins) — data shape, validation and the .txt export/import format.
  * The .txt is how notes move between deployments or to people outside them,
  * so it is human-readable and lossless.
  */
@@ -17,7 +17,18 @@ export interface PinNote {
   text: string
   createdAt: string
   updatedAt: string
+  /** the element it is about: a selector that finds it again, its visible name, and where on it (%) */
+  sel?: string
+  label?: string
+  ex?: number
+  ey?: number
+  /** who wrote it — the person the app is "viewing as" */
+  author?: string
+  replies?: Reply[]
+  resolved?: boolean
 }
+
+export interface Reply { id: string; author: string; text: string; at: string }
 
 export const MAX_NOTES = 500
 export const MAX_TEXT = 4000
@@ -34,7 +45,22 @@ export function validNote(n: unknown): PinNote | null {
   const createdAt = str(o.createdAt, 40), updatedAt = str(o.updatedAt, 40)
   const x = num(o.x, 0, 100), y = num(o.y, 0, 100), vw = num(o.vw, 1, 10000), vh = num(o.vh, 1, 10000), scrollY = num(o.scrollY, 0, 1_000_000)
   if (!id || !page || text === null || !createdAt || !updatedAt || x === null || y === null || vw === null || vh === null || scrollY === null) return null
-  return { id, page, x, y, vw, vh, scrollY, text, createdAt, updatedAt }
+  const note: PinNote = { id, page, x, y, vw, vh, scrollY, text, createdAt, updatedAt }
+  const sel = str(o.sel), label = str(o.label, 120), author = str(o.author, 80)
+  const ex = num(o.ex, 0, 100), ey = num(o.ey, 0, 100)
+  if (sel) note.sel = sel
+  if (label) note.label = label
+  if (author) note.author = author
+  if (ex !== null && ey !== null) { note.ex = ex; note.ey = ey }
+  if (o.resolved === true) note.resolved = true
+  if (Array.isArray(o.replies)) {
+    note.replies = o.replies.slice(0, 100).map((rp) => {
+      const q = (rp ?? {}) as Record<string, unknown>
+      const rid = str(q.id, 64), ra = str(q.author, 80), rt = str(q.text, MAX_TEXT), rat = str(q.at, 40)
+      return rid && ra && rt !== null && rat ? { id: rid, author: ra, text: rt, at: rat } : null
+    }).filter((x): x is Reply => !!x)
+  }
+  return note
 }
 
 export const validNotes = (list: unknown): PinNote[] =>
@@ -63,6 +89,13 @@ export function toTxt(list: PinNote[], app = 'Skillhouse', now = new Date()): st
     `scroll: ${n.scrollY}`,
     `created: ${n.createdAt}`,
     `updated: ${n.updatedAt}`,
+    ...(n.label ? [`element: ${n.label}`] : []),
+    ...(n.sel ? [`selector: ${n.sel}`] : []),
+    ...(n.ex !== undefined ? [`anchor: ${n.ex}, ${n.ey}`] : []),
+    ...(n.author ? [`author: ${n.author}`] : []),
+    `status: ${n.resolved ? 'resolved' : 'open'}`,
+    // Replies as one JSON line: still readable, and lossless for multi-line text.
+    ...(n.replies?.length ? [`replies: ${JSON.stringify(n.replies)}`] : []),
     'note:',
     ...n.text.split('\n').map(escapeLine),
   ].join('\n') + '\n')
@@ -91,7 +124,11 @@ export function fromTxt(txt: string): PinNote[] {
     }
     const [x, y] = (meta.pos ?? '').split(',').map((s) => Number(s.trim()))
     const [vw, vh] = (meta.viewport ?? '').split('x').map(Number)
-    const note = validNote({ id, page: meta.page, x, y, vw, vh, scrollY: Number(meta.scroll), text: body.join('\n'), createdAt: meta.created, updatedAt: meta.updated })
+    const [ex, ey] = (meta.anchor ?? '').split(',').map((v) => Number(v.trim()))
+    let replies: unknown = undefined
+    try { replies = meta.replies ? JSON.parse(meta.replies) : undefined } catch { /* skip broken replies */ }
+    const note = validNote({ id, page: meta.page, x, y, vw, vh, scrollY: Number(meta.scroll), text: body.join('\n'), createdAt: meta.created, updatedAt: meta.updated,
+      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, resolved: meta.status === 'resolved', replies })
     if (note) out.push(note)
   }
   return out

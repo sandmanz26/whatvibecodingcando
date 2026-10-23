@@ -153,7 +153,7 @@ export default function Overview() {
               <h2>Most-used skills</h2>
               <p>Runs in the last 4 weeks</p>
             </div>
-            <Link to="/insights" className="btn ghost sm">Insights <ArrowRight size={13} /></Link>
+            <Link to="/insights" className="btn ghost sm">Value <ArrowRight size={13} /></Link>
           </div>
           <div className="card-body">
             <BarList rows={top.map((s) => ({ id: s.id, label: s.title, value: sum(s.usage.slice(-4)), onClick: () => nav(`/skills/${s.id}`) }))} />

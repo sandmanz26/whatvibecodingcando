@@ -45,23 +45,25 @@ src/
 
 Two tools that sit *around* the product (not features of it). Each has its own flag and neither changes how the app behaves. Both are switched off on the console route (`/console/*`), and each marks its own DOM (`data-insights-ignore`, `data-review-pins`) so neither records nor reacts to the other.
 
-Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags.reviewPins`). You can toggle them on **Click insights** (`#/console/insights`) or from the ⌘K palette.
+Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags.reviewPins`). Recording is toggled on **Sessions** (`#/console/insights`); both can be toggled from the ⌘K palette. Comments are on by default.
 
 ### Click insights
 - **Recorded:** screen views (with the previous screen), and taps. A tap stores its position, the control's visible name (its aria-label or own text, max 100 chars), its kind, its section, a selector to find it again, where on the element it landed, its aria state, time since the screen opened, scroll depth, rage (3+ taps within 1 s and 40 px), dead (not a control), and its effect within 0.7 s (navigated / changed / nothing).
 - **Never recorded:** anything typed, field values, names, emails, or page content. For a field we keep only its placeholder, name or type. The session id is random, per tab (sessionStorage), and not linked to a user.
 - **Defaults:** on in development; **off in production builds until the product owner decides on consent** (banner / privacy policy).
-- **Where to review:** `#/console/insights`. The **Screen viewer** shows the real app inside the console at a mobile, tablet or desktop width, with every tap drawn where it landed (as dots, or as labelled element outlines). Below it are screens, problem taps, elements (each with *where*: its area plus its third of the page, e.g. “Sidebar · top-left”), **areas**, and paths. Add `?heatmap` (dots) or `?heatmap=elements` (outlined elements; `&el=<selector>` focuses one) to any screen URL. Only taps from the same page *and* layout bucket are drawn (mobile < 640 px, tablet < 1024 px, desktop).
+- **Where to review:** `#/console/insights` (**Sessions**). Pick a session to read it **in time order**: the screens it went through, then every tap — time, element, where it sits, and what happened (opened a page, changed the screen, nothing; rage and dead taps are flagged). **Replay taps** opens each tap on the real screen with the tap drawn and the element ringed; ← → step through. Researchers can tag a session (Confused, Got lost…) and write notes, and export it as CSV. The **Heatmap** tab shows all taps on one screen at one width. Earlier versions of this page also had a screen viewer shows the real app inside the console at a mobile, tablet or desktop width, with every tap drawn where it landed (as dots, or as labelled element outlines). Below it are screens, problem taps, elements (each with *where*: its area plus its third of the page, e.g. “Sidebar · top-left”), **areas**, and paths. Add `?heatmap` (dots) or `?heatmap=elements` (outlined elements; `&el=<selector>` focuses one) to any screen URL. Only taps from the same page *and* layout bucket are drawn (mobile < 640 px, tablet < 1024 px, desktop).
 
 ### Usability tests (task-based)
 - Find them at `#/console/tests`. Each test has tasks. A task has a prompt, a start page, a time limit, and a success rule: *reach a page* (a trailing `*` matches any page below it) or *tap an element*. You pick the element by clicking it on the real screen.
 - Share the test link (`#/<start>?test=<id>`). The participant gets an intro, then one task at a time with a timer at the bottom of the screen. They can give up at any point.
 - Recorded per task: the outcome (success, timed out, gave up), time on task, taps (position and control name only), the pages visited, and whether the first click was right (it hit the target, or it moved toward the target page). The participant name is an optional nickname.
+- Open a participant to see their taps for each task in order, and replay any of them on the real screen.
 - Results show success rate, median time, average taps, direct success (no backtracking), first-click accuracy, the most common first clicks, and every tap drawn on the real screen (green = hit the target, red = missed).
 - Results are stored in the browser where the test was taken (`skillhouse.tests`, `skillhouse.tests.sessions`).
 
-### Review pins
-- A draggable 40 px pen button, shown at every screen width (hidden on the console and inside its screen viewer). Tap it to add numbered notes anywhere, see all notes, save or open a `.txt`, delete all, or hide the tool until reload. Pins scroll with the page: x is a % of the current width; y is `scrollY + y% × viewport height at placement`.
+### Comments
+- A draggable comment button on every screen (hidden on the console, inside its screen viewer and during a usability test). **Comment on something** outlines whatever is under the pointer; a click pins the comment to that element, so it follows the element when the layout moves. Each comment has its author (the person the app is viewing as), replies, and an open/resolved state. **All comments** lists them; choosing one goes back to its page, scrolls to the element, rings it and opens the thread.
+- Older placement data (position only) still loads. Tap it to add numbered notes anywhere, see all notes, save or open a `.txt`, delete all, or hide the tool until reload. Pins scroll with the page: x is a % of the current width; y is `scrollY + y% × viewport height at placement`.
 - The `.txt` export is human-readable and lossless. Importing merges notes by id, and the file wins.
 
 ### Storage and sync
@@ -92,3 +94,12 @@ A second take on the same data and store, designed with [taste-skill](https://gi
 - **Write a skill**: you type the skill as a document. Readiness checks, a "would it trigger?" simulator and team lending sit beside it.
 
 The style's tokens are Instrument Sans with Instrument Serif for the greeting only, one teal on data, and tonal panels with no shadows. It lives in `src/v2/`. Checks run on all five screens at 1440, 768 and 390 px: taste-skill `lint.mjs` gives 0 FAIL and 0 WARN, and `inspect.mjs --app` gives 0 FAIL. One WARN is kept on purpose: the 48px serif greeting, which is the dealt style's move. The classic UI stays at `#/`.
+
+## External skills
+
+Skills can come from outside: Anthropic's [skills repository](https://github.com/anthropics/skills) or a community repo such as [taste-skill](https://github.com/Leonxlnx/taste-skill).
+
+- Each external skill records where it comes from, its license, and the version it is **pinned** at. When upstream has a newer version, the skill shows "Update upstream".
+- **Pull vX for review** turns that update into a new version that goes back through review. Until then, the team keeps running the pinned version.
+- Importing (**Bring one in**, from a known source or a GitHub link) creates the skill *in review*. The rule "External skills are vetted and pinned" blocks publishing until someone other than the importer marks the security review passed.
+- No backend: importing records the source and pins the version without downloading files.

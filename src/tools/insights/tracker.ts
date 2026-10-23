@@ -28,7 +28,8 @@ function sessionId() {
 }
 
 /** Should taps and views be recorded right now? */
-const paused = () => isEmbedded || isConsole(currentPath()) || currentQuery().has('heatmap')
+// Also paused while someone is choosing an element to comment on: those clicks aren't use of the app.
+const paused = () => document.documentElement.dataset.commenting === 'on' || isEmbedded || isConsole(currentPath()) || currentQuery().has('heatmap')
 
 function visible(el: Element) {
   const r = el.getBoundingClientRect()
@@ -103,11 +104,13 @@ function headingOf(el: Element) {
 function sectionFor(el: Element): string {
   const dialog = el.closest('[role=dialog], dialog')
   if (dialog) return `Dialog · ${headingOf(dialog) || 'untitled'}`
-  const nav = el.closest('nav, aside')
-  if (nav) return squash(nav.getAttribute('aria-label')) || (nav.tagName === 'NAV' ? 'Navigation' : 'Sidebar')
+  // Only the app's navigation is "Sidebar"; a side panel inside a page is named by its own heading below.
+  if (el.closest('aside.sidebar, aside.v2-side')) return 'Sidebar'
+  const nav = el.closest('nav')
+  if (nav) return squash(nav.getAttribute('aria-label')) || 'Navigation'
   let node: Element | null = el.parentElement
   while (node && node !== document.body) {
-    if (node.matches('section, article, form, header, [role=toolbar]')) {
+    if (node.matches('section, article, aside, form, header, [role=toolbar]')) {
       const name = headingOf(node)
       if (name) return name
     }

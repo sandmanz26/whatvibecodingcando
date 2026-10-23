@@ -18,6 +18,8 @@ interface Props {
   /** 'dots' / 'elements' draw a heatmap; 'pick' lets the designer choose an element. */
   mode: 'dots' | 'elements' | 'pick'
   focus?: string | null
+  /** draw a single tap (x % of width, y page px) instead of every tap */
+  dot?: { x: number; y: number }
   /** testId:taskId — draw a usability task's taps instead of everyday clicks */
   task?: string
   onPick?: (p: Picked) => void
@@ -28,7 +30,7 @@ interface Props {
 const appUrl = (hash: string) => `${window.location.pathname}${window.location.search}#${hash}`
 
 /** The real app in an iframe at a device width, scaled to fit, with a heatmap or a picker on top. */
-export function ScreenViewer({ page, device, mode, focus, task, onPick, maxHeight = 620 }: Props) {
+export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, maxHeight = 620 }: Props) {
   const wrap = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [width, setWidth] = useState(800)
@@ -46,6 +48,7 @@ export function ScreenViewer({ page, device, mode, focus, task, onPick, maxHeigh
   const heat = mode === 'pick' ? [] : [
     `heatmap${mode === 'elements' ? '=elements' : ''}`,
     focus ? `el=${encodeURIComponent(focus)}` : '', task ? `task=${encodeURIComponent(task)}` : '',
+    dot ? `dot=${dot.x},${dot.y}` : '',
   ].filter(Boolean)
   const hash = `${page}?${[...heat, 'embed'].join('&')}`
   const openHash = heat.length ? `${page}?${heat.join('&')}` : page

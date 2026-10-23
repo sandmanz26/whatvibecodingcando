@@ -5,8 +5,28 @@ import { Empty, Modal } from '../components/ui'
 import { ConsoleNav } from './ConsoleNav'
 import { ScreenViewer, type Device } from '../tools/insights/ScreenViewer'
 import { layoutOf } from '../tools/insights/store'
-import { loadSessions, loadTests, saveSessions, summarize, type UsabilityTest } from '../tools/tests/store'
+import { loadSessions, loadTests, saveSessions, summarize, type Attempt, type TestTask, type UsabilityTest } from '../tools/tests/store'
+import { StepDrawer, Timeline } from './Sessions'
+import type { Step } from '../tools/insights/sessions'
 import { useStore } from '../store/store'
+
+/** A task attempt as timeline steps: the start page, then each tap, with page changes between them. */
+function attemptSteps(task: TestTask, a: Attempt): Step[] {
+  const steps: Step[] = [{ at: 0, t: '', kind: 'view', page: task.startPage, flags: [], vw: a.taps[0]?.vw ?? 1280 }]
+  let page = task.startPage
+  a.taps.forEach((tap, i) => {
+    if (tap.page !== page) { steps.push({ at: tap.t, t: '', kind: 'view', page: tap.page, from: page, flags: [], vw: tap.vw }); page = tap.page }
+    const last = i === a.taps.length - 1
+    steps.push({
+      at: tap.t, t: '', kind: 'tap', page: tap.page, label: tap.label, what: 'tap', where: tap.page,
+      effect: tap.hit ? 'reached the goal' : last && a.outcome !== 'success' ? (a.outcome === 'timeout' ? 'then time ran out' : 'then they gave up') : 'kept going',
+      flags: [], x: tap.x, y: tap.y, sel: tap.sel, vw: tap.vw,
+    })
+  })
+  const end = a.pages[a.pages.length - 1]
+  if (a.outcome === 'success' && task.success.kind === 'page' && end && end !== page) steps.push({ at: a.ms, t: '', kind: 'view', page: end, from: page, flags: [], vw: steps[0].vw })
+  return steps
+}
 
 const testUrl = (t: UsabilityTest) => `${window.location.origin}${window.location.pathname}#${t.tasks[0]?.startPage ?? '/'}?test=${t.id}`
 const pctOf = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0)
@@ -116,6 +136,8 @@ function Results({ id }: { id: string }) {
   const [viewPage, setViewPage] = useState<string | null>(null)
   const [device, setDevice] = useState<Device | null>(null)
   const [confirm, setConfirm] = useState(false)
+  const [who, setWho] = useState<string | null>(null)
+  const [replay, setReplay] = useState<{ steps: Step[]; i: number; title: string } | null>(null)
 
   if (!test) return <main className="page"><ConsoleNav /><div className="card"><Empty title="Test not found"><Link className="btn sm" to="/console/tests">All tests</Link></Empty></div></main>
 
@@ -235,7 +257,7 @@ function Results({ id }: { id: string }) {
       {sum.sessions.length > 0 && (
         <section className="card mt-16">
           <div className="card-head">
-            <div><h2>Participants</h2><p>One row per session</p></div>
+            <div><h2>Participants</h2><p>Open a participant to see every tap, in order, for each task</p></div>
             <button className="btn sm danger" onClick={() => setConfirm(true)}><Trash2 size={13} /> Delete results</button>
           </div>
           <div className="card-body" style={{ overflowX: 'auto', paddingTop: 8 }}>
@@ -243,8 +265,9 @@ function Results({ id }: { id: string }) {
               <thead><tr><th>Participant</th><th>Date</th><th>Screen</th>{test.tasks.map((t, i) => <th key={t.id} className="r">Task {i + 1}</th>)}</tr></thead>
               <tbody>
                 {[...sum.sessions].reverse().map((s) => (
-                  <tr key={s.id}>
-                    <td style={{ fontWeight: 550 }}>{s.participant}</td>
+                  <Fragment key={s.id}>
+                  <tr className="clickable" onClick={() => setWho(who === s.id ? null : s.id)} aria-expanded={who === s.id}>
+                    <td style={{ fontWeight: 550 }}><span className="row" style={{ gap: 6 }}>{who === s.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}{s.participant}</span></td>
                     <td className="muted">{new Date(s.startedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
                     <td className="secondary">{layoutOf(s.vw)}</td>
                     {test.tasks.map((t) => {
@@ -259,6 +282,27 @@ function Results({ id }: { id: string }) {
                       )
                     })}
                   </tr>
+                  {who === s.id && (
+                    <tr>
+                      <td colSpan={3 + test.tasks.length}>
+                        <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(3, test.tasks.length)}, minmax(0, 1fr))`, padding: '6px 0 12px' }}>
+                          {test.tasks.map((t, i) => {
+                            const a = s.attempts.find((x) => x.taskId === t.id)
+                            const steps = a ? attemptSteps(t, a) : []
+                            return (
+                              <div key={t.id} className="card card-body" style={{ padding: 14 }}>
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>Task {i + 1}</div>
+                                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>{t.prompt}</div>
+                                {!a ? <p className="muted" style={{ fontSize: 13 }}>Not attempted.</p>
+                                  : <Timeline steps={steps} active={null} onPick={(k) => setReplay({ steps, i: k, title: `${s.participant} · task ${i + 1}` })} />}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -270,6 +314,8 @@ function Results({ id }: { id: string }) {
         Results come from this browser. <button className="btn ghost sm" onClick={() => setVersion((v) => v + 1)}>Refresh</button>
         <a className="btn ghost sm" href={testUrl(test)} target="_blank" rel="noopener">Open test <ExternalLink size={12} /></a>
       </p>
+
+      {replay && <StepDrawer steps={replay.steps} index={replay.i} onMove={(i) => setReplay({ ...replay, i })} onClose={() => setReplay(null)} title={replay.title} />}
 
       {confirm && (
         <Modal title="Delete all results for this test?" description={`Removes ${sum.sessions.length} session${sum.sessions.length === 1 ? '' : 's'}. The test itself stays.`} onClose={() => setConfirm(false)}

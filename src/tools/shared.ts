@@ -12,10 +12,10 @@ export const APP = 'skillhouse'
 export type ToolFlag = 'insights' | 'reviewPins'
 
 // Insights: on in dev, off in production builds until the product owner decides on consent.
-// Review pins: off until a reviewer switches them on.
+// Comments (review pins): on — anyone can comment on any screen.
 const DEFAULTS: Record<ToolFlag, boolean> = {
   insights: import.meta.env.DEV,
-  reviewPins: false,
+  reviewPins: true,
 }
 
 const flagKey = (f: ToolFlag) => `${APP}.flags.${f}`

@@ -44,6 +44,8 @@ export function HeatmapOverlay() {
   const embed = q.has('embed')
   // task=<testId>:<taskId> draws a usability task's taps instead of everyday click data.
   const task = q.get('task')
+  // dot=x,y draws one tap (a step of a session) instead of every tap on the screen.
+  const dot = q.get('dot')?.split(',').map(Number) as [number, number] | undefined
 
   const [clicks, setClicks] = useState<ClickEvent[] | null>(null)
   const [vw, setVw] = useState(window.innerWidth)
@@ -117,6 +119,12 @@ export function HeatmapOverlay() {
   }, [active, embed, clicks, here.length, missing, vw, pathname])
 
   useEffect(() => {
+    if (!active || !dot || focus) return
+    const t = window.setTimeout(() => window.scrollTo({ top: Math.max(0, dot[1] - window.innerHeight / 2), behavior: 'smooth' }), 300)
+    return () => window.clearTimeout(t)
+  }, [active, dot?.[0], dot?.[1], focus])
+
+  useEffect(() => {
     if (!active || !focus || clicks === null) return
     const t = window.setTimeout(() => firstVisible(focus)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300)
     return () => window.clearTimeout(t)
@@ -137,7 +145,8 @@ export function HeatmapOverlay() {
     <div data-insights-ignore>
       {mode === 'dots' && (
         <div className="hm-dots" style={{ height: docH }} aria-hidden>
-          {here.map((c, i) => <i key={i} style={{ left: `${c.x}%`, top: c.y }} />)}
+          {dot ? <i className="one" style={{ left: `${dot[0]}%`, top: dot[1] }} />
+            : here.map((c, i) => <i key={i} style={{ left: `${c.x}%`, top: c.y }} />)}
         </div>
       )}
       {boxes.filter((b) => mode === 'elements' || b.sel === focus).map((b) => (
