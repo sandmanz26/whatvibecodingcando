@@ -8,9 +8,6 @@ import { useStore } from '../store/store'
 import { evaluate } from '../lib/logic'
 import { Avatar, Modal } from './ui'
 import { CommandPalette } from './CommandPalette'
-import { HeatmapOverlay, InsightsTracker } from '../tools/insights/InsightsTools'
-import { ReviewPins } from '../tools/pins/ReviewPins'
-import { UsabilityRunner } from '../tools/tests/Runner'
 
 function useTheme() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -78,7 +75,7 @@ export function Layout() {
           <span className="brand-mark"><Layers size={15} /></span>
           <span>
             <div className="brand-name">Skillhouse</div>
-            <div className="brand-sub">Acme Labs workspace</div>
+            <div className="brand-sub">Arunika Labs workspace</div>
           </span>
         </Link>
         {nav('/', 'Overview', LayoutGrid)}
@@ -92,6 +89,7 @@ export function Layout() {
         {nav('/playbook', 'Playbook', Sparkles)}
         {nav('/console/insights', 'Click insights', MousePointerClick)}
         {nav('/console/tests', 'Usability tests', ListChecks)}
+        {nav('/v2', 'Skillhouse v2', Sparkles)}
 
         <div className="sidebar-foot">
           <div className="card" style={{ padding: 10 }}>
@@ -133,7 +131,7 @@ export function Layout() {
       <div className="main">
         <header className="topbar">
           <nav className="crumbs" aria-label="Breadcrumb">
-            <Link to="/">Acme Labs</Link>
+            <Link to="/">Arunika Labs</Link>
             <ChevronRight size={13} />
             {crumbSkill ? (
               <>
@@ -153,10 +151,6 @@ export function Layout() {
         <Outlet />
       </div>
 
-      <InsightsTracker />
-      <HeatmapOverlay />
-      <ReviewPins />
-      <UsabilityRunner />
 
       {palette && <CommandPalette onClose={() => setPalette(false)} toggleTheme={toggleTheme} />}
 

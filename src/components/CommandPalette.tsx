@@ -14,7 +14,7 @@ interface Item {
   run: () => void
 }
 
-export function CommandPalette({ onClose, toggleTheme }: { onClose: () => void; toggleTheme: () => void }) {
+export function CommandPalette({ onClose, toggleTheme, v2 = false }: { onClose: () => void; toggleTheme: () => void; v2?: boolean }) {
   const { skills, members, dispatch, lens, setLens, toast } = useStore()
   const nav = useNavigate()
   const [q, setQ] = useState('')
@@ -24,7 +24,16 @@ export function CommandPalette({ onClose, toggleTheme }: { onClose: () => void; 
   const items = useMemo<Item[]>(() => {
     const go = (path: string) => () => { nav(path); onClose() }
     const all: Item[] = [
-      { id: 'new', group: 'Actions', label: 'Create new skill', icon: <Plus size={15} />, run: go('/skills/new') },
+      ...(v2 ? [
+        { id: 'v2-write', group: 'Actions', label: 'Write a skill', icon: <Plus size={15} />, run: go('/v2/write') },
+        { id: 'v2-home', group: 'Pages', label: 'Home', icon: <LayoutGrid size={15} />, run: go('/v2') },
+        { id: 'v2-shelf', group: 'Pages', label: 'The shelf', icon: <Library size={15} />, run: go('/v2/shelf') },
+        { id: 'v2-review', group: 'Pages', label: 'Review desk', icon: <KanbanSquare size={15} />, run: go('/v2/review') },
+        { id: 'v1', group: 'Pages', label: 'Classic view (v1)', icon: <LayoutGrid size={15} />, run: go('/') },
+      ] : [
+        { id: 'new', group: 'Actions', label: 'Create new skill', icon: <Plus size={15} />, run: go('/skills/new') },
+        { id: 'v2', group: 'Pages', label: 'Skillhouse v2', icon: <Sparkles size={15} />, run: go('/v2') },
+      ]),
       { id: 'theme', group: 'Actions', label: 'Toggle dark mode', icon: <Moon size={15} />, run: () => { toggleTheme(); onClose() } },
       { id: 'lens', group: 'Actions', label: lens ? 'Hide demo lens' : 'Show demo lens', icon: <Lightbulb size={15} />, run: () => { setLens(!lens); onClose() } },
       { id: 'insights', group: 'Tools', label: `${getFlag('insights') ? 'Stop' : 'Start'} recording clicks`, icon: <MousePointerClick size={15} />, run: () => { setFlag('insights', !getFlag('insights')); toast(`Click recording ${getFlag('insights') ? 'on' : 'off'}`); onClose() } },
@@ -37,17 +46,19 @@ export function CommandPalette({ onClose, toggleTheme }: { onClose: () => void; 
       { id: 'p-g', group: 'Pages', label: 'Governance', icon: <ShieldCheck size={15} />, run: go('/governance') },
       { id: 'p-i', group: 'Pages', label: 'Insights', icon: <LineChart size={15} />, run: go('/insights') },
       { id: 'p-b', group: 'Pages', label: 'Playbook', icon: <Sparkles size={15} />, run: go('/playbook') },
-      ...skills.map((s) => ({ id: s.id, group: 'Skills', label: s.title, sub: s.name, icon: stageIcon(s.stage), run: go(`/skills/${s.id}`) })),
+      ...skills.map((s) => ({ id: s.id, group: 'Skills', label: s.title, sub: s.name, icon: stageIcon(s.stage), run: go(v2 ? `/v2/skills/${s.id}` : `/skills/${s.id}`) })),
       ...members.map((m) => ({
         id: m.id, group: 'View as', label: m.name, sub: m.role, icon: <UserRound size={15} />,
         run: () => { dispatch({ type: 'setUser', id: m.id }); toast(`Now viewing as ${m.name} (${m.role})`); onClose() },
       })),
     ]
+    // v2 has its own pages and is light-only; drop the classic page list and the theme switch there.
+    if (v2) all.splice(0, all.length, ...all.filter((i) => i.id !== 'theme' && !(i.id.startsWith('p-') && i.id !== 'p-c')))
     const t = q.trim().toLowerCase()
     if (!t) return all.filter((i) => i.group !== 'View as').slice(0, 14)
     const words = t.split(/\s+/)
     return all.filter((i) => { const hay = `${i.label} ${i.sub ?? ''} ${i.group}`.toLowerCase(); return words.every((w) => hay.includes(w)) }).slice(0, 30)
-  }, [q, skills, members, nav, onClose, toggleTheme, lens, setLens, dispatch, toast])
+  }, [q, skills, members, nav, onClose, toggleTheme, lens, setLens, dispatch, toast, v2])
 
   useEffect(() => setSel(0), [q])
   useEffect(() => {

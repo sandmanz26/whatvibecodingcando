@@ -225,7 +225,7 @@ const RAW: SkillSeed[] = [
     description: 'Summarizes an account’s recent tickets, usage dips and sentiment into a churn-risk brief for the account manager.',
     triggers: ['churn risk', 'account health'],
     instructions: 'Lead with the risk level. Cite the three strongest signals. Suggest one save action.',
-    examples: ['How at-risk is Acme Corp?'], tools: ['Read', 'Bash(curl:*)'],
+    examples: ['How at-risk is Sinar Retail?'], tools: ['Read', 'Bash(curl:*)'],
     usage: [0, 0, 0, 12], weights: { cs: 1 }, rating: 0, minutesSaved: 20, hasEvals: true,
     reviewerIds: ['u1', 'u5'], approvals: [],
     comments: [{ authorId: 'u1', text: 'Needs a second reviewer — it calls curl, so two-approval policy applies.', at: '2026-10-21T10:05:00' }],

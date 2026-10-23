@@ -69,7 +69,7 @@ export default function Overview() {
       <div className="page-head">
         <div>
           <h1>{greeting}, {me.name.split(' ')[0]}</h1>
-          <p>Here’s how Acme Labs is using Claude skills over the last 4 weeks.</p>
+          <p>Here’s how Arunika Labs is using Claude skills over the last 4 weeks.</p>
         </div>
         <div className="actions">
           <GuardedButton className="btn primary" allowed={allowed('skill.create')} reason={`Needs ${minimumRole('skill.create')} role`} onClick={() => nav('/skills/new')}>

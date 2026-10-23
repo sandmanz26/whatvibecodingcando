@@ -80,3 +80,15 @@ Rules for those endpoints:
 - Validate every POST.
 - Send `Cache-Control: no-store`.
 - **The endpoints are unauthenticated.** Anyone who can reach them can read or clear the data. That is acceptable only because they store nothing personal.
+
+## Skillhouse v2 (`#/v2`)
+
+A second take on the same data and store, designed with [taste-skill](https://github.com/Leonxlnx/taste-skill) (`draw.mjs --app`, style **editorial-greeting**, seed 1825630831; the sheet is saved in `.taste-skill/direction.json`). It is less of an admin panel and more of a team's home:
+
+- **Home**: a typeset greeting that names the team and today's one fact ("Two skills are waiting on your review"), four plain counts, **the shelf**, what's waiting on you, hours saved each week, and what happened lately.
+- **The shelf**: this product's own element. Every skill is a book spine. Its height is runs in the last four weeks. Books waiting for review lean at the end (outlined in teal when the next step is yours), drafts are hatched, and retired or unused skills gather dust. Hover or focus a spine for its numbers; click it to open the skill.
+- **Review desk**: inbox-style triage. The waiting list sits beside the open skill, with approve, publish and send-back actions. Each action states why it is blocked for your role.
+- **Skill page**: the SKILL.md set as the page Claude reads, with runs, lending, versions and conversation in a rail beside it.
+- **Write a skill**: you type the skill as a document. Readiness checks, a "would it trigger?" simulator and team lending sit beside it.
+
+The style's tokens are Instrument Sans with Instrument Serif for the greeting only, one teal on data, and tonal panels with no shadows. It lives in `src/v2/`. Checks run on all five screens at 1440, 768 and 390 px: taste-skill `lint.mjs` gives 0 FAIL and 0 WARN, and `inspect.mjs --app` gives 0 FAIL. One WARN is kept on purpose: the 48px serif greeting, which is the dealt style's move. The classic UI stays at `#/`.
