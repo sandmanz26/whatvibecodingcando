@@ -41,7 +41,8 @@ export function CommandPalette({ onClose, toggleTheme }: { onClose: () => void; 
     ]
     const t = q.trim().toLowerCase()
     if (!t) return all.filter((i) => i.group !== 'View as').slice(0, 14)
-    return all.filter((i) => `${i.label} ${i.sub ?? ''} ${i.group}`.toLowerCase().includes(t)).slice(0, 30)
+    const words = t.split(/\s+/)
+    return all.filter((i) => { const hay = `${i.label} ${i.sub ?? ''} ${i.group}`.toLowerCase(); return words.every((w) => hay.includes(w)) }).slice(0, 30)
   }, [q, skills, members, nav, onClose, toggleTheme, lens, setLens, dispatch, toast])
 
   useEffect(() => setSel(0), [q])

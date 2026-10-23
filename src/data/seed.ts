@@ -41,6 +41,7 @@ function rng(seed: number) {
 }
 
 const WEEKS = 12
+const USAGE_SCALE = 0.15
 
 function series(seed: number, base: number, growth: number, noise = 0.18, startWeek = 0): number[] {
   const r = rng(seed)
@@ -295,7 +296,8 @@ export const slugify = (s: string) =>
 export function buildSkills(): Skill[] {
   return RAW.map((r, i) => {
     const [base, growth, noise, start] = r.usage
-    const usage = base === 0 ? Array(WEEKS).fill(0) : series(i * 97 + 13, base, growth, noise, start ?? 0)
+    // Bases above are per-org; scale to a 12-person workspace so per-person numbers stay believable.
+    const usage = base === 0 ? Array(WEEKS).fill(0) : series(i * 97 + 13, base * USAGE_SCALE, growth, noise, start ?? 0)
     return {
       id: r.id,
       name: slugify(r.title),

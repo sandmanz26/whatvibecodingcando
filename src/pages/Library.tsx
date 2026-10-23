@@ -81,7 +81,7 @@ export default function Library() {
       <div className="toolbar">
         <div className="input-wrap">
           <Search size={15} />
-          <input className="input" placeholder="Search by name, trigger or description" value={q} onChange={(e) => set('q', e.target.value, '')} aria-label="Search skills" />
+          <input className="input" placeholder="Search skills or triggers" value={q} onChange={(e) => set('q', e.target.value, '')} aria-label="Search skills" />
         </div>
         <select className="select" style={{ width: 170 }} value={team} onChange={(e) => set('team', e.target.value, 'all')} aria-label="Team">
           <option value="all">All teams</option>

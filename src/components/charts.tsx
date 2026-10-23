@@ -67,7 +67,7 @@ export function LineChart({ series, labels, height = 240, area = false }: { seri
             <text className="tick" x={pad.l - 8} y={y(t)} dy="0.32em" textAnchor="end">{compact(t)}</text>
           </g>
         ))}
-        {labels.map((l, i) => (i % labelEvery === 0 || i === n - 1) && (
+        {labels.map((l, i) => (i === n - 1 || (i % labelEvery === 0 && x(n - 1) - x(i) > 72)) && (
           <text key={i} className="tick" x={x(i)} y={height - 6} textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}>{l}</text>
         ))}
         {series.map((s) => {
