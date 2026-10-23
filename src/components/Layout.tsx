@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import {
-  LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Search,
+  LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Search,
   Layers, X, CircleAlert, ChevronRight, MousePointerClick, ListChecks,
 } from 'lucide-react'
 import { useStore } from '../store/store'
@@ -16,7 +16,6 @@ const TITLES: Record<string, string> = {
   team: 'People',
   governance: 'Rules',
   insights: 'Value',
-  playbook: 'Demo guide',
   console: 'Sessions',
 }
 
@@ -73,7 +72,6 @@ export function Layout() {
         <div className="nav-label">Research</div>
         {nav('/console/insights', 'Sessions', MousePointerClick)}
         {nav('/console/tests', 'Usability tests', ListChecks)}
-        {nav('/playbook', 'Demo guide', Sparkles)}
 
       </aside>
 

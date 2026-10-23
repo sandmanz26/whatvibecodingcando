@@ -13,7 +13,6 @@ import Pipeline from './pages/Pipeline'
 import Team from './pages/Team'
 import Governance from './pages/Governance'
 import Insights from './pages/Insights'
-import Playbook from './pages/Playbook'
 import Sessions from './pages/Sessions'
 import UsabilityTests from './pages/UsabilityTests'
 import TestEditor from './pages/TestEditor'
@@ -52,7 +51,6 @@ export default function App() {
             <Route path="team" element={<Team />} />
             <Route path="governance" element={<Governance />} />
             <Route path="insights" element={<Insights />} />
-            <Route path="playbook" element={<Playbook />} />
             <Route path="console/insights" element={<Sessions />} />
             <Route path="console/tests" element={<UsabilityTests />} />
             <Route path="console/tests/:id" element={<UsabilityTests />} />

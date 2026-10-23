@@ -24,7 +24,6 @@ npm run build     # static build in dist/ (hash routing, works on any static hos
 | Team & access | RBAC, editable roles, team × skill access matrix, permission table |
 | Governance | Policy engine re-evaluating the catalog live, one-click fixes, audit log |
 | Insights | ROI what-if calculator, adoption heatmap, funnel |
-| Playbook | The demo script and ideas to explore next |
 
 Try **“Viewing as”** in the sidebar (or ⌘K → “view as”) to switch between Admin, Maintainer, Member and Viewer and watch permissions change everywhere. The **Lens** toggle shows/hides the per-page notes explaining what each screen demonstrates.
 
@@ -62,7 +61,7 @@ Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags
 - Results are stored in the browser where the test was taken (`skillhouse.tests`, `skillhouse.tests.sessions`).
 
 ### Comments
-- **How to comment:** press **Comment** in the dock (or press **C**, or click the round comment button), then click **anywhere** on the screen — the comment is placed on that spot, not tied to an element. Type, then Close.
+- **How to comment** (works on every screen, v1, v2 and the research pages): press **Comment** in the dock (or press **C**, or click the round comment button), then click **anywhere** on the screen — the comment is placed on that spot, not tied to an element. Type, then Close.
 - **All comments** (the speech-bubbles icon in the dock, or ⋯ beside the comment button) lists every comment with its page; choosing one goes to that page, scrolls to the spot and opens it. No replies or statuses: a comment is a note on a spot.
 - Comments made with the earlier element-pinned version still load and still follow their element.
 - The `.txt` export is human-readable and lossless. Importing merges notes by id, and the file wins.

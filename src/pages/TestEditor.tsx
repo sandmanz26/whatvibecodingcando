@@ -25,7 +25,7 @@ export default function TestEditor() {
 
   if (!isNew && !existing) return <main className="page"><ConsoleNav /><div className="card"><Empty title="Test not found"><Link className="btn sm" to="/console/tests">All tests</Link></Empty></div></main>
 
-  const pages = ['/', '/skills', '/skills/new', '/pipeline', '/team', '/governance', '/insights', '/playbook', ...skills.map((s) => `/skills/${s.id}`)]
+  const pages = ['/', '/skills', '/skills/new', '/pipeline', '/team', '/governance', '/insights', ...skills.map((s) => `/skills/${s.id}`)]
   const setTask = (tid: string, patch: Partial<TestTask>) => setTest((t) => ({ ...t, tasks: t.tasks.map((x) => (x.id === tid ? { ...x, ...patch } : x)) }))
   const move = (i: number, d: -1 | 1) => setTest((t) => {
     const tasks = [...t.tasks]

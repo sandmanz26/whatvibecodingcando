@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { GripVertical, Moon, Sun, RotateCcw, MessageSquarePlus, MessagesSquare } from 'lucide-react'
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
-import { getFlag, isConsole, isEmbedded, readJSON, setFlag, writeJSON } from '../tools/shared'
+import { getFlag, isEmbedded, readJSON, setFlag, writeJSON } from '../tools/shared'
 import { useStore } from '../store/store'
 import { useTheme } from '../lib/theme'
 import { Avatar, Modal } from './ui'
@@ -103,12 +103,8 @@ export function VersionSwitch() {
             <small>{me.role}</small>
           </span>
         </label>
-        {!isConsole(pathname) && (
-          <>
-            <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
-            <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
-          </>
-        )}
+        <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
+        <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
         <div className="dock-seg" role="group" aria-label="App version">
           <button aria-pressed={!v2} onClick={() => v2 && nav(counterpart(pathname, false))}>v1 <span>Classic</span></button>
           <button aria-pressed={v2} onClick={() => !v2 && nav(counterpart(pathname, true))}>v2 <span>Shelf</span></button>

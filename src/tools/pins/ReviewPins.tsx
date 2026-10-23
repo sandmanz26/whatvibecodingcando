@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { MessageSquarePlus, MessageSquare, X, List, Download, Upload, Trash2, EyeOff } from 'lucide-react'
-import { APP, TOOL_DOM, isConsole, isEmbedded, readJSON, useFlag, writeJSON } from '../shared'
+import { APP, TOOL_DOM, isEmbedded, readJSON, useFlag, writeJSON } from '../shared'
 import { useStore } from '../../store/store'
 import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, toTxt, txtFileName, type PinNote } from './format'
 import { STATUS_TEXT, usePinSync } from './useSync'
@@ -60,12 +60,11 @@ function dragHandlers(onMove: (e: PointerEvent) => void, onTap: () => void, onEn
   }
 }
 
-/** Comments on any screen and any element — mounted app-wide. */
+/** Comments on every screen — mounted app-wide. */
 export function ReviewPins() {
   const on = useFlag('reviewPins')
-  const { pathname } = useLocation()
   const [hidden, setHidden] = useState(false)
-  if (!on || hidden || isConsole(pathname) || isEmbedded) return null
+  if (!on || hidden || isEmbedded) return null
   return <Comments onHide={() => setHidden(true)} />
 }
 

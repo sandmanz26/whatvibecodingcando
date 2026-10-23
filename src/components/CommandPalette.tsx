@@ -45,7 +45,6 @@ export function CommandPalette({ onClose, toggleTheme, v2 = false }: { onClose: 
       { id: 'p-t', group: 'Pages', label: 'Team & access', icon: <Users size={15} />, run: go('/team') },
       { id: 'p-g', group: 'Pages', label: 'Governance', icon: <ShieldCheck size={15} />, run: go('/governance') },
       { id: 'p-i', group: 'Pages', label: 'Insights', icon: <LineChart size={15} />, run: go('/insights') },
-      { id: 'p-b', group: 'Pages', label: 'Playbook', icon: <Sparkles size={15} />, run: go('/playbook') },
       ...skills.map((s) => ({ id: s.id, group: 'Skills', label: s.title, sub: s.name, icon: stageIcon(s.stage), run: go(v2 ? `/v2/skills/${s.id}` : `/skills/${s.id}`) })),
       ...members.map((m) => ({
         id: m.id, group: 'View as', label: m.name, sub: m.role, icon: <UserRound size={15} />,
