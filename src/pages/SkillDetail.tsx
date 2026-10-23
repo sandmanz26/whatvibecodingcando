@@ -5,6 +5,7 @@ import { useStore, useCan } from '../store/store'
 import { Avatar, CategoryIcon, Empty, GuardedButton, Lens, StageBadge, Switch, TeamTag } from '../components/ui'
 import { LineChart, Legend } from '../components/charts'
 import { LENS } from '../data/lens'
+import { SourceBlock } from '../components/SourceBlock'
 import { WEEK_LABELS } from '../data/seed'
 import { ago, blockers, dateLabel, fmt, isRisky, minimumRole, requiredApprovals, sum, toSkillMd } from '../lib/logic'
 
@@ -233,6 +234,12 @@ export default function SkillDetail() {
         </div>
 
         <aside className="stack gap-16">
+          {s.source && (
+            <section className="card card-body">
+              <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}><h3>Where it comes from</h3>{s.source.latest && <span className="badge">Update upstream</span>}</div>
+              <SourceBlock skill={s} />
+            </section>
+          )}
           <section className="card card-body">
             <div className="stack gap-12">
               <div className="row" style={{ justifyContent: 'space-between' }}>

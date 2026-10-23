@@ -71,7 +71,7 @@ export default function Governance() {
     <main className="page">
       <div className="page-head">
         <div>
-          <h1>Governance</h1>
+          <h1>Rules</h1>
           <p>Policies run continuously against every skill. Turn one on and the whole catalog is re-checked instantly.</p>
         </div>
       </div>

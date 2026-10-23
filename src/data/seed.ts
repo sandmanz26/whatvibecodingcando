@@ -28,6 +28,7 @@ export const POLICIES: Policy[] = [
   { id: 'p-two-approvals', name: 'Two approvals to publish', description: 'Skills that can run shell or write files need two reviewers, not one.', enabled: true, severity: 'serious' },
   { id: 'p-description', name: 'Descriptions say when to trigger', description: 'Claude picks skills by their description. Under 60 characters is usually too vague to trigger reliably.', enabled: true, severity: 'warning' },
   { id: 'p-stale', name: 'No stale skills', description: 'Flag published skills with zero runs in the last 4 weeks. Unused skills are noise in Claude’s context.', enabled: true, severity: 'warning' },
+  { id: 'p-external', name: 'External skills are vetted and pinned', description: 'A skill imported from outside runs only after a security review, pinned to one version, so an upstream change can’t reach the team unreviewed.', enabled: true, severity: 'critical' },
   { id: 'p-access', name: 'Least-privilege access', description: 'Warn when a skill is shared with every team but only one team actually uses it.', enabled: false, severity: 'warning' },
 ]
 
@@ -93,6 +94,7 @@ interface SkillSeed {
   reviewerIds?: string[]
   approvals?: string[]
   hasEvals: boolean
+  source?: import('./types').ExternalSource
   comments?: { authorId: string; text: string; at: string }[]
   history?: { version: string; at: string; authorId: string; note: string }[]
 }
@@ -288,6 +290,40 @@ const RAW: SkillSeed[] = [
     examples: ['Check this order form for anything unusual'], tools: ['Read'],
     usage: [0, 0, 0, 12], weights: { pro: 1 }, rating: 0, minutesSaved: 45, hasEvals: false,
   },
+  {
+    id: 'e1', title: 'Word documents', category: 'Writing', ownerId: 'u5', teamIds: ['pro', 'cs', 'des', 'eng'], stage: 'published', version: '1.2.0',
+    createdAt: '2026-06-03', updatedAt: '2026-09-02',
+    description: 'Creates, reads and edits Word (.docx) files, including tracked changes and templates. Use when someone asks for a Word document or attaches one.',
+    triggers: ['make a word doc', 'edit this docx', 'tracked changes'],
+    instructions: 'Imported from anthropics/skills. Instructions are maintained upstream; changes arrive as new versions and go through review here.',
+    examples: ['Turn these notes into a Word document with headings'], tools: ['Read', 'Write', 'Bash(python:*)'],
+    usage: [60, 0.04, 0.2], weights: { pro: 0.4, cs: 0.3, des: 0.1, eng: 0.2 }, rating: 4.6, minutesSaved: 20, hasEvals: true,
+    reviewerIds: ['u2', 'u1'], approvals: ['u2', 'u1'],
+    source: { kind: 'external', origin: 'Anthropic', repo: 'anthropics/skills', path: 'skills/docx', url: 'https://github.com/anthropics/skills', license: 'See repository', pinned: '1.2.0', latest: '1.3.0', syncedAt: '2026-09-02', vetted: true },
+  },
+  {
+    id: 'e2', title: 'PDF toolkit', category: 'Operations', ownerId: 'u1', teamIds: ['pro', 'cs'], stage: 'published', version: '1.1.0',
+    createdAt: '2026-06-03', updatedAt: '2026-08-14',
+    description: 'Reads, fills, merges and splits PDF files, and extracts tables from them. Use when a PDF is attached or asked for.',
+    triggers: ['merge these pdfs', 'fill this form', 'extract the table'],
+    instructions: 'Imported from anthropics/skills. Instructions are maintained upstream; changes arrive as new versions and go through review here.',
+    examples: ['Merge the signed contract pages into one PDF'], tools: ['Read', 'Bash(python:*)'],
+    usage: [35, 0.02, 0.25], weights: { pro: 0.5, cs: 0.5 }, rating: 4.4, minutesSaved: 12, hasEvals: true,
+    reviewerIds: ['u2', 'u6'], approvals: ['u2', 'u6'],
+    source: { kind: 'external', origin: 'Anthropic', repo: 'anthropics/skills', path: 'skills/pdf', url: 'https://github.com/anthropics/skills', license: 'See repository', pinned: '1.1.0', syncedAt: '2026-08-14', vetted: true },
+  },
+  {
+    id: 'e3', title: 'Design taste', category: 'Design', ownerId: 'u3', teamIds: ['des'], stage: 'review', version: '2.0.0',
+    createdAt: '2026-10-20', updatedAt: '2026-10-21',
+    description: 'Art direction for web pages and app screens: deals a researched direction, bans generated-looking ornaments and checks the result in a real browser. Use when a page looks generic.',
+    triggers: ['make it look designed', 'this looks generic', 'design direction'],
+    instructions: 'Imported from Leonxlnx/taste-skill. Runs its own scripts (draw, lint, inspect) with Node and a local Chrome; review them before approving.',
+    examples: ['Redesign the settings screen so it stops looking like a template'], tools: ['Read', 'Write', 'Bash(node:*)'],
+    usage: [0, 0, 0, 12], weights: { des: 1 }, rating: 0, minutesSaved: 40, hasEvals: false,
+    reviewerIds: ['u2'], approvals: [],
+    comments: [{ authorId: 'u3', text: 'Used it on Skillhouse v2. It runs node scripts and launches Chrome — needs a security look before we lend it out.', at: '2026-10-21T11:20:00' }],
+    source: { kind: 'external', origin: 'Leonxlnx (community)', repo: 'Leonxlnx/taste-skill', path: 'skills/taste-skill', url: 'https://github.com/Leonxlnx/taste-skill', license: 'MIT', pinned: '2.0.0', syncedAt: '2026-10-20', vetted: false },
+  },
 ]
 
 export const slugify = (s: string) =>
@@ -321,6 +357,7 @@ export function buildSkills(): Skill[] {
       reviewerIds: r.reviewerIds ?? [],
       approvals: r.approvals ?? [],
       hasEvals: r.hasEvals,
+      ...(r.source ? { source: r.source } : {}),
       comments: (r.comments ?? []).map((c, j) => ({ id: `${r.id}-c${j}`, ...c })),
       versions: r.history ?? [{ version: r.version, at: r.updatedAt, authorId: r.ownerId, note: r.version === '0.1.0' ? 'First draft.' : 'Current version.' }],
     }

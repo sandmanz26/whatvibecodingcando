@@ -178,6 +178,12 @@
 .book.waiting:hover, .book.waiting:focus-visible { transform: rotate(-7deg) translateY(-8px); }
 .book.waiting.yours { border-color: var(--accent); color: var(--accent); }
 .book.draft { background-color: #f6f6f5; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M-2 2l4-4M0 8l8-8M6 10l4-4' stroke='%23d6d6d3' stroke-width='1.5'/%3E%3C/svg%3E"); border: 1px solid #dcdcda; color: var(--muted); }
+.book.ext::before { content: ''; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 62%; height: 12px; border-radius: 2px; background: #f5f5f4; }
+.book.ext.waiting::before { background: var(--text); }
+.book.ext.waiting.yours::before { background: var(--accent); }
+.book.ext span { margin-top: 26px; }
+.shelf-legend i.ext-key { position: relative; }
+.shelf-legend i.ext-key::after { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; height: 3px; background: #f5f5f4; border-radius: 1px; }
 .book.dusty { background: #c8c8c5; color: #3d3d3a; }
 .shelf-tip {
   position: absolute; z-index: 5; width: 260px; padding: 12px 14px; border-radius: 14px; pointer-events: none;

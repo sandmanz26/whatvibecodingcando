@@ -35,6 +35,25 @@ export interface Version {
   note: string
 }
 
+/** Where a skill comes from. Internal skills are written here; external ones are imported and pinned. */
+export interface ExternalSource {
+  kind: 'external'
+  /** who publishes it, e.g. "Anthropic" */
+  origin: string
+  /** owner/repo on GitHub */
+  repo: string
+  path: string
+  url: string
+  license: string
+  /** the version this workspace runs */
+  pinned: string
+  /** newest version upstream, when it differs from pinned */
+  latest?: string
+  syncedAt: string
+  /** passed the security review for external code */
+  vetted: boolean
+}
+
 export interface Skill {
   id: string
   /** kebab-case slug, the `name` in SKILL.md frontmatter */
@@ -64,6 +83,8 @@ export interface Skill {
   comments: Comment[]
   versions: Version[]
   hasEvals: boolean
+  /** absent = written in this workspace */
+  source?: ExternalSource
 }
 
 export type AuditAction =
@@ -78,6 +99,8 @@ export type AuditAction =
   | 'role'
   | 'policy'
   | 'restored'
+  | 'imported'
+  | 'synced'
 
 export interface AuditEvent {
   id: string

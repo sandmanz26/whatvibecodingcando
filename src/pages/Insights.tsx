@@ -58,7 +58,7 @@ export default function Insights() {
     <main className="page">
       <div className="page-head">
         <div>
-          <h1>Insights</h1>
+          <h1>Value</h1>
           <p>Is this worth it? Adjust the assumptions and every number recalculates.</p>
         </div>
       </div>

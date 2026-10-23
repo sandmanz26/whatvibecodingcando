@@ -35,7 +35,8 @@ export function Shelf({ skills, height = 236, showLegend = true }: { skills: Ski
     ? Math.max(64, Math.round(64 + (runs(s) / max) * (height - 80)))
     : Math.round(height * 0.58)
 
-  const cls = (s: Skill) => {
+  const cls = (s: Skill) => (s.source ? 'ext ' : '') + baseCls(s)
+  const baseCls = (s: Skill) => {
     if (s.stage === 'deprecated' || (s.stage === 'published' && sum(s.usage.slice(-4)) === 0)) return 'dusty'
     if (s.stage === 'draft') return 'draft'
     if (s.stage === 'review' || s.stage === 'approved') return `waiting ${yours(s) ? 'yours' : ''}`
@@ -79,7 +80,7 @@ export function Shelf({ skills, height = 236, showLegend = true }: { skills: Ski
           ) : (
             <span className="v2-small">{stageLabel(tip.s.stage)} · v{tip.s.version}{tip.s.stage === 'review' ? ` · ${tip.s.approvals.length} approval${tip.s.approvals.length === 1 ? '' : 's'}` : ''}</span>
           )}
-          <div className="v2-small" style={{ marginTop: 4 }}>{firstName(member(tip.s.ownerId))} wrote it · {tip.s.category}</div>
+          <div className="v2-small" style={{ marginTop: 4 }}>{tip.s.source ? `From ${tip.s.source.origin} · pinned v${tip.s.source.pinned}${tip.s.source.latest ? ` · v${tip.s.source.latest} upstream` : ''}` : `${firstName(member(tip.s.ownerId))} wrote it`} · {tip.s.category}</div>
         </div>
       )}
       {showLegend && (
@@ -87,6 +88,7 @@ export function Shelf({ skills, height = 236, showLegend = true }: { skills: Ski
           <span><i style={{ background: 'var(--chart-1)' }} />Standing: published, height is runs in 4 weeks</span>
           <span><i style={{ border: '1.5px solid var(--text)', transform: 'rotate(-7deg)' }} />Leaning: waiting for review</span>
           <span><i style={{ border: '1.5px solid var(--accent)', transform: 'rotate(-7deg)' }} />Waiting on you</span>
+          <span><i className="ext-key" style={{ background: 'var(--chart-1)' }} />Label: brought in from outside</span>
           <span><i style={{ background: '#f6f6f5', border: '1px solid #dcdcda' }} />Draft</span>
           <span><i style={{ background: '#c8c8c5' }} />Retired or gathering dust</span>
         </div>

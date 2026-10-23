@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { Home, Library, Inbox, PenLine, MousePointerClick, ArrowLeftRight, Search, X, CircleAlert } from 'lucide-react'
+import { Home, Library, Inbox, PenLine, MousePointerClick, Search, X, CircleAlert } from 'lucide-react'
 import { useStore } from '../store/store'
 import { can } from '../lib/logic'
 import { CommandPalette } from '../components/CommandPalette'
@@ -44,7 +44,6 @@ export function V2Shell() {
           {nav('/v2/write', 'Write a skill', PenLine)}
           <div className="v2-nav-group">Research</div>
           {nav('/console/insights', 'Clicks and tests', MousePointerClick, undefined, true)}
-          {nav('/', 'Classic view', ArrowLeftRight, undefined, true)}
           <div className="v2-side-foot">
             <label className="v2-me">
               <Face member={me} />

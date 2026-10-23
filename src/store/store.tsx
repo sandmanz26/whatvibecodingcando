@@ -24,8 +24,12 @@ type Action =
   | { type: 'setOwner'; id: string; ownerId: string }
   | { type: 'togglePolicy'; id: string }
   | { type: 'attachEvals'; id: string }
+  | { type: 'importExternal'; skill: Skill }
+  | { type: 'syncExternal'; id: string }
+  | { type: 'vetExternal'; id: string }
 
-const KEY = 'skillhouse:v1'
+// Bumped when the seed gains new fields (external skills), so old saved demos reload fresh.
+const KEY = 'skillhouse:v2'
 
 function initial(): State {
   return {
@@ -144,6 +148,34 @@ function reducer(state: State, a: Action): State {
         audit: log(state, 'policy', `${p.enabled ? 'Disabled' : 'Enabled'} “${p.name}”`),
       }
     }
+    case 'importExternal':
+      return {
+        ...state,
+        skills: [{ ...a.skill, ownerId: state.currentUserId }, ...state.skills],
+        audit: log(state, 'imported', `Imported from ${a.skill.source?.repo} at v${a.skill.version}; waiting for a security review`, a.skill.id),
+      }
+    case 'syncExternal': {
+      const s = state.skills.find((x) => x.id === a.id)!
+      const latest = s.source?.latest
+      if (!s.source || !latest) return state
+      const at = now()
+      // An upstream update is a new version: it goes back through review before anyone runs it.
+      return {
+        ...state,
+        skills: patch(state, a.id, (x) => ({
+          ...x, version: latest, stage: 'review', approvals: [], updatedAt: at,
+          source: { ...x.source!, pinned: latest, latest: undefined, syncedAt: at, vetted: false },
+          versions: [{ version: latest, at, authorId: state.currentUserId, note: `Pulled v${latest} from ${x.source!.repo}. Needs review.` }, ...x.versions],
+        })),
+        audit: log(state, 'synced', `Pulled v${latest} from ${s.source.repo} and sent it for review`, a.id),
+      }
+    }
+    case 'vetExternal':
+      return {
+        ...state,
+        skills: patch(state, a.id, (x) => (x.source ? { ...x, source: { ...x.source, vetted: true } } : x)),
+        audit: log(state, 'approved', 'Passed the security review for external code', a.id),
+      }
     case 'attachEvals':
       return {
         ...state,
@@ -184,7 +216,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, load)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [lens, setLensState] = useState<boolean>(() => {
-    try { return localStorage.getItem('skillhouse:lens') !== 'off' } catch { return true }
+    // Off by default: the notes are for presenting the demo, not for using it.
+    try { return localStorage.getItem('skillhouse:lens') === 'on' } catch { return false }
   })
   const stateRef = useRef(state)
   stateRef.current = state

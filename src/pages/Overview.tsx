@@ -1,13 +1,12 @@
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowDownRight, ArrowUpRight, Plus, ArrowRight, Clock } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Plus, ArrowRight } from 'lucide-react'
 import { useStore, useCan } from '../store/store'
 import { LineChart, Legend, Sparkline, BarList } from '../components/charts'
-import { Avatar, GuardedButton, Lens, Severity, StageBadge } from '../components/ui'
+import { GuardedButton, Lens, Severity, StageBadge } from '../components/ui'
 import { LENS } from '../data/lens'
 import { WEEK_LABELS } from '../data/seed'
-import { ago, can, compact, evaluate, fmt, hoursSaved, minimumRole, requiredApprovals, sum, teamWeekly } from '../lib/logic'
-import { ActivityText } from './shared'
+import { can, compact, evaluate, fmt, hoursSaved, minimumRole, requiredApprovals, sum, teamWeekly } from '../lib/logic'
 
 function Delta({ now, prev, suffix = 'vs prior 4 wks' }: { now: number; prev: number; suffix?: string }) {
   if (!prev) return <span className="delta"><span className="vs">New this period</span></span>
@@ -22,7 +21,7 @@ function Delta({ now, prev, suffix = 'vs prior 4 wks' }: { now: number; prev: nu
 }
 
 export default function Overview() {
-  const { skills, teams, members, policies, audit, me, member, skill } = useStore()
+  const { skills, teams, members, policies, me, member, skill } = useStore()
   const allowed = useCan()
   const nav = useNavigate()
 
@@ -163,19 +162,22 @@ export default function Overview() {
         <section className="card">
           <div className="card-head">
             <div>
-              <h2>Recent activity</h2>
-              <p>Every change is logged</p>
+              <h2>From outside</h2>
+              <p>Skills brought in from other repositories, pinned to a version</p>
             </div>
-            <Link to="/governance?tab=audit" className="btn ghost sm">Audit log <ArrowRight size={13} /></Link>
+            <Link to="/skills?from=outside" className="btn ghost sm">All <ArrowRight size={13} /></Link>
           </div>
           <div className="card-body" style={{ paddingTop: 6 }}>
             <div className="feed">
-              {audit.slice(0, 6).map((a) => (
-                <div key={a.id} className="feed-item">
-                  <Avatar member={member(a.actorId)} />
-                  <div className="what"><ActivityText event={a} /></div>
-                  <div className="when"><Clock size={11} style={{ verticalAlign: -1, marginRight: 3 }} />{ago(a.at)}</div>
-                </div>
+              {skills.filter((s) => s.source).map((s) => (
+                <Link key={s.id} to={`/skills/${s.id}`} className="feed-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                  <div className="what"><b>{s.title}</b><div className="muted" style={{ fontSize: 12.5 }}>{s.source!.repo} · pinned v{s.source!.pinned}</div></div>
+                  <div>
+                    {!s.source!.vetted ? <span className="badge" style={{ color: 'var(--critical-ink)' }}>Needs security review</span>
+                      : s.source!.latest ? <span className="badge">v{s.source!.latest} upstream</span>
+                        : <span className="badge outline">Up to date</span>}
+                  </div>
+                </Link>
               ))}
             </div>
           </div>

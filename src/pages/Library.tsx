@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { LayoutGrid, List, Plus, Search, Star, X } from 'lucide-react'
+import { LayoutGrid, List, Plus, Search, Star, X, Download, GitBranch } from 'lucide-react'
 import { useStore, useCan } from '../store/store'
-import { Avatar, CATEGORIES, CategoryIcon, Empty, GuardedButton, Lens, StageBadge, TeamDots } from '../components/ui'
+import { Avatar, CategoryIcon, Empty, GuardedButton, Lens, StageBadge, TeamDots } from '../components/ui'
+import { ImportExternal } from '../components/ImportExternal'
 import { Sparkline } from '../components/charts'
 import { LENS } from '../data/lens'
 import { ago, fmt, minimumRole, STAGES, sum } from '../lib/logic'
@@ -18,7 +19,8 @@ export default function Library() {
   const q = params.get('q') ?? ''
   const stage = (params.get('stage') ?? 'all') as Stage | 'all'
   const team = params.get('team') ?? 'all'
-  const cat = params.get('cat') ?? 'all'
+  const from = params.get('from') ?? 'all'
+  const [importing, setImporting] = useState(false)
   const sort = (params.get('sort') ?? 'used') as keyof typeof SORTS
   const view = params.get('view') ?? 'grid'
 
@@ -34,7 +36,7 @@ export default function Library() {
     const r = skills.filter((s) =>
       (stage === 'all' || s.stage === stage) &&
       (team === 'all' || s.teamIds.includes(team)) &&
-      (cat === 'all' || s.category === cat) &&
+      (from === 'all' || (from === 'outside' ? !!s.source : !s.source)) &&
       (!t || `${s.title} ${s.name} ${s.description} ${s.triggers.join(' ')}`.toLowerCase().includes(t)))
     const by = {
       used: (a: typeof r[0], b: typeof r[0]) => sum(b.usage.slice(-4)) - sum(a.usage.slice(-4)),
@@ -43,7 +45,7 @@ export default function Library() {
       rating: (a: typeof r[0], b: typeof r[0]) => b.rating - a.rating,
     }[sort]
     return [...r].sort(by)
-  }, [skills, q, stage, team, cat, sort])
+  }, [skills, q, stage, team, from, sort])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: skills.length }
@@ -51,16 +53,19 @@ export default function Library() {
     return c
   }, [skills])
 
-  const filtered = q || stage !== 'all' || team !== 'all' || cat !== 'all'
+  const filtered = q || stage !== 'all' || team !== 'all' || from !== 'all'
 
   return (
     <main className="page">
       <div className="page-head">
         <div>
-          <h1>Skill library</h1>
-          <p>Every Claude skill your team has written, who owns it, and who can use it.</p>
+          <h1>Skills</h1>
+          <p>Written here or brought in from outside — who looks after each one, and who can use it.</p>
         </div>
         <div className="actions">
+          <GuardedButton allowed={allowed('skill.create')} reason={`Needs ${minimumRole('skill.create')} role`} onClick={() => setImporting(true)}>
+            <Download size={15} /> Bring one in
+          </GuardedButton>
           <GuardedButton className="btn primary" allowed={allowed('skill.create')} reason={`Needs ${minimumRole('skill.create')} role`} onClick={() => nav('/skills/new')}>
             <Plus size={15} /> New skill
           </GuardedButton>
@@ -87,10 +92,11 @@ export default function Library() {
           <option value="all">All teams</option>
           {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
-        <select className="select" style={{ width: 160 }} value={cat} onChange={(e) => set('cat', e.target.value, 'all')} aria-label="Category">
-          <option value="all">All categories</option>
-          {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-        </select>
+        <div className="seg" role="group" aria-label="Source">
+          <button aria-pressed={from === 'all'} onClick={() => set('from', 'all', 'all')}>Anywhere</button>
+          <button aria-pressed={from === 'here'} onClick={() => set('from', 'here', 'all')}>Written here</button>
+          <button aria-pressed={from === 'outside'} onClick={() => set('from', 'outside', 'all')}>From outside</button>
+        </div>
         <select className="select" style={{ width: 170 }} value={sort} onChange={(e) => set('sort', e.target.value, 'used')} aria-label="Sort">
           {Object.entries(SORTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
@@ -130,7 +136,9 @@ export default function Library() {
                   {runs > 0 && <Sparkline values={s.usage} width={110} />}
                 </div>
                 <div className="foot">
-                  <span className="row" style={{ gap: 6 }}><Avatar member={member(s.ownerId)} />{member(s.ownerId)?.name}</span>
+                  {s.source
+                    ? <span className="row" style={{ gap: 6 }}><GitBranch size={14} />From {s.source.origin}{s.source.latest && <span className="badge" style={{ height: 20 }}>Update</span>}</span>
+                    : <span className="row" style={{ gap: 6 }}><Avatar member={member(s.ownerId)} />{member(s.ownerId)?.name}</span>}
                   <TeamDots ids={s.teamIds} />
                 </div>
               </button>
@@ -162,6 +170,7 @@ export default function Library() {
           </table>
         </div>
       )}
+      {importing && <ImportExternal onClose={() => setImporting(false)} />}
     </main>
   )
 }

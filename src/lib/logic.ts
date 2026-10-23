@@ -93,6 +93,7 @@ export function evaluate(skills: Skill[], members: Member[], policies: Policy[])
       if (!s.hasEvals) push('p-evals', s, 'Published without an eval suite')
       if (isRisky(s) && s.approvals.length < 2) push('p-two-approvals', s, `Runs ${s.tools.filter((t) => /^(Bash|Write|Edit)/.test(t)).join(', ')} with ${s.approvals.length} approval`)
       if (sum(s.usage.slice(-4)) === 0) push('p-stale', s, 'No runs in the last 4 weeks')
+      if (s.source && !s.source.vetted) push('p-external', s, `Imported from ${s.source.repo} without a security review`)
       if (s.teamIds.length >= 3) {
         const totals = s.teamIds.map((t) => sum(s.usageByTeam[t] ?? []))
         const all = sum(totals)
@@ -123,6 +124,7 @@ export function blockers(skill: Skill, to: Stage, user: Member | undefined, poli
     const req = requiredApprovals(skill, policies)
     if (skill.approvals.length < req) r.push(`Needs ${req} approval${req > 1 ? 's' : ''} (has ${skill.approvals.length})`)
     if (policies.find((p) => p.id === 'p-evals')?.enabled && !skill.hasEvals) r.push('Attach an eval suite first')
+    if (policies.find((p) => p.id === 'p-external')?.enabled && skill.source && !skill.source.vetted) r.push('External code needs a security review first')
   }
   if (to === 'deprecated') need('skill.deprecate')
   return [...new Set(r)]

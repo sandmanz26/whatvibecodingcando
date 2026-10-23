@@ -21,7 +21,7 @@ export default function Pipeline() {
     <main className="page" style={{ maxWidth: 1480 }}>
       <div className="page-head">
         <div>
-          <h1>Review pipeline</h1>
+          <h1>Review</h1>
           <p>Drag a skill to move it. Rules are enforced as you drop — if a move is blocked, the column tells you why.</p>
         </div>
         <div className="actions">

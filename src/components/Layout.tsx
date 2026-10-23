@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import {
   LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Search, Moon, Sun,
-  Lightbulb, RotateCcw, Layers, X, CircleAlert, ChevronRight, MousePointerClick, ListChecks,
+  RotateCcw, Layers, X, CircleAlert, ChevronRight, MousePointerClick, ListChecks,
 } from 'lucide-react'
 import { useStore } from '../store/store'
 import { evaluate } from '../lib/logic'
@@ -24,17 +24,17 @@ function useTheme() {
 
 const TITLES: Record<string, string> = {
   '': 'Overview',
-  skills: 'Skill library',
-  pipeline: 'Review pipeline',
-  team: 'Team & access',
-  governance: 'Governance',
-  insights: 'Insights',
-  playbook: 'Playbook',
-  console: 'Click insights',
+  skills: 'Skills',
+  pipeline: 'Review',
+  team: 'People',
+  governance: 'Rules',
+  insights: 'Value',
+  playbook: 'Demo guide',
+  console: 'Sessions',
 }
 
 export function Layout() {
-  const { skills, members, policies, me, dispatch, toasts, dismiss, lens, setLens, skill, toast } = useStore()
+  const { skills, members, policies, me, dispatch, toasts, dismiss, skill, toast } = useStore()
   const [theme, toggleTheme] = useTheme()
   const [palette, setPalette] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -79,27 +79,23 @@ export function Layout() {
           </span>
         </Link>
         {nav('/', 'Overview', LayoutGrid)}
-        {nav('/skills', 'Skill library', Library, skills.length)}
-        {nav('/pipeline', 'Review pipeline', KanbanSquare, inReview)}
-        <div className="nav-label">Manage</div>
-        {nav('/team', 'Team & access', Users)}
-        {nav('/governance', 'Governance', ShieldCheck, violations.length, violations.some((v) => v.severity === 'critical'))}
-        {nav('/insights', 'Insights', LineChart)}
-        <div className="nav-label">Demo</div>
-        {nav('/playbook', 'Playbook', Sparkles)}
-        {nav('/console/insights', 'Click insights', MousePointerClick)}
+        {nav('/skills', 'Skills', Library, skills.length)}
+        {nav('/pipeline', 'Review', KanbanSquare, inReview)}
+        {nav('/team', 'People', Users)}
+        {nav('/governance', 'Rules', ShieldCheck, violations.length, violations.some((v) => v.severity === 'critical'))}
+        {nav('/insights', 'Value', LineChart)}
+        <div className="nav-label">Research</div>
+        {nav('/console/insights', 'Sessions', MousePointerClick)}
         {nav('/console/tests', 'Usability tests', ListChecks)}
-        {nav('/v2', 'Skillhouse v2', Sparkles)}
+        {nav('/playbook', 'Demo guide', Sparkles)}
 
         <div className="sidebar-foot">
-          <div className="card" style={{ padding: 10 }}>
-            <label className="label" htmlFor="viewas" style={{ fontSize: 11.5, color: 'var(--ink-3)', fontWeight: 550 }}>Viewing as</label>
-            <div className="row" style={{ marginTop: 6 }}>
-              <Avatar member={me} />
+          <label className="row viewas" htmlFor="viewas" title="Switch person to see permissions change">
+            <Avatar member={me} />
+            <span style={{ minWidth: 0, flex: 1 }}>
               <select
                 id="viewas"
-                className="select"
-                style={{ height: 30, fontSize: 12.5, fontWeight: 550 }}
+                aria-label="Viewing as"
                 value={me.id}
                 onChange={(e) => {
                   dispatch({ type: 'setUser', id: e.target.value })
@@ -113,18 +109,11 @@ export function Layout() {
                   </optgroup>
                 ))}
               </select>
-            </div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 6 }}>Role: <b style={{ color: 'var(--ink-2)' }}>{me.role}</b> · switch to see permissions change</div>
-          </div>
-          <div className="row" style={{ justifyContent: 'space-between', padding: '0 2px' }}>
-            <button className="btn ghost sm" onClick={() => setLens(!lens)} aria-pressed={lens} title="Toggle demo lens">
-              <Lightbulb size={14} color={lens ? 'var(--accent)' : undefined} /> Lens {lens ? 'on' : 'off'}
-            </button>
-            <div className="row" style={{ gap: 2 }}>
-              <button className="btn ghost sm icon" onClick={toggleTheme} aria-label="Toggle theme">{theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}</button>
-              <button className="btn ghost sm icon" onClick={() => setConfirmReset(true)} aria-label="Reset demo data" title="Reset demo data"><RotateCcw size={14} /></button>
-            </div>
-          </div>
+              <small>{me.role}</small>
+            </span>
+            <button className="btn ghost sm icon" onClick={(e) => { e.preventDefault(); toggleTheme() }} aria-label="Toggle theme">{theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}</button>
+            <button className="btn ghost sm icon" onClick={(e) => { e.preventDefault(); setConfirmReset(true) }} aria-label="Reset demo data" title="Reset demo data"><RotateCcw size={14} /></button>
+          </label>
         </div>
       </aside>
 
@@ -135,7 +124,7 @@ export function Layout() {
             <ChevronRight size={13} />
             {crumbSkill ? (
               <>
-                <Link to="/skills">Skill library</Link>
+                <Link to="/skills">Skills</Link>
                 <ChevronRight size={13} />
                 <span className="here">{crumbSkill.title}</span>
               </>

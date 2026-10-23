@@ -14,6 +14,8 @@ const VERB: Record<AuditEvent['action'], string> = {
   role: 'changed a role',
   policy: 'changed a policy',
   restored: 'moved back',
+  imported: 'imported',
+  synced: 'updated from upstream',
 
 }
 

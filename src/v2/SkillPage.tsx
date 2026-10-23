@@ -6,6 +6,7 @@ import { LineChart } from '../components/charts'
 import { WEEK_LABELS } from '../data/seed'
 import { ago, dateLabel, fmt, minimumRole, requiredApprovals, stageLabel, sum, toSkillMd } from '../lib/logic'
 import { SkillDoc } from './SkillDoc'
+import { SourceBlock } from '../components/SourceBlock'
 import { Face, firstName } from './bits'
 
 export default function V2SkillPage() {
@@ -39,7 +40,7 @@ export default function V2SkillPage() {
           <div>
             <h1 className="v2-title">{s.title}</h1>
             <p className="v2-sub" style={{ marginTop: 4 }}>
-              {firstName(owner)} wrote it · v{s.version} · {s.stage === 'published' ? `${fmt(runs4)} runs and ${fmt(hours4)} hours saved in the last 4 weeks` : `${stageLabel(s.stage)}, updated ${ago(s.updatedAt)}`}
+              {s.source ? `From ${s.source.origin}, looked after by ${firstName(owner)}` : `${firstName(owner)} wrote it`} · v{s.version} · {s.stage === 'published' ? `${fmt(runs4)} runs and ${fmt(hours4)} hours saved in the last 4 weeks` : `${stageLabel(s.stage)}, updated ${ago(s.updatedAt)}`}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -82,6 +83,13 @@ export default function V2SkillPage() {
                 </div>
               )}
             </section>
+
+            {s.source && (
+              <section className="v2-panel">
+                <div className="v2-panel-head"><h2 className="v2-section">Where it comes from</h2>{s.source.latest && <span className="v2-chip warn">Update upstream</span>}</div>
+                <SourceBlock skill={s} v2 />
+              </section>
+            )}
 
             <section className="v2-panel">
               <div className="v2-panel-head"><h2 className="v2-section">Versions</h2><span className="v2-chip">{s.versions.length}</span></div>

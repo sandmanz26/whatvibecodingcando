@@ -10,7 +10,7 @@ import { Face, firstName, longDate } from './bits'
 
 const VERB: Record<string, string> = {
   created: 'started', updated: 'edited', submitted: 'sent for review', approved: 'approved', published: 'put on the shelf',
-  deprecated: 'retired', commented: 'commented on', access: 'lent out', role: 'changed a role', policy: 'changed a rule', restored: 'took back',
+  deprecated: 'retired', commented: 'commented on', access: 'lent out', role: 'changed a role', policy: 'changed a rule', restored: 'took back', imported: 'brought in', synced: 'updated',
 }
 
 export default function V2Home() {
@@ -38,6 +38,8 @@ export default function V2Home() {
       out.push({ id: `r${s.id}`, to: `/v2/review/${s.id}`, title: s.title, detail: `${firstName(member(s.ownerId))} asked · ${s.approvals.length} of ${requiredApprovals(s, policies)} approvals`, tag: 'Review', tone: 'teal', who: s.ownerId }))
     skills.filter((s) => s.stage === 'approved' && can(me, 'skill.publish', s)).forEach((s) =>
       out.push({ id: `a${s.id}`, to: `/v2/review/${s.id}`, title: s.title, detail: 'Approved, not on the shelf yet', tag: 'Publish', tone: 'pos', who: s.ownerId }))
+    skills.filter((s) => s.source?.latest && s.ownerId === me.id).forEach((s) =>
+      out.push({ id: `u${s.id}`, to: `/v2/skills/${s.id}`, title: s.title, detail: `v${s.source!.latest} is out upstream; you run v${s.source!.pinned}`, tag: 'Update', tone: 'warn', who: s.ownerId }))
     skills.filter((s) => s.stage === 'draft' && s.ownerId === me.id).forEach((s) =>
       out.push({ id: `d${s.id}`, to: `/v2/write/${s.id}`, title: s.title, detail: 'Your draft', tag: 'Finish', tone: '', who: s.ownerId }))
     return out

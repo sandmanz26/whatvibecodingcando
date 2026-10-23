@@ -2,6 +2,7 @@ import { HashRouter, Route, Routes } from 'react-router-dom'
 import { HeatmapOverlay, InsightsTracker } from './tools/insights/InsightsTools'
 import { ReviewPins } from './tools/pins/ReviewPins'
 import { UsabilityRunner } from './tools/tests/Runner'
+import { VersionSwitch } from './components/VersionSwitch'
 import { StoreProvider } from './store/store'
 import { Layout } from './components/Layout'
 import Overview from './pages/Overview'
@@ -64,6 +65,7 @@ export default function App() {
         <HeatmapOverlay />
         <ReviewPins />
         <UsabilityRunner />
+        <VersionSwitch />
       </HashRouter>
     </StoreProvider>
   )

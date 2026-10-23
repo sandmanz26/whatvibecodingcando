@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Check, Minus } from 'lucide-react'
 import { useStore, useCan } from '../store/store'
 import { Avatar, Lens, StageBadge, TeamTag } from '../components/ui'
-import { Sparkline } from '../components/charts'
 import { LENS } from '../data/lens'
-import { ALL_PERMISSIONS, PERMISSION_LABELS, ROLES, can, dateLabel, fmt, minimumRole, sum, teamWeekly } from '../lib/logic'
+import { ALL_PERMISSIONS, PERMISSION_LABELS, ROLES, can, dateLabel, fmt, minimumRole, sum } from '../lib/logic'
 import type { Role } from '../data/types'
 
 type Tab = 'members' | 'matrix' | 'roles'
@@ -21,34 +20,13 @@ export default function Team() {
     <main className="page">
       <div className="page-head">
         <div>
-          <h1>Team & access</h1>
+          <h1>People</h1>
           <p>{members.length} people across {teams.length} teams. Roles decide what people can do; access decides which skills each team sees.</p>
         </div>
       </div>
 
       <Lens info={LENS.team} />
 
-      <div className="grid g-4" style={{ marginBottom: 20 }}>
-        {teams.map((t) => {
-          const weekly = teamWeekly(skills, t.id)
-          return (
-            <section key={t.id} className="card stat">
-              <div className="row" style={{ gap: 8 }}>
-                <i style={{ width: 10, height: 10, borderRadius: 3, background: `var(--s${t.slot})` }} />
-                <span className="stat-label" style={{ color: 'var(--ink)', fontWeight: 600 }}>{t.name}</span>
-              </div>
-              <div className="stat-foot" style={{ alignItems: 'flex-end' }}>
-                <div>
-                  <div className="stat-value num" style={{ fontSize: 22 }}>{fmt(sum(weekly.slice(-4)))}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>runs · 4 wks</div>
-                  <div className="secondary" style={{ fontSize: 12, marginTop: 6 }}>{members.filter((m) => m.teamId === t.id).length} people · {live.filter((s) => s.teamIds.includes(t.id)).length} skills</div>
-                </div>
-                <Sparkline values={weekly} color={`var(--s${t.slot})`} />
-              </div>
-            </section>
-          )
-        })}
-      </div>
 
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'members'} onClick={() => setTab('members')}>Members<span className="count">{members.length}</span></button>
