@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import {
   LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Search, Moon, Sun,
-  Lightbulb, RotateCcw, Layers, X, CircleAlert, ChevronRight,
+  Lightbulb, RotateCcw, Layers, X, CircleAlert, ChevronRight, MousePointerClick,
 } from 'lucide-react'
 import { useStore } from '../store/store'
 import { evaluate } from '../lib/logic'
 import { Avatar, Modal } from './ui'
 import { CommandPalette } from './CommandPalette'
+import { HeatmapOverlay, InsightsTracker } from '../tools/insights/InsightsTools'
+import { ReviewPins } from '../tools/pins/ReviewPins'
 
 function useTheme() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -30,6 +32,7 @@ const TITLES: Record<string, string> = {
   governance: 'Governance',
   insights: 'Insights',
   playbook: 'Playbook',
+  console: 'Click insights',
 }
 
 export function Layout() {
@@ -86,6 +89,7 @@ export function Layout() {
         {nav('/insights', 'Insights', LineChart)}
         <div className="nav-label">Demo</div>
         {nav('/playbook', 'Playbook', Sparkles)}
+        {nav('/console/insights', 'Click insights', MousePointerClick)}
 
         <div className="sidebar-foot">
           <div className="card" style={{ padding: 10 }}>
@@ -146,6 +150,10 @@ export function Layout() {
         </header>
         <Outlet />
       </div>
+
+      <InsightsTracker />
+      <HeatmapOverlay />
+      <ReviewPins />
 
       {palette && <CommandPalette onClose={() => setPalette(false)} toggleTheme={toggleTheme} />}
 

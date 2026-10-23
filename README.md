@@ -40,3 +40,36 @@ src/
   components/ layout, command palette, charts, UI primitives
   pages/     one file per screen
 ```
+
+## Internal tools: click insights & review pins
+
+Two tools that sit *around* the product (not features of it). Each has its own flag and neither changes how the app behaves. Both are switched off on the console route (`/console/*`), and each marks its own DOM (`data-insights-ignore`, `data-review-pins`) so neither records nor reacts to the other.
+
+Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags.reviewPins`). You can toggle them on **Click insights** (`#/console/insights`) or from the ⌘K palette.
+
+### Click insights
+- **Recorded:** screen views (with the previous screen), and taps. A tap stores its position, the control's visible name (its aria-label or own text, max 100 chars), its kind, its section, a selector to find it again, where on the element it landed, its aria state, time since the screen opened, scroll depth, rage (3+ taps within 1 s and 40 px), dead (not a control), and its effect within 0.7 s (navigated / changed / nothing).
+- **Never recorded:** anything typed, field values, names, emails, or page content. For a field we keep only its placeholder, name or type. The session id is random, per tab (sessionStorage), and not linked to a user.
+- **Defaults:** on in development; **off in production builds until the product owner decides on consent** (banner / privacy policy).
+- **Where to review:** `#/console/insights` (screens, problem taps, elements, paths). Add `?heatmap` (dots) or `?heatmap=elements` (outlined elements; `&el=<selector>` focuses one) to any screen URL. Only taps from the same page *and* layout bucket are drawn (mobile < 640 px, tablet < 1024 px, desktop).
+
+### Review pins
+- A draggable 40 px pen button, shown only below 500 px wide (the mobile layout). Tap it to add numbered notes anywhere, see all notes, save or open a `.txt`, delete all, or hide the tool until reload. Pins scroll with the page: x is a % of the current width; y is `scrollY + y% × viewport height at placement`.
+- The `.txt` export is human-readable and lossless. Importing merges notes by id, and the file wins.
+
+### Storage and sync
+This project ships **no backend**. By default both tools are *local only* and keep their data in this browser (`skillhouse.insights.clicks`, newest 3,000 events; `skillhouse.reviewPins`). The UI says which mode it is in.
+
+To share data between browsers, build with `VITE_TOOLS_API=/api` and provide two endpoints that follow this contract:
+
+| Endpoint | Calls |
+|---|---|
+| `/api/clicks` | `GET → { configured, scope, events }` · `POST { events } (≤ 200) → { configured, scope, stored }` · `POST { clear: true }` |
+| `/api/review-pins` | `GET → { configured, scope, annotations }` · `POST { annotations }` replaces the whole set (≤ 500 notes, text ≤ 4,000 chars). Last write wins. |
+
+Rules for those endpoints:
+- When their key-value store is missing they must answer HTTP 200 `{ configured: false }`. The client then falls back to localStorage, so you never get an error screen.
+- Scope keys per deployment: production uses the bare key; every other deployment appends its branch. Return that key as `scope`.
+- Validate every POST.
+- Send `Cache-Control: no-store`.
+- **The endpoints are unauthenticated.** Anyone who can reach them can read or clear the data. That is acceptable only because they store nothing personal.

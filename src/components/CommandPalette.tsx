@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Moon, Lightbulb, UserRound, CornerDownLeft } from 'lucide-react'
+import { Search, Plus, LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Moon, Lightbulb, UserRound, CornerDownLeft, MousePointerClick, PenLine } from 'lucide-react'
 import { useStore } from '../store/store'
 import { stageIcon } from './ui'
+import { getFlag, setFlag } from '../tools/shared'
 
 interface Item {
   id: string
@@ -26,6 +27,9 @@ export function CommandPalette({ onClose, toggleTheme }: { onClose: () => void; 
       { id: 'new', group: 'Actions', label: 'Create new skill', icon: <Plus size={15} />, run: go('/skills/new') },
       { id: 'theme', group: 'Actions', label: 'Toggle dark mode', icon: <Moon size={15} />, run: () => { toggleTheme(); onClose() } },
       { id: 'lens', group: 'Actions', label: lens ? 'Hide demo lens' : 'Show demo lens', icon: <Lightbulb size={15} />, run: () => { setLens(!lens); onClose() } },
+      { id: 'insights', group: 'Tools', label: `${getFlag('insights') ? 'Stop' : 'Start'} recording clicks`, icon: <MousePointerClick size={15} />, run: () => { setFlag('insights', !getFlag('insights')); toast(`Click recording ${getFlag('insights') ? 'on' : 'off'}`); onClose() } },
+      { id: 'pins', group: 'Tools', label: `Turn review pins ${getFlag('reviewPins') ? 'off' : 'on'}`, sub: 'below 500 px', icon: <PenLine size={15} />, run: () => { setFlag('reviewPins', !getFlag('reviewPins')); toast(`Review pins ${getFlag('reviewPins') ? 'on — narrow the window below 500 px to see the button' : 'off'}`); onClose() } },
+      { id: 'p-c', group: 'Pages', label: 'Click insights', icon: <MousePointerClick size={15} />, run: go('/console/insights') },
       { id: 'p-o', group: 'Pages', label: 'Overview', icon: <LayoutGrid size={15} />, run: go('/') },
       { id: 'p-l', group: 'Pages', label: 'Skill library', icon: <Library size={15} />, run: go('/skills') },
       { id: 'p-p', group: 'Pages', label: 'Review pipeline', icon: <KanbanSquare size={15} />, run: go('/pipeline') },

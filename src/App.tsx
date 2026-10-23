@@ -10,6 +10,7 @@ import Team from './pages/Team'
 import Governance from './pages/Governance'
 import Insights from './pages/Insights'
 import Playbook from './pages/Playbook'
+import ClickInsights from './pages/ClickInsights'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="governance" element={<Governance />} />
             <Route path="insights" element={<Insights />} />
             <Route path="playbook" element={<Playbook />} />
+            <Route path="console/insights" element={<ClickInsights />} />
             <Route path="*" element={<Overview />} />
           </Route>
         </Routes>
