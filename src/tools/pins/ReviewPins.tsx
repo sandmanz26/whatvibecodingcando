@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { MessageSquarePlus, MessageSquare, X, List, Download, Upload, Trash2, EyeOff, Check, RotateCcw, Send } from 'lucide-react'
+import { MessageSquarePlus, MessageSquare, X, List, Download, Upload, Trash2, EyeOff } from 'lucide-react'
 import { APP, TOOL_DOM, isConsole, isEmbedded, readJSON, useFlag, writeJSON } from '../shared'
-import { describeTarget } from '../insights/tracker'
 import { useStore } from '../../store/store'
 import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, toTxt, txtFileName, type PinNote } from './format'
 import { STATUS_TEXT, usePinSync } from './useSync'
@@ -26,7 +25,7 @@ function firstVisible(sel: string): Element | null {
   return null
 }
 
-/** Where a comment sits in the document: on its element when it can be found, else where it was placed. */
+/** Where a comment sits in the document: where it was placed (older comments pinned to an element follow it). */
 function anchor(n: PinNote, vw: number) {
   if (n.sel) {
     const el = firstVisible(n.sel)
@@ -77,12 +76,10 @@ function Comments({ onHide }: { onHide: () => void }) {
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight })
   const [, setTick] = useState(0)
   const [placing, setPlacing] = useState(false)
-  const [hover, setHover] = useState<DOMRect | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [menu, setMenu] = useState(false)
-  const [list, setList] = useState<'open' | 'resolved' | null>(null)
+  const [list, setList] = useState<'open' | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
-  const [reply, setReply] = useState('')
   const [confirmAll, setConfirmAll] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
@@ -104,55 +101,42 @@ function Comments({ onHide }: { onHide: () => void }) {
 
   const ordered = useMemo(() => [...notes].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [notes])
   const number = useMemo(() => new Map(ordered.map((n, i) => [n.id, i + 1])), [ordered])
-  const here = ordered.filter((n) => n.page === pathname && !n.resolved)
+  const here = ordered.filter((n) => n.page === pathname)
   const open = notes.find((n) => n.id === openId)
-  const openCount = notes.filter((n) => !n.resolved).length
 
   const say = (t: string) => { setToast(t); window.setTimeout(() => setToast((x) => (x === t ? null : x)), 2600) }
   const update = (id: string, patch: Partial<PinNote>) => setNotes((all) => all.map((n) => (n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n)))
 
   const closeCard = useCallback(() => {
-    // A comment left empty with no replies is dropped rather than kept as a blank pin.
-    setNotes((all) => all.filter((n) => n.id !== openId || n.text.trim() !== '' || (n.replies?.length ?? 0) > 0))
+    // A comment left empty is dropped rather than kept as a blank pin.
+    setNotes((all) => all.filter((n) => n.id !== openId || n.text.trim() !== ''))
     setOpenId(null)
-    setReply('')
   }, [openId, setNotes])
 
-  // Comment mode: outline what's under the pointer; a click pins the comment to that element.
+  // Comment mode: a crosshair, and a click drops the comment right there — anywhere on the page.
   useEffect(() => {
     if (!placing) return
     document.documentElement.dataset.commenting = 'on'
-    const over = (e: MouseEvent) => {
-      const t = e.target as Element
-      if (!(t instanceof Element) || t.closest(TOOL_DOM)) { setHover(null); return }
-      setHover(describeTarget(t).el.getBoundingClientRect())
-    }
     const click = (e: MouseEvent) => {
       const t = e.target as Element
       if (!(t instanceof Element) || t.closest(TOOL_DOM)) return
       e.preventDefault()
       e.stopPropagation()
       if (notes.length >= MAX_NOTES) { setPlacing(false); return say(`Limit of ${MAX_NOTES} comments reached`) }
-      const { el, sel, label } = describeTarget(t)
-      const r = el.getBoundingClientRect()
       const now = new Date().toISOString()
       const n: PinNote = {
         id: uid(), page: pathname,
         x: Math.round((e.clientX / window.innerWidth) * 1000) / 10, y: Math.round((e.clientY / window.innerHeight) * 1000) / 10,
         vw: window.innerWidth, vh: window.innerHeight, scrollY: Math.round(window.scrollY),
-        text: '', createdAt: now, updatedAt: now, sel, label: label.slice(0, 120), author: me.name,
-        ex: Math.round(((e.clientX - r.left) / Math.max(1, r.width)) * 1000) / 10, ey: Math.round(((e.clientY - r.top) / Math.max(1, r.height)) * 1000) / 10,
+        text: '', createdAt: now, updatedAt: now, author: me.name,
       }
       setNotes((all) => [...all, n])
       setPlacing(false)
-      setHover(null)
       setOpenId(n.id)
     }
-    document.addEventListener('mousemove', over, true)
     document.addEventListener('click', click, true)
     return () => {
       delete document.documentElement.dataset.commenting
-      document.removeEventListener('mousemove', over, true)
       document.removeEventListener('click', click, true)
     }
   }, [placing, pathname, me.name, notes.length, setNotes])
@@ -185,13 +169,13 @@ function Comments({ onHide }: { onHide: () => void }) {
       else if (openId) closeCard()
       else if (list) setList(null)
       else if (menu) setMenu(false)
-      else if (placing) { setPlacing(false); setHover(null) }
+      else if (placing) setPlacing(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [confirmAll, openId, list, menu, placing, closeCard])
 
-  // From the list: go to the page, scroll the element into view, ring it, open the thread.
+  // From the list: go to the page, scroll the spot into view, ping it, open the comment.
   useEffect(() => {
     if (!pending) return
     const n = notes.find((x) => x.id === pending)
@@ -233,18 +217,12 @@ function Comments({ onHide }: { onHide: () => void }) {
     setList('open')
   }
 
-  const sendReply = () => {
-    if (!open || !reply.trim()) return
-    update(open.id, { replies: [...(open.replies ?? []), { id: uid(), author: me.name, text: reply.trim().slice(0, MAX_TEXT), at: new Date().toISOString() }] })
-    setReply('')
-  }
-
   const right = btn.x + BTN / 2 > vp.w / 2
   const below = btn.y + BTN / 2 < vp.h / 2
   const menuStyle: React.CSSProperties = { ...(right ? { right: vp.w - btn.x - BTN } : { left: btn.x }), ...(below ? { top: btn.y + BTN + 8 } : { bottom: vp.h - btn.y + 8 }) }
 
   const flashEl = flash ? notes.find((n) => n.id === flash) : undefined
-  const flashRect = flashEl?.sel ? firstVisible(flashEl.sel)?.getBoundingClientRect() : undefined
+  const flashAt = flashEl ? anchor(flashEl, vp.w) : undefined
 
   const card = (() => {
     if (!open) return null
@@ -262,23 +240,21 @@ function Comments({ onHide }: { onHide: () => void }) {
       {here.map((n) => {
         const a = anchor(n, vp.w)
         return (
-          <button key={n.id} className={`rp-pin ${openId === n.id ? 'open' : ''} ${a.found ? '' : 'lost'}`} style={{ left: a.x, top: a.y }}
-            title={a.found ? n.label : `${n.label ?? 'Element'} isn’t on this layout any more`}
+          <button key={n.id} className={`rp-pin ${openId === n.id ? 'open' : ''}`} style={{ left: a.x, top: a.y }}
+            title={n.text ? n.text.slice(0, 80) : 'Empty comment'}
             aria-label={`Comment ${number.get(n.id)}${n.text ? `: ${n.text.slice(0, 40)}` : ''}`}
             onClick={() => { setMenu(false); setList(null); setOpenId(n.id) }}>
             {number.get(n.id)}
-            {(n.replies?.length ?? 0) > 0 && <span className="rp-replies">{n.replies!.length}</span>}
           </button>
         )
       })}
 
       {placing && (
         <>
-          <span className="rp-hint">Click the thing you want to comment on · Esc to cancel</span>
-          {hover && <div className="rp-outline" style={{ left: hover.left - 3, top: hover.top - 3, width: hover.width + 6, height: hover.height + 6 }} />}
+          <span className="rp-hint">Click anywhere to leave a comment · Esc to cancel</span>
         </>
       )}
-      {flashRect && <div className="rp-outline flash" style={{ left: flashRect.left - 4, top: flashRect.top - 4, width: flashRect.width + 8, height: flashRect.height + 8 }} />}
+      {flashAt && <span className="rp-ping" style={{ left: flashAt.x, top: flashAt.y }} aria-hidden />}
 
       <button
         className={`rp-fab ${placing ? 'placing' : ''}`}
@@ -288,7 +264,7 @@ function Comments({ onHide }: { onHide: () => void }) {
         {...dragHandlers(
           (e) => setBtn(clamp({ x: e.clientX - BTN / 2, y: e.clientY - BTN / 2 })),
           // One click starts commenting; the ⋯ button beside it holds everything else.
-          () => { setMenu(false); setOpenId(null); setList(null); if (placing) { setPlacing(false); setHover(null) } else setPlacing(true) },
+          () => { setMenu(false); setOpenId(null); setList(null); if (placing) setPlacing(false); else setPlacing(true) },
           () => setBtn((b: { x: number; y: number }) => { writeJSON(BUTTON_KEY, b); return b }),
         )}
       >
@@ -303,7 +279,7 @@ function Comments({ onHide }: { onHide: () => void }) {
       {menu && (
         <div className="rp-menu" style={menuStyle} role="menu">
           <button role="menuitem" onClick={() => { setMenu(false); setPlacing(true) }}><MessageSquarePlus size={15} /> Comment on something</button>
-          <button role="menuitem" onClick={() => { setMenu(false); setList('open') }}><List size={15} /> All comments ({openCount} open)</button>
+          <button role="menuitem" onClick={() => { setMenu(false); setList('open') }}><List size={15} /> All comments ({notes.length})</button>
           <button role="menuitem" onClick={exportTxt} disabled={!notes.length}><Download size={15} /> Save to .txt</button>
           <button role="menuitem" onClick={() => fileRef.current?.click()}><Upload size={15} /> Open a .txt</button>
           <button role="menuitem" className="danger" onClick={() => { setMenu(false); setConfirmAll(true) }} disabled={!notes.length}><Trash2 size={15} /> Delete all comments</button>
@@ -318,32 +294,16 @@ function Comments({ onHide }: { onHide: () => void }) {
         <div className="rp-card" style={card} role="dialog" aria-label={`Comment ${number.get(open.id)}`}>
           <div className="rp-card-head">
             <b>Comment {number.get(open.id)}</b>
-            <span>on {open.label ? `“${open.label}”` : 'this spot'} · <span className="mono">{open.page}</span></span>
+            <span>{open.author ?? 'Someone'} · {ago(open.createdAt)} · <span className="mono">{open.page}</span></span>
           </div>
-          {mine(open) && !(open.replies?.length) ? (
+          {mine(open) ? (
             <textarea autoFocus rows={3} maxLength={MAX_TEXT} placeholder="What should change here?" value={open.text} onChange={(e) => update(open.id, { text: e.target.value })} aria-label="Comment" />
           ) : (
-            <div className="rp-msg"><b>{open.author ?? 'Someone'}</b> <span>{ago(open.createdAt)}</span><p>{open.text || '—'}</p></div>
-          )}
-          {(open.replies ?? []).map((r) => (
-            <div key={r.id} className="rp-msg reply"><b>{r.author}</b> <span>{ago(r.at)}</span><p>{r.text}</p></div>
-          ))}
-          {(open.text.trim() || (open.replies?.length ?? 0) > 0) && (
-            <form className="rp-reply" onSubmit={(e) => { e.preventDefault(); sendReply() }}>
-              <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder={`Reply as ${me.name.split(' ')[0]}`} aria-label="Reply" />
-              <button type="submit" className="btn sm icon" aria-label="Send reply" disabled={!reply.trim()}><Send size={13} /></button>
-            </form>
+            <div className="rp-msg"><p>{open.text || '—'}</p></div>
           )}
           <div className="rp-card-foot">
             <button className="btn sm ghost danger" onClick={() => { setNotes((all) => all.filter((n) => n.id !== open.id)); setOpenId(null) }}><Trash2 size={13} /> Delete</button>
-            <span style={{ display: 'flex', gap: 6 }}>
-              {(open.text.trim() || (open.replies?.length ?? 0) > 0) && (
-                <button className="btn sm" onClick={() => { update(open.id, { resolved: !open.resolved }); say(open.resolved ? 'Reopened' : 'Resolved — find it under Resolved in the list'); setOpenId(null) }}>
-                  {open.resolved ? <><RotateCcw size={13} /> Reopen</> : <><Check size={13} /> Resolve</>}
-                </button>
-              )}
-              <button className="btn sm primary" onClick={closeCard}>Close</button>
-            </span>
+            <button className="btn sm primary" onClick={closeCard}>Close</button>
           </div>
         </div>
       )}
@@ -352,24 +312,19 @@ function Comments({ onHide }: { onHide: () => void }) {
         <div className="rp-sheet" role="dialog" aria-label="All comments">
           <div className="rp-sheet-head">
             <b>Comments</b>
-            <div className="seg" role="group" aria-label="Show" style={{ marginLeft: 8 }}>
-              <button aria-pressed={list === 'open'} onClick={() => setList('open')}>Open {openCount}</button>
-              <button aria-pressed={list === 'resolved'} onClick={() => setList('resolved')}>Resolved {notes.length - openCount}</button>
-            </div>
+            <span className="muted">{notes.length}</span>
             <button className="btn ghost sm icon" style={{ marginLeft: 'auto' }} onClick={() => setList(null)} aria-label="Close list"><X size={15} /></button>
           </div>
-          {ordered.filter((n) => (list === 'open' ? !n.resolved : n.resolved)).length === 0 && (
-            <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>{list === 'open' ? 'No open comments. Use “Comment on something” and click any element.' : 'Nothing resolved yet.'}</p>
-          )}
+          {notes.length === 0 && <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>No comments yet. Press Comment (or C) and click anywhere on a screen.</p>}
           <ol>
-            {[...ordered].reverse().filter((n) => (list === 'open' ? !n.resolved : n.resolved)).map((n) => (
+            {[...ordered].reverse().map((n) => (
               <li key={n.id}>
                 <button onClick={() => goTo(n)}>
                   <span className="rp-num">{number.get(n.id)}</span>
                   <span style={{ minWidth: 0 }}>
-                    <span className="rp-where"><span className="mono">{n.page}</span>{n.label ? ` · ${n.label}` : ''}</span>
+                    <span className="rp-where mono">{n.page}</span>
                     <span className="rp-text">{n.text || 'Empty comment'}</span>
-                    <span className="rp-meta">{n.author ?? 'Someone'} · {ago(n.createdAt)}{n.replies?.length ? ` · ${n.replies.length} repl${n.replies.length === 1 ? 'y' : 'ies'}` : ''}</span>
+                    <span className="rp-meta">{n.author ?? 'Someone'} · {ago(n.createdAt)}</span>
                   </span>
                 </button>
               </li>

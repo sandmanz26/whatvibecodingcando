@@ -198,3 +198,7 @@ html[data-ut-running] .rp-root { display: none; }
 .hm-dots i.stale { background: rgba(140, 140, 136, 0.28); box-shadow: 0 0 0 1px rgba(140, 140, 136, 0.4); }
 .rp-more { position: fixed; width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; background: var(--surface, #fff); color: var(--ink, #111); box-shadow: 0 2px 10px rgba(0,0,0,.2); font-size: 15px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .rp-more:hover { background: var(--surface-2, #f3f3f3); }
+/* free placement: a crosshair while choosing the spot, and a ping when you arrive from the list */
+html[data-commenting] body, html[data-commenting] body * { cursor: crosshair !important; }
+.rp-ping { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 0 rgba(235, 104, 52, 0.6); animation: rp-ping 1.8s ease-out forwards; }
+@keyframes rp-ping { 0% { box-shadow: 0 0 0 0 rgba(235, 104, 52, 0.7); } 70% { box-shadow: 0 0 0 26px rgba(235, 104, 52, 0); } 100% { box-shadow: 0 0 0 26px rgba(235, 104, 52, 0); } }

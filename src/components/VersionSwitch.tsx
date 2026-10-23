@@ -105,7 +105,7 @@ export function VersionSwitch() {
         </label>
         {!isConsole(pathname) && (
           <>
-            <button className="dock-comment" onClick={() => comment('start')} title="Comment on any element — or press C"><MessageSquarePlus size={15} /> Comment</button>
+            <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
             <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
           </>
         )}

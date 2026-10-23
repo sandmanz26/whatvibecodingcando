@@ -62,9 +62,9 @@ Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags
 - Results are stored in the browser where the test was taken (`skillhouse.tests`, `skillhouse.tests.sessions`).
 
 ### Comments
-- **How to comment:** press **Comment** in the dock (or press **C**, or click the round comment button), then click the element you mean. Type, then Close. **All comments** is the speech-bubbles icon in the dock, or ⋯ beside the comment button.
-- A draggable comment button on every screen (hidden on the console, inside its screen viewer and during a usability test). **Comment on something** outlines whatever is under the pointer; a click pins the comment to that element, so it follows the element when the layout moves. Each comment has its author (the person the app is viewing as), replies, and an open/resolved state. **All comments** lists them; choosing one goes back to its page, scrolls to the element, rings it and opens the thread.
-- Older placement data (position only) still loads. Tap it to add numbered notes anywhere, see all notes, save or open a `.txt`, delete all, or hide the tool until reload. Pins scroll with the page: x is a % of the current width; y is `scrollY + y% × viewport height at placement`.
+- **How to comment:** press **Comment** in the dock (or press **C**, or click the round comment button), then click **anywhere** on the screen — the comment is placed on that spot, not tied to an element. Type, then Close.
+- **All comments** (the speech-bubbles icon in the dock, or ⋯ beside the comment button) lists every comment with its page; choosing one goes to that page, scrolls to the spot and opens it. No replies or statuses: a comment is a note on a spot.
+- Comments made with the earlier element-pinned version still load and still follow their element.
 - The `.txt` export is human-readable and lossless. Importing merges notes by id, and the file wins.
 
 ### Storage and sync
