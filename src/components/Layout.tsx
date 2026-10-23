@@ -1,32 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import {
-  LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Search,
-  Layers, X, CircleAlert, ChevronRight, MousePointerClick, ListChecks,
+  LayoutGrid, Library, FolderGit2, Users, HeartPulse, Search,
+  Layers, ChevronRight,
 } from 'lucide-react'
 import { useStore } from '../store/store'
-import { evaluate } from '../lib/logic'
 import { CommandPalette } from './CommandPalette'
-import { useTheme } from '../lib/theme'
+import { Toasts } from './ui'
 
 const TITLES: Record<string, string> = {
   '': 'Overview',
   skills: 'Skills',
-  pipeline: 'Review',
-  team: 'People',
-  governance: 'Rules',
-  insights: 'Value',
-  console: 'Sessions',
+  projects: 'Projects',
+  teams: 'Teams',
+  health: 'Health',
 }
 
 export function Layout() {
-  const { skills, members, policies, toasts, dismiss, skill } = useStore()
-  const [, toggleTheme] = useTheme()
+  const { skills, projects, open, skill, project } = useStore()
   const [palette, setPalette] = useState(false)
   const loc = useLocation()
-
-  const violations = useMemo(() => evaluate(skills, members, policies), [skills, members, policies])
-  const inReview = skills.filter((s) => s.stage === 'review').length
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -43,7 +36,7 @@ export function Layout() {
 
   const parts = loc.pathname.split('/').filter(Boolean)
   const section = parts[0] ?? ''
-  const crumbSkill = section === 'skills' && parts[1] && parts[1] !== 'new' ? skill(parts[1]) : undefined
+  const crumb = section === 'skills' && parts[1] ? skill(parts[1])?.title : section === 'projects' && parts[1] ? project(parts[1])?.name : undefined
 
   const nav = (to: string, label: string, Icon: typeof LayoutGrid, count?: number, alert?: boolean) => (
     <NavLink to={to} end={to === '/'} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -65,14 +58,9 @@ export function Layout() {
         </Link>
         {nav('/', 'Overview', LayoutGrid)}
         {nav('/skills', 'Skills', Library, skills.length)}
-        {nav('/pipeline', 'Review', KanbanSquare, inReview)}
-        {nav('/team', 'People', Users)}
-        {nav('/governance', 'Rules', ShieldCheck, violations.length, violations.some((v) => v.severity === 'critical'))}
-        {nav('/insights', 'Value', LineChart)}
-        <div className="nav-label">Research</div>
-        {nav('/console/insights', 'Sessions', MousePointerClick)}
-        {nav('/console/tests', 'Usability tests', ListChecks)}
-
+        {nav('/projects', 'Projects', FolderGit2, projects.length)}
+        {nav('/teams', 'Teams', Users)}
+        {nav('/health', 'Health', HeartPulse, open.length, open.some((v) => v.severity === 'high'))}
       </aside>
 
       <div className="main">
@@ -80,14 +68,14 @@ export function Layout() {
           <nav className="crumbs" aria-label="Breadcrumb">
             <Link to="/">Arunika Labs</Link>
             <ChevronRight size={13} />
-            {crumbSkill ? (
+            {crumb ? (
               <>
-                <Link to="/skills">Skills</Link>
+                <Link to={`/${section}`}>{TITLES[section]}</Link>
                 <ChevronRight size={13} />
-                <span className="here">{crumbSkill.title}</span>
+                <span className="here">{crumb}</span>
               </>
             ) : (
-              <span className="here">{parts[1] === 'new' ? 'New skill' : section === 'console' && parts[1] === 'tests' ? 'Usability tests' : TITLES[section] ?? 'Overview'}</span>
+              <span className="here">{TITLES[section] ?? 'Overview'}</span>
             )}
           </nav>
           <div className="spacer" />
@@ -99,18 +87,10 @@ export function Layout() {
       </div>
 
 
-      {palette && <CommandPalette onClose={() => setPalette(false)} toggleTheme={toggleTheme} />}
+      {palette && <CommandPalette onClose={() => setPalette(false)} />}
 
 
-      <div className="toasts" role="status" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.tone}`}>
-            {t.tone === 'error' && <CircleAlert size={15} />}
-            {t.text}
-            <button onClick={() => dismiss(t.id)} aria-label="Dismiss"><X size={14} /></button>
-          </div>
-        ))}
-      </div>
+      <Toasts />
     </div>
   )
 }

@@ -1,31 +1,35 @@
-export type Role = 'Admin' | 'Maintainer' | 'Member' | 'Viewer'
-
-export type Stage = 'draft' | 'review' | 'approved' | 'published' | 'deprecated'
-
 export type Category = 'Engineering' | 'Design' | 'Product' | 'Support' | 'Operations' | 'Writing'
+
+/** active: maintained and recommended · experimental: being tried · deprecated: replaced, should be removed */
+export type Status = 'active' | 'experimental' | 'deprecated'
 
 export interface Team {
   id: string
   name: string
   /** categorical slot 1–4, fixed per team so color follows the entity */
   slot: 1 | 2 | 3 | 4
+  /** people on the team, for per-person intensity */
+  size: number
 }
 
 export interface Member {
   id: string
   name: string
   title: string
-  role: Role
   teamId: string
-  email: string
-  joinedAt: string
+  /** false once the person has left the company */
+  active: boolean
 }
 
-export interface Comment {
+/** A repository where skills are installed, e.g. under .claude/skills/. */
+export interface Project {
   id: string
-  authorId: string
-  text: string
-  at: string
+  /** repository name */
+  name: string
+  teamId: string
+  description: string
+  /** when the inventory last read this repository */
+  scannedAt: string
 }
 
 export interface Version {
@@ -35,21 +39,16 @@ export interface Version {
   note: string
 }
 
-/** Where a skill comes from. Internal skills are written here; external ones are imported and pinned. */
+/** Where a skill comes from when it was not written in this company. */
 export interface ExternalSource {
-  kind: 'external'
   /** who publishes it, e.g. "Anthropic" */
   origin: string
   /** owner/repo on GitHub */
   repo: string
-  path: string
   url: string
   license: string
-  /** the version this workspace runs */
-  pinned: string
-  /** newest version upstream, when it differs from pinned */
-  latest?: string
-  syncedAt: string
+  /** newest version upstream, when it is ahead of ours */
+  upstream?: string
   /** passed the security review for external code */
   vetted: boolean
 }
@@ -61,60 +60,31 @@ export interface Skill {
   title: string
   description: string
   category: Category
+  /** the team that maintains it */
+  teamId: string
   ownerId: string
-  teamIds: string[]
-  stage: Stage
+  status: Status
+  /** newest released version */
   version: string
-  createdAt: string
+  /** where the source of truth lives */
+  home: string
   updatedAt: string
   triggers: string[]
   instructions: string
-  examples: string[]
   tools: string[]
-  /** weekly invocations for the last 12 weeks, oldest first */
-  usage: number[]
-  /** usage split per team for the last 12 weeks */
-  usageByTeam: Record<string, number[]>
-  rating: number
-  /** minutes saved per run, self-reported by owner */
-  minutesSaved: number
-  reviewerIds: string[]
-  approvals: string[]
-  comments: Comment[]
   versions: Version[]
-  hasEvals: boolean
-  /** absent = written in this workspace */
+  /** for deprecated skills: what to use instead */
+  replacedBy?: string
   source?: ExternalSource
 }
 
-export type AuditAction =
-  | 'created'
-  | 'updated'
-  | 'submitted'
-  | 'approved'
-  | 'published'
-  | 'deprecated'
-  | 'commented'
-  | 'access'
-  | 'role'
-  | 'policy'
-  | 'restored'
-  | 'imported'
-  | 'synced'
-
-export interface AuditEvent {
-  id: string
-  at: string
-  actorId: string
-  action: AuditAction
-  skillId?: string
-  detail: string
-}
-
-export interface Policy {
-  id: string
-  name: string
-  description: string
-  enabled: boolean
-  severity: 'warning' | 'serious' | 'critical'
+/** One copy of a skill inside one project. */
+export interface Install {
+  skillId: string
+  projectId: string
+  version: string
+  /** runs per week for the last 12 weeks, oldest first */
+  runs: number[]
+  /** the copy was edited inside the project, so it no longer follows the source */
+  edited?: boolean
 }

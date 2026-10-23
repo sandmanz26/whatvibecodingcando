@@ -2,7 +2,6 @@ import { Fragment, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Flag, Pencil, Plus, Play, TimerOff, Trash2, X } from 'lucide-react'
 import { Empty, Modal } from '../components/ui'
-import { ConsoleNav } from './ConsoleNav'
 import { ScreenViewer, type Device } from '../tools/insights/ScreenViewer'
 import { layoutOf } from '../tools/insights/store'
 import { loadSessions, loadTests, saveSessions, summarize, type Attempt, type TestTask, type UsabilityTest } from '../tools/tests/store'
@@ -73,7 +72,7 @@ function List() {
   const sessions = loadSessions()
   return (
     <main className="page">
-      <ConsoleNav />
+      
       <div className="page-head">
         <div>
           <h1>Usability tests</h1>
@@ -139,7 +138,7 @@ function Results({ id }: { id: string }) {
   const [who, setWho] = useState<string | null>(null)
   const [replay, setReplay] = useState<{ steps: Step[]; i: number; title: string } | null>(null)
 
-  if (!test) return <main className="page"><ConsoleNav /><div className="card"><Empty title="Test not found"><Link className="btn sm" to="/console/tests">All tests</Link></Empty></div></main>
+  if (!test) return <main className="page"><div className="card"><Empty title="Test not found"><Link className="btn sm" to="/console/tests">All tests</Link></Empty></div></main>
 
   const sum = summarize(test, sessions)
   const att = sum.tasks.reduce((n, x) => n + x.attempts, 0)
@@ -150,7 +149,7 @@ function Results({ id }: { id: string }) {
 
   return (
     <main className="page">
-      <ConsoleNav />
+      
       <div className="page-head">
         <div>
           <div className="muted" style={{ fontSize: 12.5, marginBottom: 2 }}><Link to="/console/tests">Usability tests</Link> /</div>

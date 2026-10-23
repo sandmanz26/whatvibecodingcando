@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowDown, ArrowUp, Check, Crosshair, Plus, Trash2 } from 'lucide-react'
 import { Empty, Modal } from '../components/ui'
-import { ConsoleNav } from './ConsoleNav'
 import { DEVICES, ScreenViewer, type Device, type Picked } from '../tools/insights/ScreenViewer'
 import { loadTests, saveTests, uid, type TestTask, type UsabilityTest } from '../tools/tests/store'
 import { useStore } from '../store/store'
@@ -13,7 +12,7 @@ export default function TestEditor() {
   const { id } = useParams()
   const isNew = id === 'new'
   const nav = useNavigate()
-  const { skills, toast } = useStore()
+  const { skills, projects, toast } = useStore()
   const existing = isNew ? undefined : loadTests().find((t) => t.id === id)
   const [test, setTest] = useState<UsabilityTest>(() => existing ?? {
     id: uid(), name: '', intro: 'You’ll get a few short tasks. There are no wrong answers — we’re testing the design, not you.',
@@ -23,9 +22,9 @@ export default function TestEditor() {
   const [pickDevice, setPickDevice] = useState<Device>('desktop')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  if (!isNew && !existing) return <main className="page"><ConsoleNav /><div className="card"><Empty title="Test not found"><Link className="btn sm" to="/console/tests">All tests</Link></Empty></div></main>
+  if (!isNew && !existing) return <main className="page"><div className="card"><Empty title="Test not found"><Link className="btn sm" to="/console/tests">All tests</Link></Empty></div></main>
 
-  const pages = ['/', '/skills', '/skills/new', '/pipeline', '/team', '/governance', '/insights', ...skills.map((s) => `/skills/${s.id}`)]
+  const pages = ['/', '/skills', '/projects', '/teams', '/health', ...skills.map((s) => `/skills/${s.id}`), ...projects.map((p) => `/projects/${p.id}`), '/v2', '/v2/shelf', '/v2/projects', '/v2/tidy']
   const setTask = (tid: string, patch: Partial<TestTask>) => setTest((t) => ({ ...t, tasks: t.tasks.map((x) => (x.id === tid ? { ...x, ...patch } : x)) }))
   const move = (i: number, d: -1 | 1) => setTest((t) => {
     const tasks = [...t.tasks]
@@ -58,7 +57,7 @@ export default function TestEditor() {
 
   return (
     <main className="page" style={{ maxWidth: 980 }}>
-      <ConsoleNav />
+      
       <div className="page-head">
         <div>
           <div className="muted" style={{ fontSize: 12.5, marginBottom: 2 }}><Link to="/console/tests">Usability tests</Link> /</div>
@@ -76,7 +75,7 @@ export default function TestEditor() {
       <section className="card card-body stack gap-16" style={{ marginBottom: 16 }}>
         <div className="field">
           <label htmlFor="tname">Test name</label>
-          <input id="tname" className="input" value={test.name} onChange={(e) => setTest({ ...test, name: e.target.value })} placeholder="e.g. Finding and approving skills" />
+          <input id="tname" className="input" value={test.name} onChange={(e) => setTest({ ...test, name: e.target.value })} placeholder="e.g. Finding duplicate skills" />
         </div>
         <div className="field">
           <label htmlFor="tintro">Welcome message</label>

@@ -1,191 +1,218 @@
-import type { Member, Policy, Role, Skill, Stage } from '../data/types'
+import type { Install, Member, Project, Skill, Team } from '../data/types'
 import { DEMO_NOW } from '../data/seed'
 
-/* ---------- permissions ---------- */
-
-export type Permission =
-  | 'skill.create'
-  | 'skill.edit'
-  | 'skill.submit'
-  | 'skill.approve'
-  | 'skill.publish'
-  | 'skill.deprecate'
-  | 'skill.comment'
-  | 'access.manage'
-  | 'members.manage'
-  | 'policies.manage'
-
-const MATRIX: Record<Role, Permission[]> = {
-  Admin: ['skill.create', 'skill.edit', 'skill.submit', 'skill.approve', 'skill.publish', 'skill.deprecate', 'skill.comment', 'access.manage', 'members.manage', 'policies.manage'],
-  Maintainer: ['skill.create', 'skill.edit', 'skill.submit', 'skill.approve', 'skill.publish', 'skill.deprecate', 'skill.comment', 'access.manage'],
-  Member: ['skill.create', 'skill.edit', 'skill.submit', 'skill.comment'],
-  Viewer: [],
-}
-
-export const PERMISSION_LABELS: Record<Permission, string> = {
-  'skill.create': 'Create drafts',
-  'skill.edit': 'Edit skills',
-  'skill.submit': 'Submit for review',
-  'skill.approve': 'Approve reviews',
-  'skill.publish': 'Publish to team',
-  'skill.deprecate': 'Deprecate',
-  'skill.comment': 'Comment',
-  'access.manage': 'Manage team access',
-  'members.manage': 'Manage members & roles',
-  'policies.manage': 'Manage policies',
-}
-
-export const ROLES: Role[] = ['Admin', 'Maintainer', 'Member', 'Viewer']
-export const ALL_PERMISSIONS = Object.keys(PERMISSION_LABELS) as Permission[]
-
-export function can(user: Member | undefined, p: Permission, skill?: Skill): boolean {
-  if (!user) return false
-  if (!MATRIX[user.role].includes(p)) return false
-  // Members can only edit and submit their own skills.
-  if (skill && user.role === 'Member' && (p === 'skill.edit' || p === 'skill.submit')) return skill.ownerId === user.id
-  // Nobody approves their own work.
-  if (skill && p === 'skill.approve') return skill.ownerId !== user.id
-  return true
-}
-
-export function minimumRole(p: Permission): Role {
-  return ([...ROLES].reverse().find((r) => MATRIX[r].includes(p)) ?? 'Admin') as Role
-}
-
-/* ---------- stages ---------- */
-
-export const STAGES: { id: Stage; label: string; hint: string }[] = [
-  { id: 'draft', label: 'Draft', hint: 'Being written' },
-  { id: 'review', label: 'In review', hint: 'Waiting on reviewers' },
-  { id: 'approved', label: 'Approved', hint: 'Ready to publish' },
-  { id: 'published', label: 'Published', hint: 'Live for teams' },
-  { id: 'deprecated', label: 'Deprecated', hint: 'Retired' },
-]
-
-export const stageLabel = (s: Stage) => STAGES.find((x) => x.id === s)!.label
-
-export const isRisky = (s: Skill) => s.tools.some((t) => /^(Bash|Write|Edit)/.test(t))
-export const requiredApprovals = (s: Skill, policies: Policy[]) =>
-  policies.find((p) => p.id === 'p-two-approvals')?.enabled && isRisky(s) ? 2 : 1
-
-/* ---------- policies ---------- */
-
-export interface Violation {
-  policyId: string
-  skillId: string
-  message: string
-  severity: Policy['severity']
-}
-
-export function evaluate(skills: Skill[], members: Member[], policies: Policy[]): Violation[] {
-  const out: Violation[] = []
-  const on = (id: string) => policies.find((p) => p.id === id)
-  const push = (pid: string, s: Skill, message: string) => {
-    const p = on(pid)
-    if (p?.enabled) out.push({ policyId: pid, skillId: s.id, message, severity: p.severity })
-  }
-  for (const s of skills) {
-    if (s.stage === 'deprecated') continue
-    const owner = members.find((m) => m.id === s.ownerId)
-    if (s.stage === 'published') {
-      if (!owner) push('p-owner', s, 'Owner no longer on the team')
-      else if (owner.role === 'Viewer') push('p-owner', s, `Owner ${owner.name} is a Viewer and can’t maintain it`)
-      if (!s.hasEvals) push('p-evals', s, 'Published without an eval suite')
-      if (isRisky(s) && s.approvals.length < 2) push('p-two-approvals', s, `Runs ${s.tools.filter((t) => /^(Bash|Write|Edit)/.test(t)).join(', ')} with ${s.approvals.length} approval`)
-      if (sum(s.usage.slice(-4)) === 0) push('p-stale', s, 'No runs in the last 4 weeks')
-      if (s.source && !s.source.vetted) push('p-external', s, `Imported from ${s.source.repo} without a security review`)
-      if (s.teamIds.length >= 3) {
-        const totals = s.teamIds.map((t) => sum(s.usageByTeam[t] ?? []))
-        const all = sum(totals)
-        if (all > 0 && Math.max(...totals) / all > 0.85) push('p-access', s, `Shared with ${s.teamIds.length} teams, but one team makes ${Math.round((Math.max(...totals) / all) * 100)}% of runs`)
-      }
-    }
-    if (s.description.length < 60) push('p-description', s, `Description is ${s.description.length} characters — too short to trigger reliably`)
-  }
-  return out
-}
-
-/** Reasons a skill can't move to `to` right now. Empty array = allowed. */
-export function blockers(skill: Skill, to: Stage, user: Member | undefined, policies: Policy[]): string[] {
-  const r: string[] = []
-  const need = (p: Permission) => {
-    if (!can(user, p, skill)) r.push(`Needs ${minimumRole(p)} role${user?.role === 'Member' && p !== 'skill.approve' ? ' or ownership' : ''}`)
-  }
-  if (to === skill.stage) return r
-  if (to === 'review') need('skill.submit')
-  if (to === 'draft') need('skill.edit')
-  if (to === 'approved') {
-    need('skill.publish')
-    const req = requiredApprovals(skill, policies)
-    if (skill.approvals.length < req) r.push(`Needs ${req} approval${req > 1 ? 's' : ''} (has ${skill.approvals.length})`)
-  }
-  if (to === 'published') {
-    need('skill.publish')
-    const req = requiredApprovals(skill, policies)
-    if (skill.approvals.length < req) r.push(`Needs ${req} approval${req > 1 ? 's' : ''} (has ${skill.approvals.length})`)
-    if (policies.find((p) => p.id === 'p-evals')?.enabled && !skill.hasEvals) r.push('Attach an eval suite first')
-    if (policies.find((p) => p.id === 'p-external')?.enabled && skill.source && !skill.source.vetted) r.push('External code needs a security review first')
-  }
-  if (to === 'deprecated') need('skill.deprecate')
-  return [...new Set(r)]
-}
-
-/* ---------- quality score (editor lint) ---------- */
-
-export interface Check {
-  id: string
-  label: string
-  ok: boolean
-  hint: string
-}
-
-export function qualityChecks(s: Pick<Skill, 'title' | 'description' | 'triggers' | 'instructions' | 'examples' | 'hasEvals' | 'tools'>): Check[] {
-  return [
-    { id: 'title', label: 'Has a clear name', ok: s.title.trim().length >= 4, hint: 'Short, verb-or-noun phrase, e.g. “Release notes”.' },
-    { id: 'desc', label: 'Description says when to use it', ok: s.description.length >= 60 && /\buse (when|for|before|after|on)\b/i.test(s.description), hint: 'Claude picks skills by description. Include “Use when …”.' },
-    { id: 'triggers', label: 'At least 2 trigger phrases', ok: s.triggers.filter(Boolean).length >= 2, hint: 'How people actually ask for this.' },
-    { id: 'instr', label: 'Instructions are specific', ok: s.instructions.trim().length >= 80, hint: 'Rules, order of steps, what “good” looks like.' },
-    { id: 'examples', label: 'Includes an example request', ok: s.examples.filter(Boolean).length >= 1, hint: 'Helps reviewers test it.' },
-    { id: 'evals', label: 'Eval suite attached', ok: s.hasEvals, hint: 'Required by policy before publishing.' },
-    { id: 'tools', label: 'Tools are scoped', ok: !s.tools.some((t) => t === 'Bash' || t === 'Write'), hint: 'Prefer Bash(git diff:*) over unrestricted Bash.' },
-  ]
-}
-
-/* ---------- trigger simulator ---------- */
-
-const STOP = new Set('a an the to for of on in my this that is it and or with me can you please i we our be how what do'.split(' '))
-const tokens = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/).filter((w) => w.length > 1 && !STOP.has(w))
-
-export function matchSkills(prompt: string, skills: Skill[]) {
-  const q = tokens(prompt)
-  if (!q.length) return []
-  return skills
-    .filter((s) => s.stage === 'published' || s.stage === 'approved')
-    .map((s) => {
-      const trig = s.triggers.join(' ').toLowerCase()
-      const phrase = s.triggers.some((t) => prompt.toLowerCase().includes(t.toLowerCase()))
-      const hay = new Set(tokens(`${s.title} ${s.description} ${trig}`))
-      const hits = q.filter((w) => hay.has(w) || [...hay].some((h) => h.length > 4 && (h.startsWith(w) || w.startsWith(h))))
-      const score = Math.min(1, (phrase ? 0.55 : 0) + (hits.length / q.length) * 0.6)
-      return { skill: s, score, hits: [...new Set(hits)] }
-    })
-    .filter((r) => r.score > 0.15)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4)
-}
-
-/* ---------- metrics ---------- */
+/* ---------- numbers ---------- */
 
 export const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
+/** runs in the last four weeks */
+export const recent = (runs: number[]) => sum(runs.slice(-4))
 
-export function teamWeekly(skills: Skill[], teamId: string): number[] {
-  const out = Array(12).fill(0)
-  for (const s of skills) (s.usageByTeam[teamId] ?? []).forEach((v, i) => (out[i] += v))
+export function addSeries(list: number[][], weeks = 12): number[] {
+  const out = Array(weeks).fill(0)
+  list.forEach((r) => r.forEach((v, i) => (out[i] += v)))
   return out
 }
 
-export function hoursSaved(skills: Skill[], weeks = 4) {
-  return sum(skills.map((s) => sum(s.usage.slice(-weeks)) * s.minutesSaved)) / 60
+export function cmpVersion(a: string, b: string) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0)
+  return 0
+}
+
+/* ---------- the inventory, indexed ---------- */
+
+export interface Inventory {
+  skills: Skill[]
+  installs: Install[]
+  projects: Project[]
+  teams: Team[]
+  members: Member[]
+}
+
+export const projectOf = (inv: Inventory, id: string) => inv.projects.find((p) => p.id === id)
+export const installsOf = (inv: Inventory, skillId: string) => inv.installs.filter((i) => i.skillId === skillId)
+export const installsIn = (inv: Inventory, projectId: string) => inv.installs.filter((i) => i.projectId === projectId)
+export const teamOfInstall = (inv: Inventory, i: Install) => projectOf(inv, i.projectId)?.teamId ?? ''
+
+export const skillWeekly = (inv: Inventory, skillId: string) => addSeries(installsOf(inv, skillId).map((i) => i.runs))
+
+/** Weekly runs of one skill, split by the team whose project ran it. */
+export function skillByTeam(inv: Inventory, skillId: string): Record<string, number[]> {
+  const out: Record<string, number[]> = {}
+  for (const i of installsOf(inv, skillId)) {
+    const t = teamOfInstall(inv, i)
+    out[t] = addSeries([out[t] ?? Array(12).fill(0), i.runs])
+  }
+  return out
+}
+
+/** Teams that have the skill installed in at least one of their projects. */
+export const teamsUsing = (inv: Inventory, skillId: string) =>
+  inv.teams.map((t) => t.id).filter((t) => installsOf(inv, skillId).some((i) => teamOfInstall(inv, i) === t))
+
+/** Shared: installed in more than one team's projects. */
+export const isShared = (inv: Inventory, skillId: string) => teamsUsing(inv, skillId).length > 1
+
+export const teamWeekly = (inv: Inventory, teamId: string) =>
+  addSeries(inv.installs.filter((i) => teamOfInstall(inv, i) === teamId).map((i) => i.runs))
+
+/** Runs per person per week over the last four weeks. */
+export const intensity = (inv: Inventory, team: Team) => recent(teamWeekly(inv, team.id)) / 4 / Math.max(1, team.size)
+
+/** Skills a team runs, with last-four-week runs, busiest first. */
+export function teamSkills(inv: Inventory, teamId: string) {
+  return inv.skills
+    .map((s) => ({ skill: s, runs: recent(skillByTeam(inv, s.id)[teamId] ?? []) , installed: installsOf(inv, s.id).some((i) => teamOfInstall(inv, i) === teamId) }))
+    .filter((x) => x.installed)
+    .sort((a, b) => b.runs - a.runs)
+}
+
+/* ---------- overlap: skills that say they do the same job ---------- */
+
+const STOP = new Set('a an the to for of on in my this that is it and or with me can you please i we our be how what do use when from into by any as at its their them then are has have each every one two who'.split(' '))
+const stem = (w: string) => (w.length > 5 ? w.slice(0, 5) : w)
+const words = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)).map(stem))
+
+/** 0–1: how much two skills' descriptions and trigger phrases share. */
+export function similarity(a: Skill, b: Skill) {
+  const A = words(`${a.description} ${a.triggers.join(' ')}`), B = words(`${b.description} ${b.triggers.join(' ')}`)
+  const both = [...A].filter((w) => B.has(w)).length
+  return both / (A.size + B.size - both || 1)
+}
+
+export const OVERLAP_AT = 0.3
+
+export function overlaps(inv: Inventory) {
+  const live = inv.skills.filter((s) => s.status !== 'deprecated')
+  const out: { a: Skill; b: Skill; score: number }[] = []
+  live.forEach((a, i) => live.slice(i + 1).forEach((b) => {
+    const score = similarity(a, b)
+    if (score >= OVERLAP_AT) out.push({ a, b, score })
+  }))
+  return out.sort((x, y) => y.score - x.score)
+}
+
+export function similarTo(inv: Inventory, s: Skill) {
+  return inv.skills.filter((o) => o.id !== s.id).map((o) => ({ skill: o, score: similarity(s, o) }))
+    .filter((x) => x.score >= OVERLAP_AT).sort((a, b) => b.score - a.score)
+}
+
+/* ---------- health: what makes the skill landscape messy ---------- */
+
+export type IssueKind = 'duplicate' | 'copy' | 'owner' | 'deprecated' | 'drift' | 'external' | 'unused'
+export type Severity = 'high' | 'medium' | 'low'
+
+export const KIND_LABEL: Record<IssueKind, string> = {
+  duplicate: 'Duplicate',
+  copy: 'Edited copy',
+  owner: 'No owner',
+  deprecated: 'Retired, still installed',
+  drift: 'Version drift',
+  external: 'From outside',
+  unused: 'Unused install',
+}
+
+export interface Issue {
+  id: string
+  kind: IssueKind
+  severity: Severity
+  skillId: string
+  otherId?: string
+  projectIds: string[]
+  title: string
+  detail: string
+  action: string
+}
+
+const list = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`
+
+export function findIssues(inv: Inventory): Issue[] {
+  const out: Issue[] = []
+  const team = (id: string) => inv.teams.find((t) => t.id === id)?.name ?? id
+  const pname = (id: string) => projectOf(inv, id)?.name ?? id
+  const title = (id: string) => inv.skills.find((s) => s.id === id)?.title ?? id
+
+  for (const { a, b, score } of overlaps(inv)) {
+    const pa = installsOf(inv, a.id), pb = installsOf(inv, b.id)
+    const [keep, drop] = recent(addSeries(pa.map((i) => i.runs))) >= recent(addSeries(pb.map((i) => i.runs))) ? [a, b] : [b, a]
+    out.push({
+      id: `dup:${a.id}:${b.id}`, kind: 'duplicate', severity: 'high', skillId: a.id, otherId: b.id,
+      projectIds: [...new Set([...pa, ...pb].map((i) => i.projectId))],
+      title: `${a.title} and ${b.title} do the same job`,
+      detail: `${a.teamId === b.teamId ? `Two ${team(a.teamId)} skills` : `${team(a.teamId)}’s and ${team(b.teamId)}’s skills`} share ${Math.round(score * 100)}% of what they say they do. Claude may pick either, and fixes land in one but not the other.`,
+      action: `Keep ${keep.title} as the shared one, move what’s missing from ${drop.title} into it, then remove ${drop.title}.`,
+    })
+  }
+
+  for (const s of inv.skills) {
+    const ins = installsOf(inv, s.id)
+    const owner = inv.members.find((m) => m.id === s.ownerId)
+
+    for (const i of ins.filter((i) => i.edited)) {
+      const t = teamOfInstall(inv, i)
+      out.push({
+        id: `copy:${s.id}:${i.projectId}`, kind: 'copy', severity: 'medium', skillId: s.id, projectIds: [i.projectId],
+        title: `${pname(i.projectId)} runs an edited copy of ${s.title}`,
+        detail: `${team(t)} changed their copy (from v${i.version}), so it no longer gets ${team(s.teamId)}’s updates. ${team(t)} clearly needs this skill too.`,
+        action: `Fold their changes into ${s.title}, share it with ${team(t)}, and replace the copy.`,
+      })
+    }
+
+    if (s.status === 'deprecated') {
+      if (ins.length) out.push({
+        id: `dep:${s.id}`, kind: 'deprecated', severity: 'medium', skillId: s.id, projectIds: ins.map((i) => i.projectId),
+        title: `${s.title} is retired but still installed in ${ins.length} project${ins.length > 1 ? 's' : ''}`,
+        detail: `${list(ins.map((i) => pname(i.projectId)))} still ${ins.length > 1 ? 'have' : 'has'} it.`,
+        action: s.replacedBy ? `Replace it with ${title(s.replacedBy)} and remove the old copy.` : 'Remove it from these projects.',
+      })
+      continue
+    }
+
+    if (!owner?.active) {
+      const ts = teamsUsing(inv, s.id)
+      out.push({
+        id: `own:${s.id}`, kind: 'owner', severity: 'high', skillId: s.id, projectIds: ins.map((i) => i.projectId),
+        title: `${s.title} has no active owner`,
+        detail: `${owner ? `${owner.name} left the company.` : 'Nobody owns it.'} ${ins.length} project${ins.length === 1 ? '' : 's'} in ${ts.length} team${ts.length === 1 ? '' : 's'} depend on it, and nobody answers when it misbehaves.`,
+        action: `Assign an owner in ${team(s.teamId)}.`,
+      })
+    }
+
+    const behind = ins.filter((i) => !i.edited && cmpVersion(i.version, s.version) < 0)
+    if (behind.length) {
+      const versions = new Set(ins.filter((i) => !i.edited).map((i) => i.version))
+      const major = behind.some((i) => i.version.split('.')[0] !== s.version.split('.')[0] || Number(i.version.split('.')[1]) < Number(s.version.split('.')[1]) - 1)
+      out.push({
+        id: `drift:${s.id}`, kind: 'drift', severity: major ? 'medium' : 'low', skillId: s.id, projectIds: behind.map((i) => i.projectId),
+        title: `${s.title} runs on ${versions.size} versions`,
+        detail: `${list(behind.map((i) => `${pname(i.projectId)} is on v${i.version}`))}; the latest is v${s.version}. Teams get different answers from the same skill.`,
+        action: `Update ${list(behind.map((i) => pname(i.projectId)))} to v${s.version}.`,
+      })
+    }
+
+    if (s.source && !s.source.vetted) out.push({
+      id: `ext:${s.id}`, kind: 'external', severity: 'high', skillId: s.id, projectIds: ins.map((i) => i.projectId),
+      title: `${s.title} came from outside and hasn’t had a security review`,
+      detail: `It comes from ${s.source.repo} and runs ${s.tools.filter((t) => /^(Bash|Write)/.test(t)).join(', ') || 'tools'} on people’s machines.`,
+      action: 'Review its scripts before more projects install it.',
+    })
+    else if (s.source?.upstream && cmpVersion(s.source.upstream, s.version) > 0) out.push({
+      id: `up:${s.id}`, kind: 'external', severity: 'low', skillId: s.id, projectIds: ins.map((i) => i.projectId),
+      title: `${s.title} v${s.source.upstream} is out upstream`,
+      detail: `We run v${s.version} from ${s.source.repo}.`,
+      action: 'Read the upstream changes, then decide whether to update.',
+    })
+
+    for (const i of ins.filter((i) => recent(i.runs) === 0)) out.push({
+      id: `unused:${s.id}:${i.projectId}`, kind: 'unused', severity: 'low', skillId: s.id, projectIds: [i.projectId],
+      title: `${s.title} sits unused in ${pname(i.projectId)}`,
+      detail: 'No runs in the last four weeks. Every installed skill competes for Claude’s attention.',
+      action: `Remove it from ${pname(i.projectId)}.`,
+    })
+  }
+
+  const rank: Record<Severity, number> = { high: 0, medium: 1, low: 2 }
+  return out.sort((a, b) => rank[a.severity] - rank[b.severity])
 }
 
 /* ---------- formatting ---------- */
@@ -213,30 +240,6 @@ export function ago(iso: string): string {
 
 export const dateLabel = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-
-export function bumpVersion(v: string, kind: 'patch' | 'minor' | 'major' = 'minor') {
-  const [a, b, c] = v.split('.').map(Number)
-  if (kind === 'major') return `${a + 1}.0.0`
-  if (kind === 'minor') return `${a}.${b + 1}.0`
-  return `${a}.${b}.${c + 1}`
-}
-
-export function toSkillMd(s: Pick<Skill, 'name' | 'description' | 'tools' | 'title' | 'instructions' | 'triggers' | 'examples'>) {
-  const lines = ['---', `name: ${s.name || 'untitled-skill'}`, `description: ${s.description || '…'}`]
-  if (s.tools.length) lines.push(`allowed-tools: ${s.tools.join(', ')}`)
-  lines.push('---', '', `# ${s.title || 'Untitled skill'}`, '')
-  if (s.triggers.filter(Boolean).length) {
-    lines.push('## When to use', '')
-    s.triggers.filter(Boolean).forEach((t) => lines.push(`- "${t}"`))
-    lines.push('')
-  }
-  lines.push('## Instructions', '', s.instructions || '…', '')
-  if (s.examples.filter(Boolean).length) {
-    lines.push('## Examples', '')
-    s.examples.filter(Boolean).forEach((e) => lines.push(`- ${e}`))
-  }
-  return lines.join('\n')
-}
 
 export const initials = (name: string) =>
   name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()

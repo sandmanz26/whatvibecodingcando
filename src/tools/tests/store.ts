@@ -73,14 +73,14 @@ export const uid = () => Math.random().toString(36).slice(2, 10)
 
 const SEED: UsabilityTest[] = [{
   id: 'basics',
-  name: 'Skill management basics',
-  intro: 'Imagine you lead a team that uses Claude skills every day. You’ll get three short tasks. There are no wrong answers — we’re testing the design, not you.',
+  name: 'Keeping skills tidy',
+  intro: 'Imagine you look after the Claude skills your company’s teams use. You’ll get three short tasks. There are no wrong answers — we’re testing the design, not you.',
   createdAt: '2026-10-22T09:00:00.000Z',
   updatedAt: '2026-10-22T09:00:00.000Z',
   tasks: [
-    { id: 't1', prompt: 'Find the skill that writes customer-facing release notes and open its page.', startPage: '/', success: { kind: 'page', page: '/skills/s9' }, limitSec: 60 },
-    { id: 't2', prompt: 'Some skills are waiting for someone to review them. Go to the place where you’d review them.', startPage: '/', success: { kind: 'page', page: '/pipeline' }, limitSec: 45 },
-    { id: 't3', prompt: 'Turn on the rule that warns when a skill is shared with more teams than actually use it.', startPage: '/governance', success: { kind: 'element', sel: 'button[aria-label="Least-privilege access"]', label: 'Least-privilege access switch', page: '/governance' }, limitSec: 90 },
+    { id: 't1', prompt: 'Find out which projects use the Release notes skill and open its page.', startPage: '/', success: { kind: 'page', page: '/skills/release-notes' }, limitSec: 60 },
+    { id: 't2', prompt: 'Two teams wrote skills that do the same job. Find where the app lists duplicates.', startPage: '/', success: { kind: 'page', page: '/health' }, limitSec: 60 },
+    { id: 't3', prompt: 'Which skills does the Customer Success team run the most? Open that team’s view.', startPage: '/', success: { kind: 'page', page: '/teams' }, limitSec: 60 },
   ],
 }]
 

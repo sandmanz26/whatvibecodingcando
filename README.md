@@ -1,8 +1,8 @@
 # Skillhouse
 
-A front-end-only React demo of a **Claude skill management system for teams** — built to show what vibe coding can do for *management*: dashboards, approval workflows, role-based permissions, live policy checks and ROI models.
+A front-end-only React app for **keeping a company's Claude skills tidy**. Teams lean on skills with very different intensity in their AI workflows; Skillhouse shows which skills exist, which teams and projects run them, which could be shared, and where things are getting messy (duplicates, edited copies, version drift, skills nobody owns).
 
-No backend. All data is fictional seed data stored in your browser (`localStorage`); use the reset button in the sidebar to start over.
+No backend. The data is sample data (`src/data/seed.ts`). In a real deployment the inventory would come from reading each repository's `.claude/skills/` folder and the runs from Claude Code usage logs; nothing in the app edits skills, because skills live in git and a fix is a change in the repository.
 
 ## Run it
 
@@ -14,18 +14,16 @@ npm run build     # static build in dist/ (hash routing, works on any static hos
 
 ## What's inside
 
-| Page | Management pattern it demonstrates |
+| Page | Question it answers |
 |---|---|
-| Overview | Executive dashboard — hours saved, adoption by team, personal action inbox, activity feed |
-| Skill library | Searchable catalog with filters stored in the URL, grid / table views |
-| Skill detail | Single source of truth — SKILL.md export, version history, per-team access, discussion |
-| New / edit skill | Guided authoring — live quality score, trigger simulator, auto-generated SKILL.md, auto versioning |
-| Review pipeline | Drag-and-drop approval workflow that enforces approvals, evals and role permissions |
-| Team & access | RBAC, editable roles, team × skill access matrix, permission table |
-| Governance | Policy engine re-evaluating the catalog live, one-click fixes, audit log |
-| Insights | ROI what-if calculator, adoption heatmap, funnel |
+| Overview | How much does each team use skills (runs per person per week)? What to fix first? Who uses what (skills × teams matrix)? |
+| Skills | Every skill: owning team and owner, which teams run it, how many projects, how many versions, edited copies, findings |
+| Skill detail | Where it runs (project, version, runs), runs by team, similar skills, SKILL.md, versions and which projects are on each |
+| Projects | Each repository, its team, what it has installed and what it borrows from other teams |
+| Teams | Intensity compared across teams; per team: what they run, borrow, own and lend out |
+| Health | Findings with a suggested action: duplicates, edited copies, no owner, external skills, retired-but-installed, version drift, unused installs. "Leave as is" sets one aside (stored in this browser). |
 
-Try **“Viewing as”** in the sidebar (or ⌘K → “view as”) to switch between Admin, Maintainer, Member and Viewer and watch permissions change everywhere. The **Lens** toggle shows/hides the per-page notes explaining what each screen demonstrates.
+Duplicates are found by comparing what skills say they do (description and trigger phrases, word overlap ≥ 30%).
 
 ## Stack
 
@@ -33,16 +31,20 @@ React 19 · TypeScript · Vite · React Router (hash) · lucide-react · hand-ro
 
 ```
 src/
-  data/      seed data, types, lens copy
-  lib/       permissions, policy engine, quality checks, trigger matcher, formatting
-  store/     React context + reducer, persisted to localStorage, toasts
-  components/ layout, command palette, charts, UI primitives
-  pages/     one file per screen
+  data/      sample inventory: teams, people, projects, skills, installs with weekly runs
+  lib/       usage maths, overlap detection, health findings, formatting
+  store/     read-only inventory + findings set aside, persisted to localStorage
+  components/ layouts, command palette, charts, UI primitives, research dock
+  pages/     one file per screen (research console pages included)
+  v2/        the second design of the same product
+  tools/     research tools
 ```
 
-## Internal tools: click insights & review pins
+## Research tools (kept apart from the product)
 
-Two tools that sit *around* the product (not features of it). Each has its own flag and neither changes how the app behaves. Both are switched off on the console route (`/console/*`), and each marks its own DOM (`data-insights-ignore`, `data-review-pins`) so neither records nor reacts to the other.
+Research tools are not part of Skillhouse: click tracking and sessions, heatmaps, usability tests, comments, the v1/v2 version switcher and the dark/light theme. They live in the floating **research dock** and in the **Research console** (`#/console/*`, its own layout with "Back to Skillhouse"); the product's navigation never links to them.
+
+Two of them sit *around* the product (not features of it). Each has its own flag and neither changes how the app behaves. Click recording pauses on the research console (`/console/*`); comments work on every screen. Each marks its own DOM (`data-insights-ignore`, `data-review-pins`) so neither records nor reacts to the other.
 
 Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags.reviewPins`). Recording is toggled on **Sessions** (`#/console/insights`); both can be toggled from the ⌘K palette. Comments are on by default.
 
@@ -85,21 +87,14 @@ Rules for those endpoints:
 
 ## Skillhouse v2 (`#/v2`)
 
-A second take on the same data and store, designed with [taste-skill](https://github.com/Leonxlnx/taste-skill) (`draw.mjs --app`, style **editorial-greeting**, seed 1825630831; the sheet is saved in `.taste-skill/direction.json`). It is less of an admin panel and more of a team's home:
+A second design of the same product, made with [taste-skill](https://github.com/Leonxlnx/taste-skill) (`draw.mjs --app`, style **editorial-greeting**, seed 1825630831; the sheet is saved in `.taste-skill/direction.json`):
 
-- **Home**: a typeset greeting that names the team and today's one fact ("Two skills are waiting on your review"), four plain counts, **the shelf**, what's waiting on you, hours saved each week, and what happened lately.
-- **The shelf**: this product's own element. Every skill is a book spine. Its height is runs in the last four weeks. Books waiting for review lean at the end (outlined in teal when the next step is yours), drafts are hatched, and retired or unused skills gather dust. Hover or focus a spine for its numbers; click it to open the skill.
-- **Review desk**: inbox-style triage. The waiting list sits beside the open skill, with approve, publish and send-back actions. Each action states why it is blocked for your role.
-- **Skill page**: the SKILL.md set as the page Claude reads, with runs, lending, versions and conversation in a rail beside it.
-- **Write a skill**: you type the skill as a document. Readiness checks, a "would it trigger?" simulator and team lending sit beside it.
+- **Home**: a typeset greeting with today's one fact ("Three jobs have two skills each"), four counts, the busiest team's shelf, what to tidy first, how hard each team leans on skills, and the most widely shared skills.
+- **Shelves**: one shelf per team, on one scale. Each book is a skill the team has installed; height is that team's runs in four weeks. The team's own skills stand, borrowed ones lean, unused or retired ones gather dust, teal marks something to tidy.
+- **Projects**, **Skill page** and **Tidy up** carry the same information as v1 in this style.
 
-The style's tokens are Instrument Sans with Instrument Serif for the greeting only, one teal on data, and tonal panels with no shadows. It lives in `src/v2/`. Checks run on all five screens at 1440, 768 and 390 px: taste-skill `lint.mjs` gives 0 FAIL and 0 WARN, and `inspect.mjs --app` gives 0 FAIL. One WARN is kept on purpose: the 48px serif greeting, which is the dealt style's move. The classic UI stays at `#/`.
+The style's tokens are Instrument Sans with Instrument Serif for the greeting only, one teal on data, and tonal panels with no shadows. It lives in `src/v2/`. The classic UI stays at `#/`.
 
 ## External skills
 
-Skills can come from outside: Anthropic's [skills repository](https://github.com/anthropics/skills) or a community repo such as [taste-skill](https://github.com/Leonxlnx/taste-skill).
-
-- Each external skill records where it comes from, its license, and the version it is **pinned** at. When upstream has a newer version, the skill shows "Update upstream".
-- **Pull vX for review** turns that update into a new version that goes back through review. Until then, the team keeps running the pinned version.
-- Importing (**Bring one in**, from a known source or a GitHub link) creates the skill *in review*. The rule "External skills are vetted and pinned" blocks publishing until someone other than the importer marks the security review passed.
-- No backend: importing records the source and pins the version without downloading files.
+Skills from outside (Anthropic's [skills repository](https://github.com/anthropics/skills), or a community repo such as [taste-skill](https://github.com/Leonxlnx/taste-skill)) appear in the inventory with their source and licence. Health flags the ones without a security review, and the ones where upstream has a newer version than ours.

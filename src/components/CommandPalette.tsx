@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, LayoutGrid, Library, KanbanSquare, Users, ShieldCheck, LineChart, Sparkles, Moon, Lightbulb, UserRound, CornerDownLeft, MousePointerClick, PenLine } from 'lucide-react'
+import { Search, LayoutGrid, Library, FolderGit2, Users, HeartPulse, CornerDownLeft } from 'lucide-react'
 import { useStore } from '../store/store'
-import { stageIcon } from './ui'
-import { getFlag, setFlag } from '../tools/shared'
+import { statusIcon } from './ui'
 
 interface Item {
   id: string
@@ -14,8 +13,8 @@ interface Item {
   run: () => void
 }
 
-export function CommandPalette({ onClose, toggleTheme, v2 = false }: { onClose: () => void; toggleTheme: () => void; v2?: boolean }) {
-  const { skills, members, dispatch, lens, setLens, toast } = useStore()
+export function CommandPalette({ onClose, v2 = false }: { onClose: () => void; v2?: boolean }) {
+  const { skills, projects, teams } = useStore()
   const nav = useNavigate()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(0)
@@ -23,41 +22,30 @@ export function CommandPalette({ onClose, toggleTheme, v2 = false }: { onClose: 
 
   const items = useMemo<Item[]>(() => {
     const go = (path: string) => () => { nav(path); onClose() }
-    const all: Item[] = [
-      ...(v2 ? [
-        { id: 'v2-write', group: 'Actions', label: 'Write a skill', icon: <Plus size={15} />, run: go('/v2/write') },
-        { id: 'v2-home', group: 'Pages', label: 'Home', icon: <LayoutGrid size={15} />, run: go('/v2') },
-        { id: 'v2-shelf', group: 'Pages', label: 'The shelf', icon: <Library size={15} />, run: go('/v2/shelf') },
-        { id: 'v2-review', group: 'Pages', label: 'Review desk', icon: <KanbanSquare size={15} />, run: go('/v2/review') },
-        { id: 'v1', group: 'Pages', label: 'Classic view (v1)', icon: <LayoutGrid size={15} />, run: go('/') },
-      ] : [
-        { id: 'new', group: 'Actions', label: 'Create new skill', icon: <Plus size={15} />, run: go('/skills/new') },
-        { id: 'v2', group: 'Pages', label: 'Skillhouse v2', icon: <Sparkles size={15} />, run: go('/v2') },
-      ]),
-      { id: 'theme', group: 'Actions', label: 'Toggle dark mode', icon: <Moon size={15} />, run: () => { toggleTheme(); onClose() } },
-      { id: 'lens', group: 'Actions', label: lens ? 'Hide demo lens' : 'Show demo lens', icon: <Lightbulb size={15} />, run: () => { setLens(!lens); onClose() } },
-      { id: 'insights', group: 'Tools', label: `${getFlag('insights') ? 'Stop' : 'Start'} recording clicks`, icon: <MousePointerClick size={15} />, run: () => { setFlag('insights', !getFlag('insights')); toast(`Click recording ${getFlag('insights') ? 'on' : 'off'}`); onClose() } },
-      { id: 'pins', group: 'Tools', label: `Turn review pins ${getFlag('reviewPins') ? 'off' : 'on'}`, icon: <PenLine size={15} />, run: () => { setFlag('reviewPins', !getFlag('reviewPins')); toast(`Review pins ${getFlag('reviewPins') ? 'on — tap the pen button in the corner' : 'off'}`); onClose() } },
-      { id: 'p-c', group: 'Pages', label: 'Sessions (research)', icon: <MousePointerClick size={15} />, run: go('/console/insights') },
+    const base = v2 ? '/v2' : ''
+    const pages: Item[] = v2 ? [
+      { id: 'p-home', group: 'Pages', label: 'Home', icon: <LayoutGrid size={15} />, run: go('/v2') },
+      { id: 'p-shelf', group: 'Pages', label: 'Shelves', icon: <Library size={15} />, run: go('/v2/shelf') },
+      { id: 'p-projects', group: 'Pages', label: 'Projects', icon: <FolderGit2 size={15} />, run: go('/v2/projects') },
+      { id: 'p-tidy', group: 'Pages', label: 'Tidy up', icon: <HeartPulse size={15} />, run: go('/v2/tidy') },
+    ] : [
       { id: 'p-o', group: 'Pages', label: 'Overview', icon: <LayoutGrid size={15} />, run: go('/') },
-      { id: 'p-l', group: 'Pages', label: 'Skill library', icon: <Library size={15} />, run: go('/skills') },
-      { id: 'p-p', group: 'Pages', label: 'Review pipeline', icon: <KanbanSquare size={15} />, run: go('/pipeline') },
-      { id: 'p-t', group: 'Pages', label: 'Team & access', icon: <Users size={15} />, run: go('/team') },
-      { id: 'p-g', group: 'Pages', label: 'Governance', icon: <ShieldCheck size={15} />, run: go('/governance') },
-      { id: 'p-i', group: 'Pages', label: 'Insights', icon: <LineChart size={15} />, run: go('/insights') },
-      ...skills.map((s) => ({ id: s.id, group: 'Skills', label: s.title, sub: s.name, icon: stageIcon(s.stage), run: go(v2 ? `/v2/skills/${s.id}` : `/skills/${s.id}`) })),
-      ...members.map((m) => ({
-        id: m.id, group: 'View as', label: m.name, sub: m.role, icon: <UserRound size={15} />,
-        run: () => { dispatch({ type: 'setUser', id: m.id }); toast(`Now viewing as ${m.name} (${m.role})`); onClose() },
-      })),
+      { id: 'p-s', group: 'Pages', label: 'Skills', icon: <Library size={15} />, run: go('/skills') },
+      { id: 'p-p', group: 'Pages', label: 'Projects', icon: <FolderGit2 size={15} />, run: go('/projects') },
+      { id: 'p-t', group: 'Pages', label: 'Teams', icon: <Users size={15} />, run: go('/teams') },
+      { id: 'p-h', group: 'Pages', label: 'Health', icon: <HeartPulse size={15} />, run: go('/health') },
     ]
-    // v2 has its own pages and is light-only; drop the classic page list and the theme switch there.
-    if (v2) all.splice(0, all.length, ...all.filter((i) => i.id !== 'theme' && !(i.id.startsWith('p-') && i.id !== 'p-c')))
+    const all: Item[] = [
+      ...pages,
+      ...skills.map((s) => ({ id: s.id, group: 'Skills', label: s.title, sub: s.name, icon: statusIcon(s.status), run: go(`${base}/skills/${s.id}`) })),
+      ...projects.map((p) => ({ id: p.id, group: 'Projects', label: p.name, sub: p.description, icon: <FolderGit2 size={15} />, run: go(`${base}/projects/${p.id}`) })),
+      ...(v2 ? [] : teams.map((t) => ({ id: t.id, group: 'Teams', label: t.name, icon: <Users size={15} />, run: go(`/teams?team=${t.id}`) }))),
+    ]
     const t = q.trim().toLowerCase()
-    if (!t) return all.filter((i) => i.group !== 'View as').slice(0, 14)
+    if (!t) return all.slice(0, 14)
     const words = t.split(/\s+/)
     return all.filter((i) => { const hay = `${i.label} ${i.sub ?? ''} ${i.group}`.toLowerCase(); return words.every((w) => hay.includes(w)) }).slice(0, 30)
-  }, [q, skills, members, nav, onClose, toggleTheme, lens, setLens, dispatch, toast, v2])
+  }, [q, skills, projects, teams, nav, onClose, v2])
 
   useEffect(() => setSel(0), [q])
   useEffect(() => {
@@ -78,7 +66,7 @@ export function CommandPalette({ onClose, toggleTheme, v2 = false }: { onClose: 
       <div className="palette" role="dialog" aria-modal="true" aria-label="Command palette" onKeyDown={onKey}>
         <div className="palette-input">
           <Search size={16} color="var(--ink-3)" />
-          <input autoFocus placeholder="Search skills, pages, people…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" role="combobox" aria-expanded aria-controls="palette-list" />
+          <input autoFocus placeholder="Search skills, projects, teams…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" role="combobox" aria-expanded aria-controls="palette-list" />
           <kbd>esc</kbd>
         </div>
         <div className="palette-list" ref={listRef} id="palette-list" role="listbox">
@@ -101,7 +89,6 @@ export function CommandPalette({ onClose, toggleTheme, v2 = false }: { onClose: 
         <div className="palette-foot">
           <span><kbd>↑</kbd> <kbd>↓</kbd> navigate</span>
           <span><kbd><CornerDownLeft size={10} /></kbd> open</span>
-          <span>Try “view as” to switch roles</span>
         </div>
       </div>
     </>

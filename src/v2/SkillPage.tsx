@@ -1,127 +1,116 @@
-import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowRight, Download, Pencil } from 'lucide-react'
-import { useStore, useCan } from '../store/store'
-import { LineChart } from '../components/charts'
-import { WEEK_LABELS } from '../data/seed'
-import { ago, dateLabel, fmt, minimumRole, requiredApprovals, stageLabel, sum, toSkillMd } from '../lib/logic'
+import { useStore } from '../store/store'
+import { KIND_LABEL, cmpVersion, dateLabel, fmt, installsOf, recent, similarTo, skillWeekly, teamsUsing } from '../lib/logic'
 import { SkillDoc } from './SkillDoc'
-import { SourceBlock } from '../components/SourceBlock'
-import { Face, firstName } from './bits'
+import { Face } from './bits'
+
+const TONE = { high: 'neg', medium: 'warn', low: '' } as const
 
 export default function V2SkillPage() {
   const { id } = useParams()
-  const { skill, member, team, teams, policies, dispatch, toast } = useStore()
-  const allowed = useCan()
+  const inv = useStore()
+  const { skill, member, team, project, open } = inv
   const nav = useNavigate()
-  const [note, setNote] = useState('')
   const s = skill(id ?? '')
 
   if (!s) return (
-    <main className="v2-canvas"><div className="v2-col"><h1 className="v2-title">This skill isn’t on the shelf</h1>
-      <p className="v2-sub">It may have been removed. <Link to="/v2/shelf" style={{ textDecoration: 'underline' }}>Back to the shelf</Link></p></div></main>
+    <main className="v2-canvas"><div className="v2-col"><h1 className="v2-title">This skill isn’t on any shelf</h1>
+      <p className="v2-sub"><Link to="/v2/shelf" style={{ textDecoration: 'underline' }}>Back to the shelves</Link></p></div></main>
   )
 
   const owner = member(s.ownerId)
-  const runs4 = sum(s.usage.slice(-4))
-  const hours4 = Math.round((runs4 * s.minutesSaved) / 60)
-  const waiting = s.stage === 'review' || s.stage === 'approved'
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([toSkillMd(s)], { type: 'text/markdown' }))
-    Object.assign(document.createElement('a'), { href: url, download: `${s.name}-SKILL.md` }).click()
-    URL.revokeObjectURL(url)
-  }
+  const ins = installsOf(inv, s.id).sort((a, b) => recent(b.runs) - recent(a.runs))
+  const using = teamsUsing(inv, s.id)
+  const versions = new Set(ins.filter((i) => !i.edited).map((i) => i.version))
+  const findings = open.filter((i) => i.skillId === s.id || i.otherId === s.id)
+  const similar = similarTo(inv, s)
 
   return (
     <main className="v2-canvas" style={{ paddingTop: 48 }}>
       <div className="v2-col v2-enter">
-        <div className="v2-small" style={{ marginBottom: 8 }}><Link to="/v2/shelf">The shelf</Link> / {s.category}</div>
-        <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
-          <div>
-            <h1 className="v2-title">{s.title}</h1>
-            <p className="v2-sub" style={{ marginTop: 4 }}>
-              {s.source ? `From ${s.source.origin}, looked after by ${firstName(owner)}` : `${firstName(owner)} wrote it`} · v{s.version} · {s.stage === 'published' ? `${fmt(runs4)} runs and ${fmt(hours4)} hours saved in the last 4 weeks` : `${stageLabel(s.stage)}, updated ${ago(s.updatedAt)}`}
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="v2-btn ghost" onClick={download}><Download size={15} /> SKILL.md</button>
-            {allowed('skill.edit', s) && s.stage !== 'deprecated' && <button className="v2-btn" onClick={() => nav(`/v2/write/${s.id}`)}><Pencil size={14} /> Edit</button>}
-            {waiting && <button className="v2-btn primary" onClick={() => nav(`/v2/review/${s.id}`)}>Open on the review desk <ArrowRight size={15} /></button>}
+        <div className="v2-small" style={{ marginBottom: 8 }}><Link to="/v2/shelf">Shelves</Link> / {team(s.teamId)?.name}</div>
+        <header>
+          <h1 className="v2-title">{s.title}</h1>
+          <p className="v2-sub" style={{ marginTop: 4, maxWidth: 760 }}>{s.description}</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+            <span className="v2-chip">{s.status === 'deprecated' ? 'Retired' : s.status === 'experimental' ? 'Experimental' : 'Active'}</span>
+            <span className="v2-chip">v{s.version}</span>
+            {s.source && <span className={`v2-chip ${s.source.vetted ? '' : 'neg'}`}>From {s.source.repo}{s.source.vetted ? '' : ' · not reviewed'}</span>}
+            {s.replacedBy && <Link className="v2-chip teal" to={`/v2/skills/${s.replacedBy}`}>Use {skill(s.replacedBy)?.title} instead</Link>}
           </div>
         </header>
 
-        <div className="v2-grid" style={{ marginTop: 32, alignItems: 'start' }}>
-          <div className="v2-span-8 v2-panel">
-            <div className="v2-panel-head"><h2 className="v2-section">What Claude reads</h2><span className="v2-small" style={{ marginLeft: 'auto' }}>.claude/skills/{s.name}/SKILL.md</span></div>
-            <SkillDoc skill={s} />
-          </div>
+        <section className="v2-grid" style={{ marginTop: 32 }} aria-label="At a glance">
+          <div className="v2-tile lead v2-span-3"><span className="label">Runs, last 4 weeks</span><span className="value">{fmt(recent(skillWeekly(inv, s.id)))}</span><span className="cap">Across every project</span></div>
+          <div className="v2-tile v2-span-3"><span className="label">Teams</span><span className="value">{using.length}</span><span className="cap">{using.map((t) => team(t)?.name).join(', ')}</span></div>
+          <div className="v2-tile v2-span-3"><span className="label">Projects</span><span className="value">{ins.length}</span><span className="cap">{ins.filter((i) => i.edited).length ? `${ins.filter((i) => i.edited).length} edited cop${ins.filter((i) => i.edited).length > 1 ? 'ies' : 'y'}` : 'All follow the source'}</span></div>
+          <div className="v2-tile v2-span-3"><span className="label">Versions in use</span><span className="value">{versions.size}</span><span className="cap">{versions.size > 1 ? `Latest is v${s.version}` : 'Everyone on the same one'}</span></div>
+        </section>
 
-          <aside className="v2-span-4" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
-            <section className="v2-panel">
-              <div className="v2-panel-head"><h2 className="v2-section">Runs each week</h2></div>
-              {sum(s.usage) === 0 ? <div className="v2-empty">No runs yet. It counts from the day it goes on the shelf.</div> : (
-                <LineChart series={[{ id: 'r', label: 'Runs', color: 'var(--accent)', values: s.usage }]} labels={WEEK_LABELS} height={140} />
-              )}
+        <div className="v2-grid" style={{ marginTop: 'var(--gap)', alignItems: 'start' }}>
+          <div className="v2-span-9" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+            <section className="v2-panel" aria-labelledby="where-h">
+              <div className="v2-panel-head"><h2 className="v2-section" id="where-h">Where it runs</h2></div>
+              <div className="v2-rows">
+                {ins.map((i) => {
+                  const p = project(i.projectId)!
+                  const behind = !i.edited && cmpVersion(i.version, s.version) < 0
+                  return (
+                    <button key={p.id} className="v2-row" onClick={() => nav(`/v2/projects/${p.id}`)}>
+                      <span className="main"><b className="mono">{p.name}</b><span>{team(p.teamId)?.name} · {p.description}</span></span>
+                      {i.edited ? <span className="v2-chip neg">Edited copy</span> : behind ? <span className="v2-chip warn">v{i.version}, behind</span> : <span className="v2-chip">v{i.version}</span>}
+                      <span className="side num" style={{ minWidth: 70 }}>{recent(i.runs) ? `${fmt(recent(i.runs))} runs` : 'unused'}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </section>
 
-            <section className="v2-panel">
-              <dl className="v2-kv">
-                <dt>Owner</dt><dd><span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Face member={owner} size="sm" />{owner?.name}</span></dd>
-                <dt>Lent to</dt><dd>{s.teamIds.map((t) => team(t)?.name).join(', ') || 'Nobody yet'}</dd>
-                <dt>Saves</dt><dd className="num">{s.minutesSaved} min a run</dd>
-                <dt>Rating</dt><dd className="num">{s.rating ? `${s.rating.toFixed(1)} of 5` : '—'}</dd>
-                <dt>Approvals</dt><dd className="num">{s.approvals.length} of {requiredApprovals(s, policies)}</dd>
-                <dt>Evals</dt><dd>{s.hasEvals ? 'Attached' : <span style={{ color: 'var(--negative)' }}>None yet</span>}</dd>
-              </dl>
-              {allowed('access.manage') && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }} aria-label="Lend to teams">
-                  {teams.map((t) => {
-                    const on = s.teamIds.includes(t.id)
-                    return <button key={t.id} className="v2-btn sm" style={on ? { background: 'var(--text)', color: '#fff' } : undefined} aria-pressed={on}
-                      onClick={() => { dispatch({ type: 'toggleAccess', id: s.id, teamId: t.id }); toast(`${on ? 'Took it back from' : 'Lent it to'} ${t.name}`) }}>{t.name}</button>
-                  })}
+            {similar.length > 0 && (
+              <section className="v2-panel" aria-labelledby="sim-h">
+                <div className="v2-panel-head"><h2 className="v2-section" id="sim-h">Does the same job</h2><span className="v2-small" style={{ marginLeft: 'auto' }}>Overlap in description and triggers</span></div>
+                <div className="v2-rows">
+                  {similar.map(({ skill: o, score }) => (
+                    <button key={o.id} className="v2-row" onClick={() => nav(`/v2/skills/${o.id}`)}>
+                      <span className="main"><b>{o.title}</b><span>{team(o.teamId)?.name}{o.status === 'deprecated' ? ' · retired' : ''}</span></span>
+                      <span className="side num">{Math.round(score * 100)}%</span>
+                    </button>
+                  ))}
                 </div>
-              )}
-            </section>
-
-            {s.source && (
-              <section className="v2-panel">
-                <div className="v2-panel-head"><h2 className="v2-section">Where it comes from</h2>{s.source.latest && <span className="v2-chip warn">Update upstream</span>}</div>
-                <SourceBlock skill={s} v2 />
               </section>
             )}
 
-            <section className="v2-panel">
-              <div className="v2-panel-head"><h2 className="v2-section">Versions</h2><span className="v2-chip">{s.versions.length}</span></div>
-              <div className="v2-rows">
-                {s.versions.slice(0, 3).map((v) => (
-                  <div key={v.version + v.at} className="v2-row" style={{ cursor: 'default' }}>
-                    <span className="main"><b className="num">v{v.version}</b><span>{v.note}</span></span>
-                    <span className="side">{dateLabel(v.at)}</span>
-                  </div>
-                ))}
-              </div>
+            <section className="v2-panel" aria-labelledby="doc-h">
+              <div className="v2-panel-head"><h2 className="v2-section" id="doc-h">SKILL.md</h2></div>
+              <SkillDoc skill={s} />
             </section>
+          </div>
 
-            <section className="v2-panel">
-              <div className="v2-panel-head"><h2 className="v2-section">Talk about it</h2><span className="v2-chip">{s.comments.length}</span></div>
-              <div className="v2-rows">
-                {s.comments.length === 0 && <div className="v2-empty">No one has said anything yet.</div>}
-                {s.comments.slice(-3).map((c) => (
-                  <div key={c.id} className="v2-row" style={{ cursor: 'default', alignItems: 'flex-start' }}>
-                    <Face member={member(c.authorId)} size="sm" />
-                    <span className="main"><b>{firstName(member(c.authorId))} <span className="v2-small" style={{ display: 'inline', fontWeight: 400 }}>{ago(c.at)}</span></b><span style={{ whiteSpace: 'normal', color: 'var(--text)' }}>{c.text}</span></span>
-                  </div>
-                ))}
+          <div className="v2-span-3" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+            <section className="v2-panel" aria-label="Details">
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+                <Face member={owner} />
+                <div><b>{owner?.name ?? 'Nobody'}</b><div className="v2-small">{owner?.active ? `Owner · ${owner.title}` : 'Owner left the company'}</div></div>
               </div>
-              {allowed('skill.comment') ? (
-                <form style={{ display: 'flex', gap: 8, marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); if (!note.trim()) return; dispatch({ type: 'comment', id: s.id, text: note.trim() }); setNote('') }}>
-                  <input className="v2-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Say something to the team" aria-label="Comment" />
-                  <button className="v2-btn" type="submit" aria-disabled={!note.trim()}>Send</button>
-                </form>
-              ) : <p className="v2-note" style={{ marginTop: 12 }}>Commenting needs the {minimumRole('skill.comment')} role.</p>}
+              <dl className="v2-kv">
+                <dt>Team</dt><dd>{team(s.teamId)?.name}</dd>
+                <dt>Updated</dt><dd>{dateLabel(s.updatedAt)}</dd>
+                <dt>Lives in</dt><dd className="mono" style={{ fontSize: 12 }}>{s.home}</dd>
+              </dl>
             </section>
-          </aside>
+            <section className="v2-panel" aria-labelledby="f-h">
+              <div className="v2-panel-head"><h2 className="v2-section" id="f-h">To tidy</h2><span className="v2-chip">{findings.length}</span></div>
+              {findings.length === 0 ? <div className="v2-empty">Nothing.</div> : (
+                <div className="v2-rows">
+                  {findings.map((f) => (
+                    <Link key={f.id} to={`/v2/tidy?kind=${f.kind}`} className="v2-row" style={{ alignItems: 'flex-start' }}>
+                      <span className="main"><b style={{ whiteSpace: 'normal' }}>{f.title}</b><span><span className={`v2-chip ${TONE[f.severity]}`}>{KIND_LABEL[f.kind]}</span></span></span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </div>
       </div>
     </main>

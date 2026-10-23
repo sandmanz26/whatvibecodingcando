@@ -1,10 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import {
-  Archive, BadgeCheck, CircleCheck, CircleDashed, CircleDot, Code2, Compass, FileText, Headphones,
-  Lightbulb, Palette, Settings2, TriangleAlert, OctagonAlert, AlertCircle, X,
+  Archive, BadgeCheck, Code2, Compass, FileText, FlaskConical, Headphones,
+  Palette, Settings2, TriangleAlert, OctagonAlert, AlertCircle, CircleAlert, X,
 } from 'lucide-react'
-import type { Category, Member, Policy, Stage } from '../data/types'
-import { initials, stageLabel } from '../lib/logic'
+import type { Category, Member, Status } from '../data/types'
+import { initials, type Severity as Sev } from '../lib/logic'
 import { useStore } from '../store/store'
 
 const AVATAR_TONES = ['#6a5d50', '#4f6170', '#5d6b4f', '#70506a', '#4f6b66', '#625178', '#7a5b45', '#4a5a7a']
@@ -29,22 +29,22 @@ export function AvatarStack({ ids, max = 3 }: { ids: string[]; max?: number }) {
   )
 }
 
-const STAGE_ICON: Record<Stage, ReactNode> = {
-  draft: <CircleDashed size={14} color="var(--ink-3)" />,
-  review: <CircleDot size={14} color="var(--warning)" strokeWidth={2.5} />,
-  approved: <CircleCheck size={14} color="var(--accent)" />,
-  published: <BadgeCheck size={14} color="var(--good)" />,
+const STATUS_ICON: Record<Status, ReactNode> = {
+  active: <BadgeCheck size={14} color="var(--good)" />,
+  experimental: <FlaskConical size={14} color="var(--warning)" />,
   deprecated: <Archive size={14} color="var(--ink-3)" />,
 }
+export const STATUS_LABEL: Record<Status, string> = { active: 'Active', experimental: 'Experimental', deprecated: 'Retired' }
 
-export function StageBadge({ stage }: { stage: Stage }) {
-  return <span className="stage">{STAGE_ICON[stage]}{stageLabel(stage)}</span>
+export function StatusBadge({ status }: { status: Status }) {
+  return <span className="stage">{STATUS_ICON[status]}{STATUS_LABEL[status]}</span>
 }
-export const stageIcon = (s: Stage) => STAGE_ICON[s]
+export const statusIcon = (s: Status) => STATUS_ICON[s]
 
-export function Severity({ level }: { level: Policy['severity'] }) {
-  const Icon = level === 'critical' ? OctagonAlert : level === 'serious' ? AlertCircle : TriangleAlert
-  return <span className={`sev ${level}`}><Icon size={13} strokeWidth={2.4} />{level[0].toUpperCase() + level.slice(1)}</span>
+const SEV_CLASS: Record<Sev, string> = { high: 'critical', medium: 'serious', low: 'warning' }
+export function SeverityTag({ level }: { level: Sev }) {
+  const Icon = level === 'high' ? OctagonAlert : level === 'medium' ? AlertCircle : TriangleAlert
+  return <span className={`sev ${SEV_CLASS[level]}`}><Icon size={13} strokeWidth={2.4} />{level[0].toUpperCase() + level.slice(1)}</span>
 }
 
 export function TeamDots({ ids }: { ids: string[] }) {
@@ -101,40 +101,6 @@ export function Switch({ checked, onChange, label, disabledReason }: { checked: 
   return disabledReason ? <span className="tip" data-tip={disabledReason}>{btn}</span> : btn
 }
 
-/** Button that stays focusable when blocked and explains why on hover. */
-export function GuardedButton({ allowed, reason, onClick, children, className = 'btn' }: {
-  allowed: boolean; reason?: string; onClick: () => void; children: ReactNode; className?: string
-}) {
-  const b = (
-    <button className={className} aria-disabled={!allowed} onClick={() => allowed && onClick()}>
-      {children}
-    </button>
-  )
-  return !allowed && reason ? <span className="tip" data-tip={reason}>{b}</span> : b
-}
-
-export interface LensInfo {
-  title: string
-  text: string
-  tags: string[]
-}
-
-export function Lens({ info }: { info: LensInfo }) {
-  const { lens, setLens } = useStore()
-  if (!lens) return null
-  return (
-    <aside className="lens" aria-label="Demo lens">
-      <span className="lens-icon"><Lightbulb size={15} /></span>
-      <div>
-        <div className="lens-title">VIBE CODING LENS · {info.title.toUpperCase()}</div>
-        <p className="lens-text">{info.text}</p>
-        <div className="lens-tags">{info.tags.map((t) => <span key={t}>{t}</span>)}</div>
-      </div>
-      <button className="btn ghost sm icon lens-close" onClick={() => setLens(false)} aria-label="Hide demo lens"><X size={14} /></button>
-    </aside>
-  )
-}
-
 export function Modal({ title, description, onClose, children, footer }: {
   title: string; description?: string; onClose: () => void; children?: ReactNode; footer?: ReactNode
 }) {
@@ -163,4 +129,19 @@ export function Modal({ title, description, onClose, children, footer }: {
 
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return <div className="empty"><strong>{title}</strong>{children}</div>
+}
+
+export function Toasts() {
+  const { toasts, dismissToast } = useStore()
+  return (
+    <div className="toasts" role="status" aria-live="polite">
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast ${t.tone}`}>
+          {t.tone === 'error' && <CircleAlert size={15} />}
+          {t.text}
+          <button onClick={() => dismissToast(t.id)} aria-label="Dismiss"><X size={14} /></button>
+        </div>
+      ))}
+    </div>
+  )
 }

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Ban, CircleSlash, Download, Flame, MousePointerClick, RefreshCw, Trash2, X, FileText } from 'lucide-react'
 import { Empty, Modal, Switch } from '../components/ui'
-import { ConsoleNav } from './ConsoleNav'
 import { DEVICES, ScreenViewer, type Device } from '../tools/insights/ScreenViewer'
 import { clearEvents, layoutOf, loadEvents, type ClickEvent, type Loaded } from '../tools/insights/store'
 import { flushNow } from '../tools/insights/tracker'
@@ -165,7 +164,7 @@ export default function Sessions() {
 
   return (
     <main className="page">
-      <ConsoleNav />
+      
       <div className="page-head">
         <div>
           <h1>Sessions</h1>

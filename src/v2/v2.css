@@ -285,3 +285,4 @@
   .desk.has-open .desk-back { display: inline-flex; }
   .desk:not(.has-open) > section { display: none; }
 }
+.book.flag { background: var(--accent); }
