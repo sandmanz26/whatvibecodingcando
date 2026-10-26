@@ -4,6 +4,8 @@ import { GripVertical, Moon, Sun, MessageSquarePlus, MessagesSquare, FlaskConica
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
 import { getFlag, isConsole, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
 import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
+import { DESIGN_EVENT, loadDesign } from '../tools/design/tokens'
+import { presetOf } from '../tools/design/presets'
 import { useTheme } from '../lib/theme'
 
 const POS_KEY = 'skillhouse.dock'
@@ -37,6 +39,12 @@ export function VersionSwitch() {
   const ref = useRef<HTMLDivElement>(null)
   const recording = useFlag('insights')
   const [session, setSession] = useState(sessionState)
+  const [design, setDesign] = useState(loadDesign)
+  useEffect(() => {
+    const sync = () => setDesign(loadDesign())
+    window.addEventListener(DESIGN_EVENT, sync)
+    return () => window.removeEventListener(DESIGN_EVENT, sync)
+  }, [])
   useEffect(() => {
     const sync = () => setSession(sessionState())
     window.addEventListener(SESSION_EVENT, sync)
@@ -92,6 +100,7 @@ export function VersionSwitch() {
         {recording && (session === 'active'
           ? <button className="dock-rec on" onClick={() => endSession('ended')} title="Recording this session. End it here; the next one starts on the main page."><i /> End session</button>
           : <span className="dock-rec" title="Recording is on. A session starts counting when the main page opens."><i /> Starts on home</span>)}
+        {design && <button className="dock-rec" onClick={() => nav('/console/design')} title="A simulated design is on in this browser">{presetOf(design.preset).name}</button>}
         <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
         <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
         <div className="dock-seg" role="group" aria-label="App version">

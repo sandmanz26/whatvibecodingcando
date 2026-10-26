@@ -1,0 +1,8 @@
+{
+  "name": "ux-research-kit",
+  "version": "1.0.0",
+  "description": "UX research tooling for any web frontend: click tracking with sessions and exact replay, heatmaps, 5-second tests, fake doors, webcam eye tracking, comments, and design-token / UI-library look simulation.",
+  "author": { "name": "sandmanz26" },
+  "license": "MIT",
+  "keywords": ["ux-research", "heatmap", "session-replay", "fake-door", "eye-tracking", "design-tokens"]
+}

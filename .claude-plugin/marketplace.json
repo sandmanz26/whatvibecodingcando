@@ -1,0 +1,15 @@
+{
+  "name": "whatvibecodingcando",
+  "description": "Claude Code plugins from Skillhouse: UX research tooling for web frontends.",
+  "owner": {
+    "name": "sandmanz26"
+  },
+  "plugins": [
+    {
+      "name": "ux-research-kit",
+      "source": "./plugins/ux-research-kit",
+      "description": "Add UX research tooling to a web app: click tracking and sessions, heatmaps, 5-second tests, fake doors, webcam eye tracking, comments, and design-token / UI-library simulation.",
+      "version": "1.0.0"
+    }
+  ]
+}

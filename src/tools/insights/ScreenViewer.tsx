@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ExternalLink, MousePointer2, Hand } from 'lucide-react'
 import { describeTarget } from './tracker'
 import type { HeatmapStats } from './InsightsTools'
+import { DESIGN_MESSAGE, type Design } from '../design/tokens'
 
 export type Device = 'mobile' | 'tablet' | 'desktop'
 export const DEVICES: Record<Device, { w: number; h: number; label: string }> = {
@@ -16,7 +17,7 @@ interface Props {
   page: string
   device: Device
   /** 'dots' / 'elements' draw a heatmap; 'pick' lets the designer choose an element. */
-  mode: 'dots' | 'elements' | 'gaze' | 'pick'
+  mode: 'dots' | 'elements' | 'gaze' | 'pick' | 'live'
   focus?: string | null
   /** draw a single tap (x % of width, y page px) instead of every tap */
   dot?: { x: number; y: number; ex?: number; ey?: number }
@@ -31,12 +32,14 @@ interface Props {
   size?: { w: number; h: number }
   /** first clicks of a 5-second test instead of everyday clicks */
   fivesec?: string
+  /** a design to preview on the screen (undefined: the screen as this browser shows it) */
+  design?: Design | null
 }
 
 const appUrl = (hash: string) => `${window.location.pathname}${window.location.search}#${hash}`
 
 /** The real app in an iframe at a device width, scaled to fit, with a heatmap or a picker on top. */
-export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, maxHeight = 620, query, size, fivesec }: Props) {
+export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, maxHeight = 620, query, size, fivesec, design }: Props) {
   const wrap = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [width, setWidth] = useState(800)
@@ -51,7 +54,7 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
     return () => ro.disconnect()
   }, [])
 
-  const heat = mode === 'pick' ? [] : [
+  const heat = mode === 'pick' || mode === 'live' ? [] : [
     `heatmap${mode === 'dots' ? '' : `=${mode}`}`,
     focus ? `el=${encodeURIComponent(focus)}` : '', task ? `task=${encodeURIComponent(task)}` : '', fivesec ? `fivesec=${encodeURIComponent(fivesec)}` : '',
     dot ? `dot=${[dot.x, dot.y, ...(dot.ex !== undefined ? [dot.ex, dot.ey ?? 50] : [])].join(',')}` : '',
@@ -68,6 +71,16 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
     return () => window.removeEventListener('message', on)
   }, [])
   useEffect(() => setStats(null), [hash, device])
+
+  // Preview a design: sent to the frame now, and again whenever it (re)loads and says it is ready.
+  useEffect(() => {
+    if (design === undefined) return
+    const send = () => frame.current?.contentWindow?.postMessage({ type: DESIGN_MESSAGE, design }, window.location.origin)
+    send()
+    const on = (e: MessageEvent) => { if (e.source === frame.current?.contentWindow && e.data?.type === `${DESIGN_MESSAGE}:ready`) send() }
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [design])
 
   // Same-origin iframe: a hash change navigates inside it without a reload.
   useEffect(() => {
@@ -132,6 +145,8 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
             </div>
             <span className="muted">{pickNav ? 'Use the app normally to reach the right screen, then switch back to Pick.' : 'Hover to outline, click to choose.'}</span>
           </>
+        ) : mode === 'live' ? (
+          <span className="muted">The real app — click around to reach other screens.</span>
         ) : (
           <span className="muted">
             {stats ? <><b className="num" style={{ color: 'var(--ink)' }}>{stats.taps}</b> {stats.unit ?? 'tap'}{stats.taps === 1 ? '' : 's'} on <span className="mono">{stats.page}</span> at {stats.layout} width{mode === 'elements' && stats.missing > 0 ? ` · ${stats.missing} element${stats.missing === 1 ? '' : 's'} not on this layout` : ''}</> : 'Loading screen…'}

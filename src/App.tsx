@@ -15,6 +15,8 @@ import { ResearchLayout } from './components/ResearchLayout'
 import FiveSecond from './pages/FiveSecond'
 import FakeDoorsPage from './pages/FakeDoorsPage'
 import EyeTracking from './pages/EyeTracking'
+import DesignTokens from './pages/DesignTokens'
+import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
 import { FakeDoors } from './tools/doors/FakeDoors'
 import { GazeRunner } from './tools/gaze/GazeRunner'
@@ -65,9 +67,11 @@ export default function App() {
             <Route path="fivesec/:id" element={<FiveSecond />} />
             <Route path="doors" element={<FakeDoorsPage />} />
             <Route path="gaze" element={<EyeTracking />} />
+            <Route path="design" element={<DesignTokens />} />
           </Route>
         </Routes>
         {/* Research tools sit around both versions of the app. */}
+        <DesignLayer />
         <InsightsTracker />
         <HeatmapOverlay />
         <ReviewPins />

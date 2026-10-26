@@ -72,6 +72,9 @@ Flags are stored in localStorage (`skillhouse.flags.insights`, `skillhouse.flags
 ### Eye tracking (webcam)
 `#/console/gaze`, participant link `#/?gaze`. Uses [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) (Apache-2.0) running in the browser: iris position inside each eye, eye openness and head direction go into a ridge regression fitted by a 9-dot calibration, then checked on 4 more dots and reported as average error in px (recording is refused when it is too far off). **The camera starts only after the participant agrees; video frames never leave the browser and are never stored** — only the estimated gaze point on the page (about 15 per second). Webcam tracking is coarse (typically 100–200 px), so the heatmap (`?heatmap=gaze`) draws soft areas. The WebAssembly runtime is bundled; the 4 MB face model loads from Google's model storage the first time.
 
+### Design tokens and UI-library looks
+`#/console/design`. Edit the app's design tokens as JSON (W3C design-token style: a token is an object with `$value`, its name is the CSS variable it sets; top-level `light`, `dark` and `v2` say where it applies). The JSON starts from the app's own stylesheets. Pick a UI library look (Material 3, Ant Design, shadcn/ui, Bootstrap 5) to load its tokens and restyle the classic app's components the way that library draws them; these imitate the look and don't load the library's code. Quick controls edit the main tokens; a live screen viewer previews any screen without saving; **Apply in this browser** puts the variant on the whole app (for example for a usability test) and the dock shows its name until it is turned off. Download/upload JSON; partial files are laid over the app's own tokens.
+
 ### Comments
 - **How to comment** (works on every screen, v1, v2 and the research pages): press **Comment** in the dock (or press **C**, or click the round comment button), then click **anywhere** on the screen — the comment is placed on that spot, not tied to an element. Type, then Close.
 - **All comments** (the speech-bubbles icon in the dock, or ⋯ beside the comment button) lists every comment with its page; choosing one goes to that page, scrolls to the spot and opens it. No replies or statuses: a comment is a note on a spot.
@@ -104,6 +107,17 @@ A second design of the same product, made with [taste-skill](https://github.com/
 - **Projects**, **Skill page** and **Tidy up** carry the same information as v1 in this style.
 
 The style's tokens are Instrument Sans with Instrument Serif for the greeting only, one teal on data, and tonal panels with no shadows. It lives in `src/v2/`. The classic UI stays at `#/`.
+
+## Installable skill: ux-research-kit
+
+The research tools are also packaged as a Claude Code skill for other projects, in `plugins/ux-research-kit/`: framework-agnostic TypeScript modules (tracking and sessions, heatmaps and replay, 5-second tests, fake doors, eye tracking, design tokens and UI-library palettes), specs per module, the privacy rules, and a verification checklist. Claude copies what a project needs, wires it to its router, and builds the console screens in that project's own components.
+
+```
+/plugin marketplace add sandmanz26/whatvibecodingcando
+/plugin install ux-research-kit@whatvibecodingcando
+```
+
+Or copy `plugins/ux-research-kit/skills/ux-research-kit/` into `~/.claude/skills/`. The modules were checked in a separate vanilla TypeScript app (strict typecheck, build, and a browser run of every module).
 
 ## External skills
 

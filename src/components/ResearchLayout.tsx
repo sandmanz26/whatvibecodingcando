@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye } from 'lucide-react'
+import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette } from 'lucide-react'
 import { Toasts } from './ui'
 
 /**
@@ -20,6 +20,7 @@ export function ResearchLayout() {
           <NavLink to="/console/fivesec" className={({ isActive }) => (isActive ? 'on' : '')}><Timer size={13} /> 5-second tests</NavLink>
           <NavLink to="/console/doors" className={({ isActive }) => (isActive ? 'on' : '')}><DoorOpen size={13} /> Fake doors</NavLink>
           <NavLink to="/console/gaze" className={({ isActive }) => (isActive ? 'on' : '')}><Eye size={13} /> Eye tracking</NavLink>
+          <NavLink to="/console/design" className={({ isActive }) => (isActive ? 'on' : '')}><Palette size={13} /> Design tokens</NavLink>
         </nav>
         <div className="spacer" />
         <Link to="/" className="btn sm"><ArrowLeft size={14} /> Back to Skillhouse</Link>
