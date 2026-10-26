@@ -6,11 +6,10 @@ import { PRESETS, presetOf } from '../tools/design/presets'
 import { baseline, changes, flatten, loadDesign, merge, saveDesign, validate, type Design, type DesignDoc } from '../tools/design/tokens'
 
 const SCREENS = [
-  { page: '/', label: 'Overview' },
-  { page: '/skills', label: 'Skills' },
-  { page: '/teams', label: 'Teams' },
-  { page: '/health', label: 'Health' },
-  { page: '/v2', label: 'v2 Home' },
+  { page: '/', label: 'Home' },
+  { page: '/search', label: 'Search' },
+  { page: '/product/p1', label: 'Product' },
+  { page: '/cart', label: 'Cart' },
 ]
 
 /** A few tokens worth a direct control; everything else is in the JSON. */
@@ -47,7 +46,7 @@ export default function DesignTokens() {
   const { toast } = useStore()
   const base = useMemo(() => baseline(), [])
   const saved = loadDesign()
-  const [preset, setPreset] = useState(saved?.preset ?? 'skillhouse')
+  const [preset, setPreset] = useState(saved?.preset ?? 'wireframe')
   const [text, setText] = useState(() => pretty(saved?.doc ?? base))
   const [screen, setScreen] = useState('/')
   const [device, setDevice] = useState<Device>('desktop')
@@ -55,7 +54,7 @@ export default function DesignTokens() {
   const file = useRef<HTMLInputElement>(null)
 
   const parsed = useMemo(() => validate(text), [text])
-  const [design, setDesign] = useState<Design>({ doc: saved?.doc ?? base, preset: saved?.preset ?? 'skillhouse' })
+  const [design, setDesign] = useState<Design>({ doc: saved?.doc ?? base, preset: saved?.preset ?? 'wireframe' })
   // Keep the last valid document while someone is mid-edit, so the preview doesn't flicker.
   useEffect(() => { if (parsed.doc) setDesign({ doc: parsed.doc, preset }) }, [parsed.doc, preset])
 
@@ -88,12 +87,12 @@ export default function DesignTokens() {
       <div className="page-head">
         <div>
           <h1>Design tokens</h1>
-          <p>Try another set of design tokens, or another UI library’s look, on the real screens. Edit the JSON (W3C design-token style: the token’s name is the CSS variable it sets; top-level <span className="mono">light</span>, <span className="mono">dark</span> and <span className="mono">v2</span> say where it applies). Apply it to use the variant in this browser, for example during a usability test.</p>
+          <p>Try another set of design tokens, or another UI library’s look, on the real screens. Edit the JSON (W3C design-token style: the token’s name is the CSS variable it sets; top-level <span className="mono">light</span> and <span className="mono">dark</span> say where it applies). Apply it to use the variant in this browser, for example during a usability test.</p>
         </div>
       </div>
 
       <section className="card">
-        <div className="card-head"><div><h2>UI library</h2><p>Restyles the classic app’s components the way each library draws them. An imitation of the look; the library’s code isn’t loaded. v2 keeps its own design.</p></div></div>
+        <div className="card-head"><div><h2>UI library</h2><p>Restyles the marketplace’s components the way each library draws them. An imitation of the look; the library’s code isn’t loaded.</p></div></div>
         <div className="card-body lib-grid">
           {PRESETS.map((p) => (
             <button key={p.id} className={`lib-card ${preset === p.id ? 'on' : ''}`} onClick={() => choose(p.id)} aria-pressed={preset === p.id}>
@@ -107,7 +106,7 @@ export default function DesignTokens() {
       <div className="grid mt-16 design-grid">
         <section className="card">
           <div className="card-head">
-            <div><h2>Tokens</h2><p>{parsed.error ? <span style={{ color: 'var(--critical-ink)' }}>{parsed.error}</span> : `${diff.length} token${diff.length === 1 ? '' : 's'} differ from Skillhouse`}</p></div>
+            <div><h2>Tokens</h2><p>{parsed.error ? <span style={{ color: 'var(--critical-ink)' }}>{parsed.error}</span> : `${diff.length} token${diff.length === 1 ? '' : 's'} differ from the wireframe`}</p></div>
             <div className="row" style={{ gap: 4 }}>
               <button className="btn ghost sm icon" onClick={() => parsed.doc && setText(pretty(parsed.doc))} aria-label="Format JSON" title="Format"><Wand2 size={13} /></button>
               <button className="btn ghost sm icon" onClick={() => choose(preset)} aria-label="Reset to the library’s tokens" title="Reset"><RotateCcw size={13} /></button>

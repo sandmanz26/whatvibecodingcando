@@ -10,7 +10,7 @@ import { fiveSecAsClicks } from '../fivesec/store'
 import { loadGaze, type GazePoint } from '../gaze/store'
 
 /** Message the heatmap posts to the console's screen viewer when embedded. */
-export interface HeatmapStats { type: 'skillhouse:heatmap'; taps: number; missing: number; layout: string; page: string; unit: 'tap' | 'gaze sample' | 'first click' }
+export interface HeatmapStats { type: 'market:heatmap'; taps: number; missing: number; layout: string; page: string; unit: 'tap' | 'gaze sample' | 'first click' }
 
 /** Installs the tracker while the flag is on and reports route changes to it. */
 export function InsightsTracker() {
@@ -168,7 +168,7 @@ export function HeatmapOverlay() {
 
   useEffect(() => {
     if (!active || !embed || clicks === null || window.parent === window) return
-    const msg: HeatmapStats = { type: 'skillhouse:heatmap', taps: count, missing, layout: layoutOf(vw), page: pathname, unit }
+    const msg: HeatmapStats = { type: 'market:heatmap', taps: count, missing, layout: layoutOf(vw), page: pathname, unit }
     window.parent.postMessage(msg, window.location.origin)
   }, [active, embed, clicks, count, missing, vw, pathname, unit])
 

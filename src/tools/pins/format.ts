@@ -79,7 +79,7 @@ const BLOCK = '--- #'
 const escapeLine = (l: string) => (l.startsWith(BLOCK) || l.startsWith('\\') ? `\\${l}` : l)
 const unescapeLine = (l: string) => (l.startsWith('\\') ? l.slice(1) : l)
 
-export function toTxt(list: PinNote[], app = 'Skillhouse', now = new Date()): string {
+export function toTxt(list: PinNote[], app = 'Marketplace', now = new Date()): string {
   const head = [`# ${app} review annotations`, '# version: 1', `# exported: ${now.toISOString()}`, ''].join('\n') + '\n'
   const blocks = readingOrder(list).map((n, i) => [
     `${BLOCK}${i + 1} ${n.id}`,
@@ -134,7 +134,7 @@ export function fromTxt(txt: string): PinNote[] {
   return out
 }
 
-export function txtFileName(app = 'skillhouse', d = new Date()) {
+export function txtFileName(app = 'market', d = new Date()) {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${app}-annotations-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.txt`
 }

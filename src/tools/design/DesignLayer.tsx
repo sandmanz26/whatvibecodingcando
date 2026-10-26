@@ -38,7 +38,7 @@ export function DesignLayer() {
     if (!el) { el = document.createElement('style'); el.id = 'design-sim'; document.head.appendChild(el) }
     const preset = presetOf(design.preset)
     el.textContent = `${toCss(design.doc, base)}\n${preset.css}`
-    if (preset.id === 'skillhouse') delete document.documentElement.dataset.uilib
+    if (preset.id === 'wireframe') delete document.documentElement.dataset.uilib
     else document.documentElement.dataset.uilib = preset.id
   }, [design])
 

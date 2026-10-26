@@ -9,7 +9,7 @@ import { STATUS_TEXT, usePinSync } from './useSync'
 
 const BUTTON_KEY = `${APP}.reviewPins.button`
 /** Fire with detail 'start' (comment mode) or 'list' (open the list) from anywhere in the app. */
-export const COMMENT_EVENT = 'skillhouse:comments'
+export const COMMENT_EVENT = 'market:comments'
 const BTN = 44
 const TAP_SLOP = 5
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)

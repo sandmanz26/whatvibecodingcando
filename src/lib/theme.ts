@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 type Theme = 'light' | 'dark'
-const EVENT = 'skillhouse:theme'
+const EVENT = 'market:theme'
 
 const current = (): Theme => {
   const t = document.documentElement.dataset.theme
@@ -20,7 +20,7 @@ export function useTheme() {
   const toggle = () => {
     const next: Theme = current() === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = next
-    try { localStorage.setItem('skillhouse:theme', next) } catch { /* ignore */ }
+    try { localStorage.setItem('market:theme', next) } catch { /* ignore */ }
     window.dispatchEvent(new Event(EVENT))
   }
   return [theme, toggle] as const

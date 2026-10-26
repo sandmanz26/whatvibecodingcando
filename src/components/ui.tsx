@@ -1,104 +1,50 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import {
-  Archive, BadgeCheck, Code2, Compass, FileText, FlaskConical, Headphones,
-  Palette, Settings2, TriangleAlert, OctagonAlert, AlertCircle, CircleAlert, X,
-} from 'lucide-react'
-import type { Category, Member, Status } from '../data/types'
-import { initials, type Severity as Sev } from '../lib/logic'
+import { Link } from 'react-router-dom'
+import { CircleAlert, Star, X } from 'lucide-react'
 import { useStore } from '../store/store'
+import { rp } from '../lib/ai'
+import type { Product } from '../data/shop'
 
-const AVATAR_TONES = ['#6a5d50', '#4f6170', '#5d6b4f', '#70506a', '#4f6b66', '#625178', '#7a5b45', '#4a5a7a']
+/** Wireframe image: a grey box with a cross, labelled with what goes there. */
+export function Placeholder({ label = 'Image', ratio = '1 / 1', className = '' }: { label?: string; ratio?: string; className?: string }) {
+  return <div className={`ph ${className}`} style={{ aspectRatio: ratio }} role="img" aria-label={label}><span>{label}</span></div>
+}
 
-export function Avatar({ member, size }: { member?: Member; size?: 'lg' }) {
-  if (!member) return <span className={`avatar ${size ?? ''}`} style={{ background: '#999' }}>?</span>
-  const n = Number(member.id.replace(/\D/g, '')) || 0
+export function Stars({ value, count }: { value: number; count?: number }) {
   return (
-    <span className={`avatar ${size ?? ''}`} style={{ background: AVATAR_TONES[n % AVATAR_TONES.length] }} title={member.name} aria-hidden>
-      {initials(member.name)}
+    <span className="stars" aria-label={`${value.toFixed(1)} out of 5${count ? `, ${count} reviews` : ''}`}>
+      <Star size={13} fill="currentColor" /> {value.toFixed(1)}{count !== undefined && <span className="muted"> ({count.toLocaleString('en-US')})</span>}
     </span>
   )
 }
 
-export function AvatarStack({ ids, max = 3 }: { ids: string[]; max?: number }) {
-  const { member } = useStore()
+export function Price({ p, size }: { p: Pick<Product, 'price' | 'oldPrice'>; size?: 'lg' }) {
   return (
-    <span className="avatar-stack">
-      {ids.slice(0, max).map((id) => <Avatar key={id} member={member(id)} />)}
-      {ids.length > max && <span className="avatar" style={{ background: 'var(--surface-3)', color: 'var(--ink-2)' }}>+{ids.length - max}</span>}
+    <span className={`price ${size ?? ''}`}>
+      <b>{rp(p.price)}</b>
+      {p.oldPrice && <><s>{rp(p.oldPrice)}</s><span className="off">−{Math.round((1 - p.price / p.oldPrice) * 100)}%</span></>}
     </span>
   )
 }
 
-const STATUS_ICON: Record<Status, ReactNode> = {
-  active: <BadgeCheck size={14} color="var(--good)" />,
-  experimental: <FlaskConical size={14} color="var(--warning)" />,
-  deprecated: <Archive size={14} color="var(--ink-3)" />,
-}
-export const STATUS_LABEL: Record<Status, string> = { active: 'Active', experimental: 'Experimental', deprecated: 'Retired' }
+const soldLabel = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k sold` : `${n} sold`)
 
-export function StatusBadge({ status }: { status: Status }) {
-  return <span className="stage">{STATUS_ICON[status]}{STATUS_LABEL[status]}</span>
-}
-export const statusIcon = (s: Status) => STATUS_ICON[s]
-
-const SEV_CLASS: Record<Sev, string> = { high: 'critical', medium: 'serious', low: 'warning' }
-export function SeverityTag({ level }: { level: Sev }) {
-  const Icon = level === 'high' ? OctagonAlert : level === 'medium' ? AlertCircle : TriangleAlert
-  return <span className={`sev ${SEV_CLASS[level]}`}><Icon size={13} strokeWidth={2.4} />{level[0].toUpperCase() + level.slice(1)}</span>
-}
-
-export function TeamDots({ ids }: { ids: string[] }) {
-  const { team } = useStore()
+export function ProductCard({ p, why }: { p: Product; why?: string }) {
   return (
-    <span className="team-dots" aria-label={ids.map((i) => team(i)?.name).join(', ')}>
-      {ids.map((id) => {
-        const t = team(id)
-        return t ? <i key={id} style={{ background: `var(--s${t.slot})` }} title={t.name} /> : null
-      })}
-    </span>
+    <Link to={`/product/${p.id}`} className="pcard">
+      <Placeholder label="Product photo" />
+      <div className="pcard-body">
+        <span className="pcard-title">{p.title}</span>
+        <Price p={p} />
+        <span className="pcard-meta"><Stars value={p.rating} /> · {soldLabel(p.sold)}</span>
+        {why && <span className="pcard-why">{why}</span>}
+      </div>
+    </Link>
   )
 }
 
-export function TeamTag({ id }: { id: string }) {
-  const { team } = useStore()
-  const t = team(id)
-  if (!t) return null
-  return (
-    <span className="badge outline">
-      <i style={{ width: 8, height: 8, borderRadius: 2, background: `var(--s${t.slot})`, display: 'inline-block' }} />
-      {t.name}
-    </span>
-  )
-}
-
-const CAT_ICON: Record<Category, typeof Code2> = {
-  Engineering: Code2,
-  Design: Palette,
-  Product: Compass,
-  Support: Headphones,
-  Operations: Settings2,
-  Writing: FileText,
-}
-export const CATEGORIES = Object.keys(CAT_ICON) as Category[]
-
-export function CategoryIcon({ category, size = 16 }: { category: Category; size?: number }) {
-  const I = CAT_ICON[category]
-  return <span className="cat-icon"><I size={size} /></span>
-}
-
-export function Switch({ checked, onChange, label, disabledReason }: { checked: boolean; onChange: () => void; label: string; disabledReason?: string }) {
-  const btn = (
-    <button
-      type="button"
-      role="switch"
-      className="switch"
-      aria-checked={checked}
-      aria-label={label}
-      aria-disabled={!!disabledReason}
-      onClick={() => !disabledReason && onChange()}
-    />
-  )
-  return disabledReason ? <span className="tip" data-tip={disabledReason}>{btn}</span> : btn
+export function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+  return <button type="button" role="switch" className="switch" aria-checked={checked} aria-label={label} onClick={onChange} />
 }
 
 export function Modal({ title, description, onClose, children, footer }: {

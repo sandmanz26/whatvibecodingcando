@@ -1,6 +1,6 @@
 /**
  * UI library looks for the classic app: each is a set of tokens plus component rules that
- * restyle Skillhouse's own components (buttons, inputs, chips, cards, tabs, switches, tables)
+ * restyle the marketplace's own components (buttons, inputs, chips, cards, tabs, switches, tables)
  * the way that library draws them. They imitate the look; they don't load the library's code.
  * Component rules apply under html[data-uilib="<id>"]; the v2 design keeps its own art direction.
  */
@@ -18,9 +18,9 @@ const t = (vars: Record<string, string>) => Object.fromEntries(Object.entries(va
 
 export const PRESETS: Preset[] = [
   {
-    id: 'skillhouse',
-    name: 'Skillhouse',
-    note: 'The app’s own design: quiet neutrals, near-black primary, 6–14 px corners.',
+    id: 'wireframe',
+    name: 'Wireframe',
+    note: 'The prototype’s own look: greys only, placeholders for images, 6–14 px corners.',
     tokens: {},
     css: '',
   },

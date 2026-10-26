@@ -4,8 +4,8 @@ import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen
 import { Toasts } from './ui'
 
 /**
- * The research console lives apart from Skillhouse: it studies how people use the
- * product (sessions, heatmaps, usability tests) and is not part of the product itself.
+ * The research console lives apart from the marketplace: it studies how people use the
+ * marketplace (sessions, heatmaps, usability tests) and is not part of the product itself.
  */
 export function ResearchLayout() {
   const { pathname } = useLocation()
@@ -23,7 +23,7 @@ export function ResearchLayout() {
           <NavLink to="/console/design" className={({ isActive }) => (isActive ? 'on' : '')}><Palette size={13} /> Design tokens</NavLink>
         </nav>
         <div className="spacer" />
-        <Link to="/" className="btn sm"><ArrowLeft size={14} /> Back to Skillhouse</Link>
+        <Link to="/" className="btn sm"><ArrowLeft size={14} /> Back to the shop</Link>
       </header>
       <Outlet />
       <Toasts />

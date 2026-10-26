@@ -5,7 +5,9 @@
  */
 import { useEffect, useState } from 'react'
 
-export const APP = 'skillhouse'
+// Storage prefix for every research tool. Changed from "skillhouse" when the product became the marketplace,
+// so research data about the old screens doesn't mix with the new ones.
+export const APP = 'market'
 
 /* ---------- flags ---------- */
 
@@ -88,7 +90,7 @@ export function safeQuery(q: URLSearchParams = currentQuery()): string {
 }
 
 /** The app's main page, where a recorded session starts counting. */
-export const isMainPage = (path: string) => path === '/' || path === '/v2'
+export const isMainPage = (path: string) => path === '/'
 
 export const CONSOLE_PREFIX = '/console'
 export const isConsole = (path: string) => path === CONSOLE_PREFIX || path.startsWith(CONSOLE_PREFIX + '/')

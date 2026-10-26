@@ -43,12 +43,12 @@ const RESULTS_KEY = `${APP}.fivesec.results`
 
 const SEED: FiveSecTest[] = [{
   id: 'first-look',
-  name: 'Where do messy skills show up?',
-  prompt: 'You want to see which skills need tidying up. Click where you would go first.',
+  name: 'Where do people go for AI help?',
+  prompt: 'You don’t know exactly what to buy and would like some help choosing. Click where you would go first.',
   page: '/',
   seconds: 5,
-  target: { sel: 'a[href="#/health"]', label: 'Health' },
-  createdAt: '2026-10-22T09:00:00.000Z',
+  target: { sel: '#ask-ai', label: 'Ask AI' },
+  createdAt: '2026-10-26T09:00:00.000Z',
 }]
 
 export const uid = () => Math.random().toString(36).slice(2, 10)

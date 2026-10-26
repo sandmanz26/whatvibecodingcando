@@ -6,18 +6,18 @@
  * nest freely. The token's own name (the last key) is the CSS variable it sets, so
  * { "color": { "primary": { "$value": "#6750a4" } } } sets --primary.
  * Top-level keys are where the tokens apply:
- *   light → the classic app in light mode · dark → the classic app in dark mode · v2 → the v2 design
+ *   light → the app in light mode · dark → the app in dark mode
  */
 import { APP, readJSON, writeJSON } from '../shared'
 
 export interface Token { $value: string; $type?: string; $description?: string }
 export interface TokenTree { [key: string]: TokenTree | Token | string | undefined }
-export type Scope = 'light' | 'dark' | 'v2'
+export type Scope = 'light' | 'dark'
 export type DesignDoc = Partial<Record<Scope, TokenTree>> & { $description?: string }
 
 export interface Design { doc: DesignDoc; preset: string }
 
-export const SCOPES: Scope[] = ['light', 'dark', 'v2']
+export const SCOPES: Scope[] = ['light', 'dark']
 const KEY = `${APP}.design`
 export const DESIGN_EVENT = `${APP}:design`
 export const DESIGN_MESSAGE = `${APP}:design`
@@ -58,7 +58,7 @@ export function treeOf(vars: Record<string, string>): TokenTree {
 
 /** The app's own tokens, read from its stylesheets: what the JSON starts from. */
 export function baseline(): DesignDoc {
-  const found: Record<Scope, Record<string, string>> = { light: {}, dark: {}, v2: {} }
+  const found: Record<Scope, Record<string, string>> = { light: {}, dark: {} }
   const take = (rule: CSSStyleRule, scope: Scope) => {
     for (let i = 0; i < rule.style.length; i++) {
       const p = rule.style[i]
@@ -71,14 +71,13 @@ export function baseline(): DesignDoc {
         const s = r.selectorText.replace(/\s+/g, '')
         if (s === ':root') take(r, 'light')
         else if (s === ":root[data-theme='dark']" || s === ':root[data-theme="dark"]') take(r, 'dark')
-        else if (s === '.v2') take(r, 'v2')
       }
     }
   }
   for (const sheet of Array.from(document.styleSheets)) {
     try { walk(sheet.cssRules) } catch { /* another origin's stylesheet */ }
   }
-  return { light: treeOf(found.light), dark: treeOf(found.dark), v2: treeOf(found.v2) }
+  return { light: treeOf(found.light), dark: treeOf(found.dark) }
 }
 
 /** Overlays one document on another, token by token. */
@@ -105,10 +104,10 @@ export function changes(base: DesignDoc, doc: DesignDoc) {
 export function validate(text: string): { doc?: DesignDoc; error?: string } {
   let raw: unknown
   try { raw = JSON.parse(text) } catch (e) { return { error: `Not valid JSON: ${(e as Error).message}` } }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'The top level must be an object with light, dark and/or v2.' }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'The top level must be an object with light and/or dark.' }
   const keys = Object.keys(raw).filter((k) => !k.startsWith('$'))
   const bad = keys.filter((k) => !SCOPES.includes(k as Scope))
-  if (bad.length) return { error: `Unknown top-level key${bad.length > 1 ? 's' : ''}: ${bad.join(', ')}. Use light, dark or v2.` }
+  if (bad.length) return { error: `Unknown top-level key${bad.length > 1 ? 's' : ''}: ${bad.join(', ')}. Use light or dark.` }
   for (const s of keys) {
     for (const [name, value] of Object.entries(flatten((raw as DesignDoc)[s as Scope]))) {
       if (!/^--[a-zA-Z0-9-]+$/.test(name)) return { error: `“${name.slice(2)}” can’t be a CSS variable name.` }
@@ -127,7 +126,7 @@ export function toCss(doc: DesignDoc, base: DesignDoc = {}): string {
     const a = flatten(base[s]), b = flatten(doc[s])
     return Object.fromEntries(Object.entries(b).filter(([k, v]) => a[k] !== v))
   }
-  const dark = diff('dark'), v2 = diff('v2')
+  const dark = diff('dark')
   // A light token that dark mode doesn't redefine (radius, fonts…) applies in both modes.
   const themed = new Set([...Object.keys(flatten(base.dark)), ...Object.keys(flatten(doc.dark))])
   const lightAll = diff('light')
@@ -139,7 +138,6 @@ export function toCss(doc: DesignDoc, base: DesignDoc = {}): string {
     Object.keys(light).length ? `@media (prefers-color-scheme: light){${block("html:root:not([data-theme='dark'])", light)}}` : '',
     block("html:root[data-theme='dark']", dark),
     Object.keys(dark).length ? `@media (prefers-color-scheme: dark){${block("html:root:not([data-theme='light'])", dark)}}` : '',
-    block('.v2.v2', v2),
   ].join('\n')
 }
 

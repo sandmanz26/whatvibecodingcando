@@ -18,11 +18,11 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 
 /* ---------- the session: one participant, one run through the app ---------- */
 
-const SID_KEY = 'skillhouse.insights.sid'
-const SEEN_KEY = 'skillhouse.insights.seen'
-const CLOSING_KEY = 'skillhouse.insights.closing'
+const SID_KEY = 'market.insights.sid'
+const SEEN_KEY = 'market.insights.seen'
+const CLOSING_KEY = 'market.insights.closing'
 const IDLE_MS = 30 * 60 * 1000
-export const SESSION_EVENT = 'skillhouse:session'
+export const SESSION_EVENT = 'market:session'
 
 const ss = {
   get: (k: string) => { try { return sessionStorage.getItem(k) } catch { return null } },

@@ -2,38 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { GripVertical, Moon, Sun, MessageSquarePlus, MessagesSquare, FlaskConical } from 'lucide-react'
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
-import { getFlag, isConsole, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
+import { getFlag, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
 import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
 import { DESIGN_EVENT, loadDesign } from '../tools/design/tokens'
 import { presetOf } from '../tools/design/presets'
 import { useTheme } from '../lib/theme'
 
-const POS_KEY = 'skillhouse.dock'
-
-/** The same place in the other version, so switching never loses where you are. */
-function counterpart(path: string, toV2: boolean): string {
-  if (toV2) {
-    const m = path.match(/^\/(skills|projects)\/([^/]+)$/)
-    if (m) return `/v2/${m[1]}/${m[2]}`
-    if (path.startsWith('/projects')) return '/v2/projects'
-    if (path.startsWith('/health')) return '/v2/tidy'
-    if (path.startsWith('/skills') || path.startsWith('/teams')) return '/v2/shelf'
-    return '/v2'
-  }
-  const m = path.match(/^\/v2\/(skills|projects)\/([^/]+)$/)
-  if (m) return `/${m[1]}/${m[2]}`
-  if (path.startsWith('/v2/projects')) return '/projects'
-  if (path.startsWith('/v2/tidy')) return '/health'
-  if (path.startsWith('/v2/shelf')) return '/teams'
-  return '/'
-}
+const POS_KEY = 'market.dock'
 
 /**
- * The research dock — not part of the product: comments, version switch, theme and
+ * The research dock — not part of the product: session, comments, design variant, theme and
  * the way into the research console. Drag it by its handle; the spot is remembered.
  */
 export function VersionSwitch() {
-  const { pathname, search } = useLocation()
+  const { search } = useLocation()
   const nav = useNavigate()
   const [theme, toggleTheme] = useTheme()
   const ref = useRef<HTMLDivElement>(null)
@@ -48,6 +30,8 @@ export function VersionSwitch() {
   useEffect(() => {
     const sync = () => setSession(sessionState())
     window.addEventListener(SESSION_EVENT, sync)
+    // The tracker may have started a session before this listener existed.
+    sync()
     return () => window.removeEventListener(SESSION_EVENT, sync)
   }, [])
   const [pos, setPos] = useState<{ x: number; y: number }>(() => readJSON(POS_KEY, { x: 16, y: window.innerHeight - (window.innerWidth <= 860 ? 140 : 72) }))
@@ -90,8 +74,6 @@ export function VersionSwitch() {
   }
 
   if (isEmbedded || new URLSearchParams(search).has('heatmap')) return null
-  const v2 = pathname === '/v2' || pathname.startsWith('/v2/')
-  const research = isConsole(pathname)
 
   return (
     <>
@@ -103,11 +85,7 @@ export function VersionSwitch() {
         {design && <button className="dock-rec" onClick={() => nav('/console/design')} title="A simulated design is on in this browser">{presetOf(design.preset).name}</button>}
         <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
         <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
-        <div className="dock-seg" role="group" aria-label="App version">
-          <button aria-pressed={!v2 && !research} onClick={() => (v2 || research) && nav(counterpart(pathname, false))}>v1 <span>Classic</span></button>
-          <button aria-pressed={v2} onClick={() => !v2 && nav(counterpart(pathname, true))}>v2 <span>Shelf</span></button>
-        </div>
-        {!v2 && <button className="dock-icon" onClick={toggleTheme} aria-label="Toggle theme" title="Toggle theme">{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</button>}
+        <button className="dock-icon" onClick={toggleTheme} aria-label="Toggle theme" title="Toggle theme">{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</button>
         <button className="dock-icon" onClick={() => nav('/console/insights')} aria-label="Research console" title="Research console: sessions, heatmaps, usability tests"><FlaskConical size={15} /></button>
       </div>
     </>

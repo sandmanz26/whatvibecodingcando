@@ -76,14 +76,14 @@ export const uid = () => Math.random().toString(36).slice(2, 10)
 
 const SEED: UsabilityTest[] = [{
   id: 'basics',
-  name: 'Keeping skills tidy',
-  intro: 'Imagine you look after the Claude skills your company’s teams use. You’ll get three short tasks. There are no wrong answers — we’re testing the design, not you.',
-  createdAt: '2026-10-22T09:00:00.000Z',
-  updatedAt: '2026-10-22T09:00:00.000Z',
+  name: 'Shopping with AI',
+  intro: 'Imagine you are shopping online. You’ll get three short tasks. There are no wrong answers — we’re testing the design, not you.',
+  createdAt: '2026-10-26T09:00:00.000Z',
+  updatedAt: '2026-10-26T09:00:00.000Z',
   tasks: [
-    { id: 't1', prompt: 'Find out which projects use the Release notes skill and open its page.', startPage: '/', success: { kind: 'page', page: '/skills/release-notes' }, limitSec: 60 },
-    { id: 't2', prompt: 'Two teams wrote skills that do the same job. Find where the app lists duplicates.', startPage: '/', success: { kind: 'page', page: '/health' }, limitSec: 60 },
-    { id: 't3', prompt: 'Which skills does the Customer Success team run the most? Open that team’s view.', startPage: '/', success: { kind: 'page', page: '/teams' }, limitSec: 60 },
+    { id: 't1', prompt: 'You want running shoes for a beginner, under Rp 500.000. Find a pair and open its page.', startPage: '/', success: { kind: 'page', page: '/product/p1' }, limitSec: 90 },
+    { id: 't2', prompt: 'Find out whether these shoes are waterproof, without reading the full specifications.', startPage: '/product/p1', success: { kind: 'element', sel: 'button[data-q="Is it waterproof?"]', label: '“Is it waterproof?” question', page: '/product/p1' }, limitSec: 60 },
+    { id: 't3', prompt: 'Ask the shopping assistant for a gift for someone who loves coffee.', startPage: '/', success: { kind: 'page', page: '/product/p9' }, limitSec: 90 },
   ],
 }]
 

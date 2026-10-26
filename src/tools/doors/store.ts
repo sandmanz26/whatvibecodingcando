@@ -32,16 +32,16 @@ export const DOORS_EVENT = `${APP}:doors`
 export const DEFAULT_MESSAGE = 'This isn’t available yet. Thanks for trying it — it tells us whether to build it next.'
 
 const SEED: FakeDoor[] = [{
-  id: 'export-csv',
-  name: 'Export the skill list',
-  page: '/skills',
-  sel: 'select[aria-label="Sort"]',
-  anchorLabel: 'Sort menu',
+  id: 'price-alert',
+  name: 'Would people set a price-drop alert?',
+  page: '/product/p5',
+  sel: '#add-to-cart',
+  anchorLabel: 'Add to cart',
   mode: 'new',
-  label: 'Export CSV',
+  label: 'Alert me if the price drops',
   message: DEFAULT_MESSAGE,
   live: false,
-  createdAt: '2026-10-22T09:00:00.000Z',
+  createdAt: '2026-10-26T09:00:00.000Z',
 }]
 
 export const uid = () => Math.random().toString(36).slice(2, 10)

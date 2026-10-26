@@ -65,7 +65,7 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
   useEffect(() => {
     const on = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return
-      if (e.data?.type === 'skillhouse:heatmap') setStats(e.data as HeatmapStats)
+      if (e.data?.type === 'market:heatmap') setStats(e.data as HeatmapStats)
     }
     window.addEventListener('message', on)
     return () => window.removeEventListener('message', on)

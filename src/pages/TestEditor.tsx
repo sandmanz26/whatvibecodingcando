@@ -5,6 +5,7 @@ import { Empty, Modal } from '../components/ui'
 import { DEVICES, ScreenViewer, type Device, type Picked } from '../tools/insights/ScreenViewer'
 import { loadTests, saveTests, uid, type TestTask, type UsabilityTest } from '../tools/tests/store'
 import { useStore } from '../store/store'
+import { PRODUCTS } from '../data/shop'
 
 const newTask = (): TestTask => ({ id: uid(), prompt: '', startPage: '/', success: { kind: 'page', page: '/' }, limitSec: 60 })
 
@@ -12,7 +13,7 @@ export default function TestEditor() {
   const { id } = useParams()
   const isNew = id === 'new'
   const nav = useNavigate()
-  const { skills, projects, toast } = useStore()
+  const { toast } = useStore()
   const existing = isNew ? undefined : loadTests().find((t) => t.id === id)
   const [test, setTest] = useState<UsabilityTest>(() => existing ?? {
     id: uid(), name: '', intro: 'You’ll get a few short tasks. There are no wrong answers — we’re testing the design, not you.',
@@ -24,7 +25,7 @@ export default function TestEditor() {
 
   if (!isNew && !existing) return <main className="page"><div className="card"><Empty title="Test not found"><Link className="btn sm" to="/console/tests">All tests</Link></Empty></div></main>
 
-  const pages = ['/', '/skills', '/projects', '/teams', '/health', ...skills.map((s) => `/skills/${s.id}`), ...projects.map((p) => `/projects/${p.id}`), '/v2', '/v2/shelf', '/v2/projects', '/v2/tidy']
+  const pages = ['/', '/search', '/cart', '/checkout', '/orders', ...PRODUCTS.map((p) => `/product/${p.id}`)]
   const setTask = (tid: string, patch: Partial<TestTask>) => setTest((t) => ({ ...t, tasks: t.tasks.map((x) => (x.id === tid ? { ...x, ...patch } : x)) }))
   const move = (i: number, d: -1 | 1) => setTest((t) => {
     const tasks = [...t.tasks]
@@ -75,7 +76,7 @@ export default function TestEditor() {
       <section className="card card-body stack gap-16" style={{ marginBottom: 16 }}>
         <div className="field">
           <label htmlFor="tname">Test name</label>
-          <input id="tname" className="input" value={test.name} onChange={(e) => setTest({ ...test, name: e.target.value })} placeholder="e.g. Finding duplicate skills" />
+          <input id="tname" className="input" value={test.name} onChange={(e) => setTest({ ...test, name: e.target.value })} placeholder="e.g. Finding a product with AI search" />
         </div>
         <div className="field">
           <label htmlFor="tintro">Welcome message</label>
@@ -99,7 +100,7 @@ export default function TestEditor() {
             </div>
             <div className="field">
               <label htmlFor={`p-${t.id}`}>What should they do?</label>
-              <textarea id={`p-${t.id}`} className="textarea" rows={2} value={t.prompt} onChange={(e) => setTask(t.id, { prompt: e.target.value })} placeholder="e.g. Find out which team uses skills the most." />
+              <textarea id={`p-${t.id}`} className="textarea" rows={2} value={t.prompt} onChange={(e) => setTask(t.id, { prompt: e.target.value })} placeholder="e.g. Find running shoes under Rp 500.000 and add them to the cart." />
             </div>
             <div className="grid g-2" style={{ gap: 12 }}>
               <div className="field">
