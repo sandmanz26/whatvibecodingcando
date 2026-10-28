@@ -626,3 +626,48 @@ html[data-ut-running] .dock { display: none; }
 @media (max-width: 1100px) { .quick { grid-template-columns: 1fr; } }
 .design-grid { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); align-items: start; }
 @media (max-width: 1000px) { .design-grid { grid-template-columns: 1fr; } }
+
+/* ---------- research report ---------- */
+.report { max-width: 860px; display: flex; flex-direction: column; gap: 22px; padding: 28px 32px; }
+.report h2 { font-size: 16px; margin-bottom: 10px; }
+.report-title { width: 100%; border: 0; border-bottom: 1px dashed transparent; background: none; font: inherit; font-size: 24px; font-weight: 650; color: var(--ink); padding: 0; outline: none; }
+.report-title:hover, .report-title:focus { border-bottom-color: var(--line-strong); }
+.report-warn { padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2); font-size: 13px; border-left: 3px solid var(--ink-3); }
+.report-short { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; }
+.report-nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.report-nums > div { display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 12.5px; }
+.report-nums b { font-size: 22px; color: var(--ink); }
+.funnel { display: flex; flex-direction: column; gap: 6px; }
+.funnel-row { display: grid; grid-template-columns: 170px 1fr 44px; gap: 12px; align-items: center; font-size: 13px; padding: 3px 0; }
+.funnel-bar { height: 12px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.funnel-bar i { display: block; height: 100%; background: var(--ink-2); }
+.funnel-row b { text-align: right; }
+.findings { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 12px; }
+.finding { padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 6px; }
+.finding.high { border-left-color: var(--ink); }
+.finding.medium { border-left-color: var(--ink-3); }
+.finding.good { border-left-style: dashed; }
+.finding-top { display: flex; align-items: center; gap: 8px; }
+.finding h3, .insight h3 { font-size: 14.5px; }
+.finding p, .insight p { font-size: 13.5px; }
+.finding-ev { font-size: 12.5px !important; color: var(--ink-3); }
+.quote { margin: 0 0 10px; padding: 8px 14px; border-left: 3px solid var(--line-strong); font-size: 14px; }
+.quote footer { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+
+/* ---------- insight repository ---------- */
+.insight { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.insight.done, .insight.wontfix { opacity: 0.65; }
+.insight-status { width: 170px; height: 28px; margin-left: auto; font-size: 12.5px; }
+
+/* ---------- design system check ---------- */
+.dscheck-frame { position: fixed; left: -10000px; top: 0; width: 1280px; height: 900px; border: 0; pointer-events: none; }
+
+@media (max-width: 720px) { .report { padding: 20px 16px; } .report-nums { grid-template-columns: repeat(2, minmax(0, 1fr)); } .funnel-row { grid-template-columns: 110px 1fr 36px; } }
+
+@media print {
+  .no-print, .dock, .toasts, [data-review-pins], .hm-bar { display: none !important; }
+  body, .research { background: #fff; }
+  .page { padding: 0; max-width: none; }
+  .report { border: 0; box-shadow: none; padding: 0; max-width: none; }
+  .finding { break-inside: avoid; }
+}

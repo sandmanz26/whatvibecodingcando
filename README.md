@@ -79,6 +79,38 @@ Flags are stored in localStorage (`market.flags.insights`, `market.flags.reviewP
 ### Design tokens and UI-library looks
 `#/console/design`. Edit the app's design tokens as JSON (W3C design-token style: a token is an object with `$value`, its name is the CSS variable it sets; top-level `light` and `dark` say where it applies). The JSON starts from the app's own stylesheets. Pick a UI library look (Material 3, Ant Design, shadcn/ui, Bootstrap 5) to load its tokens and restyle the marketplace's components the way that library draws them; these imitate the look and don't load the library's code. Quick controls edit the main tokens; a live screen viewer previews any screen without saving; **Apply in this browser** puts the variant on the whole app (for example for a usability test) and the dock shows its name until it is turned off. Download/upload JSON; partial files are laid over the app's own tokens.
 
+### Research report
+`#/console/report`. One page built from everything the tools collected (sessions, usability tests, 5-second tests, fake doors, eye tracking, researcher notes and comments). It has:
+- **In short**: the top findings in one line each.
+- **In numbers** and **Journey**: key counts, and how many sessions reached each step from home to order placed.
+- **Findings**, ranked by impact, each with its evidence, "Show on screen" (the real screen with the element outlined) and "Keep in repository". Findings include:
+  - the biggest drop in the journey;
+  - elements people tap that do nothing or aren't clickable;
+  - usability tasks with low success or slow completion;
+  - 5-second hit rates;
+  - fake-door interest;
+  - attention above the fold;
+  - researcher tags.
+- **Usability tasks** and **In their words**: a table of the tasks, then quotes from researcher notes and comments.
+
+The report is made by fixed rules, not an AI model. The same data always gives the same report, and small samples are flagged. You can copy it as Markdown, download it as .md, or print it and save as PDF. **Add sample research data** fills every tool with clearly marked demo data, so the report can be shown without running a study; it is removed again with one click (all its ids start with `demo-`).
+
+### Insight repository
+`#/console/repo`. Findings worth keeping, from the report, the design system check, or added by hand:
+- **What's kept:** each insight has impact, status (New, Being worked on, Done, Won't act), tags, evidence, and the screen and element it is about.
+- **Finding them:** search, and filter by status, impact, source or tag.
+- **Using them:** "Show on screen" opens the screen with the element outlined, and export writes Markdown. Insights are stored in `market.repo`.
+
+### Design system check
+`#/console/dscheck`. Opens each marketplace screen in a hidden frame, reads the computed styles of every visible element, and flags:
+- colours (text, background, border) that aren't tokens;
+- corner radii that aren't tokens;
+- fonts that aren't tokens;
+- font sizes off the type scale (editable);
+- inline styles that set these by hand.
+
+Inherited properties are judged only where they're set. Each off-token value comes with how often it's used, on which screens, the closest token, an example, "Show on screen" and "Keep in repository". The results also give a consistency score overall and per screen. If a design variant is applied in this browser, that variant is what gets checked.
+
 ### Comments
 - **How to comment** (works on every screen, the research pages included): press **Comment** in the dock (or press **C**, or click the round comment button), then click **anywhere** on the screen — the comment is placed on that spot, not tied to an element. Type, then Close.
 - **All comments** (the speech-bubbles icon in the dock, or ⋯ beside the comment button) lists every comment with its page; choosing one goes to that page, scrolls to the spot and opens it. No replies or statuses: a comment is a note on a spot.

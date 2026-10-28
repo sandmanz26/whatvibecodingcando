@@ -56,10 +56,10 @@ export default function Search() {
         {q && (u.category || u.maxPrice || u.needs.length > 0) && (
           <div className="understood" aria-label="What the AI understood">
             <span className="row" style={{ gap: 6 }}><Sparkles size={14} /> <b>Understood as</b></span>
-            {u.category && <span className="tag">{category(u.category)?.name}</span>}
-            {u.maxPrice && <span className="tag">Under {rp(u.maxPrice)}</span>}
+            {u.category && <span className="tag" aria-label={`Understood: ${category(u.category)?.name}`}>{category(u.category)?.name}</span>}
+            {u.maxPrice && <span className="tag" aria-label={`Understood: under ${rp(u.maxPrice)}`}>Under {rp(u.maxPrice)}</span>}
             {u.minPrice && <span className="tag">Over {rp(u.minPrice)}</span>}
-            {u.needs.map((n) => <span key={n} className="tag">{n}</span>)}
+            {u.needs.map((n) => <span key={n} className="tag" aria-label={`Understood: ${n}`}>{n}</span>)}
             <span className="muted" style={{ fontSize: 12.5 }}>Change it with the filters.</span>
           </div>
         )}

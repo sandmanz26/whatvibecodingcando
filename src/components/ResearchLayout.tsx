@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette } from 'lucide-react'
+import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch } from 'lucide-react'
 import { Toasts } from './ui'
 
 /**
@@ -12,7 +12,7 @@ export function ResearchLayout() {
   useEffect(() => { window.scrollTo(0, 0) }, [pathname])
   return (
     <div className="research">
-      <header className="topbar research-bar">
+      <header className="topbar research-bar no-print">
         <span className="research-mark"><FlaskConical size={15} /> Research console</span>
         <nav className="seg" aria-label="Research tools">
           <NavLink to="/console/insights" className={({ isActive }) => (isActive ? 'on' : '')}><MousePointerClick size={13} /> Sessions</NavLink>
@@ -21,6 +21,9 @@ export function ResearchLayout() {
           <NavLink to="/console/doors" className={({ isActive }) => (isActive ? 'on' : '')}><DoorOpen size={13} /> Fake doors</NavLink>
           <NavLink to="/console/gaze" className={({ isActive }) => (isActive ? 'on' : '')}><Eye size={13} /> Eye tracking</NavLink>
           <NavLink to="/console/design" className={({ isActive }) => (isActive ? 'on' : '')}><Palette size={13} /> Design tokens</NavLink>
+          <NavLink to="/console/dscheck" className={({ isActive }) => (isActive ? 'on' : '')}><ScanSearch size={13} /> DS check</NavLink>
+          <NavLink to="/console/report" className={({ isActive }) => (isActive ? 'on' : '')}><FileText size={13} /> Report</NavLink>
+          <NavLink to="/console/repo" className={({ isActive }) => (isActive ? 'on' : '')}><Lightbulb size={13} /> Insights</NavLink>
         </nav>
         <div className="spacer" />
         <Link to="/" className="btn sm"><ArrowLeft size={14} /> Back to the shop</Link>

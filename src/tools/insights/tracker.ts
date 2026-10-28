@@ -153,11 +153,21 @@ function controlOf(target: Element): Element | null {
   return node
 }
 
+/**
+ * A name for something that isn't a control: its own accessible name (aria-label, alt, title),
+ * from it or the nearest labelled ancestor — never its text content.
+ */
+function nonControlLabel(target: Element) {
+  const named = target.closest('[aria-label], [alt], [title]')
+  const name = named ? squash(named.getAttribute('aria-label') ?? named.getAttribute('alt') ?? named.getAttribute('title')) : ''
+  return `(not a control) ${name ? clip(name, 80) : target.tagName.toLowerCase()}`
+}
+
 /** For pickers: the control a tap on `target` would be recorded as, with its selector and name. */
 export function describeTarget(target: Element) {
   const control = controlOf(target)
   const el = control ?? target
-  return { el, sel: selectorFor(el), label: control ? labelFor(control) : `(not a control) ${target.tagName.toLowerCase()}` }
+  return { el, sel: selectorFor(el), label: control ? labelFor(control) : nonControlLabel(target) }
 }
 
 let installed: (() => void) | null = null
@@ -282,7 +292,7 @@ export function installTracker(): () => void {
       x: round1((e.clientX / window.innerWidth) * 100),
       y: Math.round(e.clientY + window.scrollY),
       docH,
-      label: control ? labelFor(control) : `(not a control) ${target.tagName.toLowerCase()}`,
+      label: control ? labelFor(control) : nonControlLabel(target),
       tag: el.tagName.toLowerCase(),
       ...(href ? { href } : {}),
       kind: control ? kindFor(control) : 'not a control',
