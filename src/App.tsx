@@ -19,6 +19,8 @@ import DesignTokens from './pages/DesignTokens'
 import Report from './pages/Report'
 import InsightRepo from './pages/InsightRepo'
 import DesignCheck from './pages/DesignCheck'
+import Narration from './pages/Narration'
+import { NarrationRecorder } from './tools/voice/Narrator'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
 import { FakeDoors } from './tools/doors/FakeDoors'
@@ -56,6 +58,7 @@ export default function App() {
             <Route path="report" element={<Report />} />
             <Route path="repo" element={<InsightRepo />} />
             <Route path="dscheck" element={<DesignCheck />} />
+            <Route path="narration" element={<Narration />} />
           </Route>
         </Routes>
         {/* Research tools sit around both versions of the app. */}
@@ -67,6 +70,7 @@ export default function App() {
         <FiveSecRunner />
         <FakeDoors />
         <GazeRunner />
+        <NarrationRecorder />
         <VersionSwitch />
       </HashRouter>
     </StoreProvider>

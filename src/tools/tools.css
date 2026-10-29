@@ -235,3 +235,23 @@ html[data-commenting] body, html[data-commenting] body * { cursor: crosshair !im
 .gz-pill > i.on { background: #d03b3b; box-shadow: 0 0 0 3px rgba(208, 59, 59, .2); }
 .gz-dot { position: fixed; z-index: 2147483400; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: rgba(42, 120, 214, 0.25); box-shadow: 0 0 0 2px rgba(42, 120, 214, 0.6); pointer-events: none; transition: left 80ms linear, top 80ms linear; }
 @media (prefers-reduced-motion: reduce) { .gz-target.busy { animation: none; } .gz-dot { transition: none; } }
+
+/* ---------- voice: narration and voice notes ---------- */
+.vo-pill { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2147483500; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); padding: 6px 6px 6px 14px; border-radius: 999px; background: #1f201d; color: #f0efec; box-shadow: 0 6px 24px rgba(0,0,0,.24); font: 13px/1.4 var(--font, system-ui), sans-serif; white-space: nowrap; }
+.vo-pill .muted { color: rgba(255,255,255,.6); }
+.vo-pill .btn { background: #fff; color: #111; border-color: transparent; }
+.vo-page { overflow: hidden; text-overflow: ellipsis; max-width: 200px; color: rgba(255,255,255,.85); }
+.vo-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff5a4f; box-shadow: 0 0 0 3px rgba(255,90,79,.25); animation: vo-blink 1.2s ease-in-out infinite; flex: none; }
+@keyframes vo-blink { 50% { opacity: .35; } }
+.vo-meter { width: 54px; height: 6px; border-radius: 3px; background: rgba(127,127,127,.3); overflow: hidden; flex: none; }
+.vo-meter i { display: block; height: 100%; background: #6fcf8f; transition: width 80ms linear; }
+.vo-chapters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.vo-chapter { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); font: inherit; font-size: 13px; color: var(--ink); text-align: left; cursor: pointer; margin-bottom: 4px; }
+.vo-chapter:hover { border-color: var(--line-strong); }
+.vo-chapter.on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.vn { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.vn audio { height: 34px; flex: 1; min-width: 0; }
+.vn-rec { padding: 6px 8px; border-radius: 8px; background: var(--surface-2, #f2f2f2); font-size: 13px; }
+.rp-voice { display: inline-block; margin-right: 6px; font-size: 11.5px; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .vo-dot { animation: none; } }
+@media (max-width: 640px) { .vo-page, .vo-pill .muted { display: none; } }

@@ -4,7 +4,9 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { MessageSquarePlus, MessageSquare, X, List, Download, Upload, Trash2, EyeOff } from 'lucide-react'
 import { APP, TOOL_DOM, isEmbedded, readJSON, useFlag, writeJSON } from '../shared'
 import { useStore } from '../../store/store'
-import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, toTxt, txtFileName, type PinNote } from './format'
+import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, toTxt, txtFileName, voiceId, type PinNote } from './format'
+import { VoiceNote } from '../voice/VoiceNote'
+import { clock, deleteClip } from '../voice/audio'
 import { STATUS_TEXT, usePinSync } from './useSync'
 
 const BUTTON_KEY = `${APP}.reviewPins.button`
@@ -107,8 +109,8 @@ function Comments({ onHide }: { onHide: () => void }) {
   const update = (id: string, patch: Partial<PinNote>) => setNotes((all) => all.map((n) => (n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n)))
 
   const closeCard = useCallback(() => {
-    // A comment left empty is dropped rather than kept as a blank pin.
-    setNotes((all) => all.filter((n) => n.id !== openId || n.text.trim() !== ''))
+    // A comment left empty (no text, no voice) is dropped rather than kept as a blank pin.
+    setNotes((all) => all.filter((n) => n.id !== openId || n.text.trim() !== '' || !!n.voice))
     setOpenId(null)
   }, [openId, setNotes])
 
@@ -296,12 +298,13 @@ function Comments({ onHide }: { onHide: () => void }) {
             <span>{open.author ?? 'Someone'} · {ago(open.createdAt)} · <span className="mono">{open.page}</span></span>
           </div>
           {mine(open) ? (
-            <textarea autoFocus rows={3} maxLength={MAX_TEXT} placeholder="What should change here?" value={open.text} onChange={(e) => update(open.id, { text: e.target.value })} aria-label="Comment" />
+            <textarea autoFocus rows={3} maxLength={MAX_TEXT} placeholder="What should change here? Type, or record a voice note." value={open.text} onChange={(e) => update(open.id, { text: e.target.value })} aria-label="Comment" />
           ) : (
-            <div className="rp-msg"><p>{open.text || '—'}</p></div>
+            open.text ? <div className="rp-msg"><p>{open.text}</p></div> : null
           )}
+          <VoiceNote key={open.id} clipId={voiceId(open.id)} ms={open.voice?.ms} editable={mine(open)} onChange={(ms) => update(open.id, { voice: ms === undefined ? undefined : { ms } })} />
           <div className="rp-card-foot">
-            <button className="btn sm ghost danger" onClick={() => { setNotes((all) => all.filter((n) => n.id !== open.id)); setOpenId(null) }}><Trash2 size={13} /> Delete</button>
+            <button className="btn sm ghost danger" onClick={() => { if (open.voice) void deleteClip(voiceId(open.id)); setNotes((all) => all.filter((n) => n.id !== open.id)); setOpenId(null) }}><Trash2 size={13} /> Delete</button>
             <button className="btn sm primary" onClick={closeCard}>Close</button>
           </div>
         </div>
@@ -322,7 +325,7 @@ function Comments({ onHide }: { onHide: () => void }) {
                   <span className="rp-num">{number.get(n.id)}</span>
                   <span style={{ minWidth: 0 }}>
                     <span className="rp-where mono">{n.page}</span>
-                    <span className="rp-text">{n.text || 'Empty comment'}</span>
+                    <span className="rp-text">{n.voice && <span className="rp-voice">🎙 {clock(n.voice.ms)}</span>}{n.text || (n.voice ? 'Voice note' : 'Empty comment')}</span>
                     <span className="rp-meta">{n.author ?? 'Someone'} · {ago(n.createdAt)}</span>
                   </span>
                 </button>
@@ -338,7 +341,7 @@ function Comments({ onHide }: { onHide: () => void }) {
           <p>This removes them for everyone on this deployment{status === 'local' || status === 'error' ? ' (here: this browser)' : ''}. It can’t be undone — save a .txt first if you might need them.</p>
           <div className="rp-card-foot">
             <button className="btn sm" onClick={() => setConfirmAll(false)}>Keep comments</button>
-            <button className="btn sm danger" onClick={() => { setNotes([]); setConfirmAll(false); say('All comments deleted') }}>Delete {notes.length}</button>
+            <button className="btn sm danger" onClick={() => { notes.forEach((n) => { if (n.voice) void deleteClip(voiceId(n.id)) }); setNotes([]); setConfirmAll(false); say('All comments deleted') }}>Delete {notes.length}</button>
           </div>
         </div>
       )}

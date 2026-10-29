@@ -111,11 +111,25 @@ The report is made by fixed rules, not an AI model. The same data always gives t
 
 Inherited properties are judged only where they're set. Each off-token value comes with how often it's used, on which screens, the closest token, an example, "Show on screen" and "Keep in repository". The results also give a consistency score overall and per screen. If a design variant is applied in this browser, that variant is what gets checked.
 
+### Narration (voice walkthroughs)
+`#/console/narration`, and the microphone button in the dock. Press it and explain the screens out loud while you go through the app.
+- **While recording:** a bar at the top shows the time, a level meter, the current screen and **Stop**. Leaving the page asks first.
+- **Chapters:** each screen you visit becomes a chapter. Screens passed through in under 1.2 s are folded into the next one.
+- **Playing back:**
+  - **Walkthroughs** plays a recording with its chapters, and the screen beside it follows the narration.
+  - **By screen** lists every explanation recorded for each screen.
+  - On any screen that has one, the dock shows **▶ Explain** to play it there.
+- **Managing recordings:** download the audio, rename, delete.
+
 ### Comments
+- **Voice notes:** a comment can be a voice note as well as (or instead of) text: **Record voice note** in its card, with a live level meter. The list marks it with 🎙 and its length. The .txt export notes the voice note's length, but the audio stays in the browser that recorded it.
 - **How to comment** (works on every screen, the research pages included): press **Comment** in the dock (or press **C**, or click the round comment button), then click **anywhere** on the screen — the comment is placed on that spot, not tied to an element. Type, then Close.
 - **All comments** (the speech-bubbles icon in the dock, or ⋯ beside the comment button) lists every comment with its page; choosing one goes to that page, scrolls to the spot and opens it. No replies or statuses: a comment is a note on a spot.
 - Comments made with the earlier element-pinned version still load and still follow their element.
 - The `.txt` export is human-readable and lossless. Importing merges notes by id, and the file wins.
+
+### Voice privacy
+The microphone starts only when someone presses a record button, and a visible indicator shows while it is on. Audio is kept in this browser's IndexedDB (`market-voice`). Nothing is uploaded or transcribed.
 
 ### Storage and sync
 This project ships **no backend**. By default both tools are *local only* and keep their data in this browser (`market.insights.clicks`, newest 3,000 events; `market.reviewPins`). The UI says which mode it is in.

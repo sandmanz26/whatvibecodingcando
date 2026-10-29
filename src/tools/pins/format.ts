@@ -26,7 +26,12 @@ export interface PinNote {
   author?: string
   replies?: Reply[]
   resolved?: boolean
+  /** a voice note: the audio lives in this browser's IndexedDB under voiceId(id) */
+  voice?: { ms: number }
 }
+
+/** Where a comment's voice note is kept (see tools/voice/audio.ts). */
+export const voiceId = (noteId: string) => `pin-${noteId}`
 
 export interface Reply { id: string; author: string; text: string; at: string }
 
@@ -53,6 +58,9 @@ export function validNote(n: unknown): PinNote | null {
   if (author) note.author = author
   if (ex !== null && ey !== null) { note.ex = ex; note.ey = ey }
   if (o.resolved === true) note.resolved = true
+  const v = o.voice as Record<string, unknown> | undefined
+  const vms = v && typeof v === 'object' ? num(v.ms, 0, 3_600_000) : null
+  if (vms !== null) note.voice = { ms: vms }
   if (Array.isArray(o.replies)) {
     note.replies = o.replies.slice(0, 100).map((rp) => {
       const q = (rp ?? {}) as Record<string, unknown>
@@ -96,6 +104,8 @@ export function toTxt(list: PinNote[], app = 'Marketplace', now = new Date()): s
     `status: ${n.resolved ? 'resolved' : 'open'}`,
     // Replies as one JSON line: still readable, and lossless for multi-line text.
     ...(n.replies?.length ? [`replies: ${JSON.stringify(n.replies)}`] : []),
+    // The audio itself stays in the browser that recorded it; the .txt notes that there was one.
+    ...(n.voice ? [`voice: ${Math.round(n.voice.ms / 1000)} s (audio not included)`] : []),
     'note:',
     ...n.text.split('\n').map(escapeLine),
   ].join('\n') + '\n')
@@ -128,7 +138,8 @@ export function fromTxt(txt: string): PinNote[] {
     let replies: unknown = undefined
     try { replies = meta.replies ? JSON.parse(meta.replies) : undefined } catch { /* skip broken replies */ }
     const note = validNote({ id, page: meta.page, x, y, vw, vh, scrollY: Number(meta.scroll), text: body.join('\n'), createdAt: meta.created, updatedAt: meta.updated,
-      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, resolved: meta.status === 'resolved', replies })
+      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, resolved: meta.status === 'resolved', replies,
+      voice: meta.voice ? { ms: (parseInt(meta.voice, 10) || 0) * 1000 } : undefined })
     if (note) out.push(note)
   }
   return out

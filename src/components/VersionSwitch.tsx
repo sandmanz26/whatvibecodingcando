@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { GripVertical, Moon, Sun, MessageSquarePlus, MessagesSquare, FlaskConical } from 'lucide-react'
+import { GripVertical, Moon, Sun, MessageSquarePlus, MessagesSquare, FlaskConical, Mic } from 'lucide-react'
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
 import { getFlag, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
 import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
 import { DESIGN_EVENT, loadDesign } from '../tools/design/tokens'
 import { presetOf } from '../tools/design/presets'
+import { ExplainButton, narrating } from '../tools/voice/Narrator'
+import { NARRATE_EVENT, NARRATION_CHANGED } from '../tools/voice/narration'
 import { useTheme } from '../lib/theme'
 
 const POS_KEY = 'market.dock'
@@ -22,6 +24,12 @@ export function VersionSwitch() {
   const recording = useFlag('insights')
   const [session, setSession] = useState(sessionState)
   const [design, setDesign] = useState(loadDesign)
+  const [isNarrating, setNarrating] = useState(narrating)
+  useEffect(() => {
+    const sync = () => setNarrating(narrating())
+    window.addEventListener(NARRATION_CHANGED, sync)
+    return () => window.removeEventListener(NARRATION_CHANGED, sync)
+  }, [])
   useEffect(() => {
     const sync = () => setDesign(loadDesign())
     window.addEventListener(DESIGN_EVENT, sync)
@@ -83,6 +91,8 @@ export function VersionSwitch() {
           ? <button className="dock-rec on" onClick={() => endSession('ended')} title="Recording this session. End it here; the next one starts on the main page."><i /> End session</button>
           : <span className="dock-rec" title="Recording is on. A session starts counting when the main page opens."><i /> Starts on home</span>)}
         {design && <button className="dock-rec" onClick={() => nav('/console/design')} title="A simulated design is on in this browser">{presetOf(design.preset).name}</button>}
+        {!isNarrating && <button className="dock-icon" onClick={() => window.dispatchEvent(new CustomEvent(NARRATE_EVENT, { detail: 'start' }))} aria-label="Narrate a walkthrough" title="Narrate: record your voice while you go through the screens"><Mic size={15} /></button>}
+        <ExplainButton />
         <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
         <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
         <button className="dock-icon" onClick={toggleTheme} aria-label="Toggle theme" title="Toggle theme">{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</button>
