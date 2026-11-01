@@ -43,7 +43,7 @@ export function Thread({ note, me, ago, onReply, onDelete }: {
             <li key={r.id}>
               <div className="rp-reply-head">
                 <CornerDownRight size={12} aria-hidden /><b>{r.author}</b><span>· {ago(r.at)}</span>
-                {r.author === me && <button className="btn ghost sm icon" onClick={() => { if (r.voice) void deleteClip(replyVoiceId(r.id)); onDelete(r) }} aria-label="Delete reply" title="Delete reply"><Trash2 size={12} /></button>}
+                {r.author === me && !note.resolved && <button className="btn ghost sm icon" onClick={() => { if (r.voice) void deleteClip(replyVoiceId(r.id)); onDelete(r) }} aria-label="Delete reply" title="Delete reply"><Trash2 size={12} /></button>}
               </div>
               {r.text && <p>{r.text}</p>}
               {r.voice && <VoiceNote clipId={replyVoiceId(r.id)} ms={r.voice.ms} editable={false} onChange={() => {}} />}

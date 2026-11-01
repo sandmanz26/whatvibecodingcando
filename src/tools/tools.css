@@ -285,3 +285,8 @@ html[data-commenting] body, html[data-commenting] body * { cursor: crosshair !im
 .rp-card-head, .rp-card-foot { flex: none; }
 .rp-card-body { flex: 1 1 auto; }
 .rp-replies li p { font-size: 13px; font-weight: 400; line-height: 1.45; }
+.rp-pin.draft { background: var(--primary); color: var(--primary-ink); font-size: 15px; cursor: default; }
+.rp-edit { margin-top: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--ink-3); text-decoration: underline; cursor: pointer; }
+.rp-edit:hover { color: var(--ink); }
+.rp-edit-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.rp-card-foot .muted { color: var(--ink-3); }

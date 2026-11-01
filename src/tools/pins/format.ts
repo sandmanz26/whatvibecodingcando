@@ -26,6 +26,8 @@ export interface PinNote {
   author?: string
   replies?: Reply[]
   resolved?: boolean
+  /** when its author last changed the text after posting */
+  editedAt?: string
   /** who set it as completed, and when */
   resolvedBy?: string
   resolvedAt?: string
@@ -66,6 +68,8 @@ export function validNote(n: unknown): PinNote | null {
   if (label) note.label = label
   if (author) note.author = author
   if (ex !== null && ey !== null) { note.ex = ex; note.ey = ey }
+  const edited = str(o.editedAt, 40)
+  if (edited) note.editedAt = edited
   if (o.resolved === true) {
     note.resolved = true
     const by = str(o.resolvedBy, 80), at = str(o.resolvedAt, 40)
@@ -117,6 +121,7 @@ export function toTxt(list: PinNote[], app = 'Marketplace', now = new Date()): s
     ...(n.sel ? [`selector: ${n.sel}`] : []),
     ...(n.ex !== undefined ? [`anchor: ${n.ex}, ${n.ey}`] : []),
     ...(n.author ? [`author: ${n.author}`] : []),
+    ...(n.editedAt ? [`edited: ${n.editedAt}`] : []),
     `status: ${n.resolved ? 'resolved' : 'open'}`,
     ...(n.resolvedBy ? [`completed_by: ${n.resolvedBy}`] : []),
     ...(n.resolvedAt ? [`completed: ${n.resolvedAt}`] : []),
@@ -156,7 +161,7 @@ export function fromTxt(txt: string): PinNote[] {
     let replies: unknown = undefined
     try { replies = meta.replies ? JSON.parse(meta.replies) : undefined } catch { /* skip broken replies */ }
     const note = validNote({ id, page: meta.page, x, y, vw, vh, scrollY: Number(meta.scroll), text: body.join('\n'), createdAt: meta.created, updatedAt: meta.updated,
-      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, resolved: meta.status === 'resolved', resolvedBy: meta.completed_by, resolvedAt: meta.completed, replies,
+      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, editedAt: meta.edited, resolved: meta.status === 'resolved', resolvedBy: meta.completed_by, resolvedAt: meta.completed, replies,
       voice: meta.voice ? { ms: (parseInt(meta.voice, 10) || 0) * 1000 } : undefined })
     if (note) out.push(note)
   }

@@ -122,13 +122,15 @@ Inherited properties are judged only where they're set. Each off-token value com
 - **Managing recordings:** download the audio, rename, delete.
 
 ### Comments
-- **Write:**
-  - Press **Comment** in the dock (or **C**, or the round comment button), then click **anywhere** on any screen, the research pages included.
-  - Write the comment, record a **voice note**, or both. The comment sits on that spot; it isn't tied to an element.
-- **Reply:** every comment has a thread, and a reply can be text, a voice note, or both. Replies show author and time, and you can delete your own.
+- **Write:** press **Comment** in the dock (or **C**, or the round comment button), then click **anywhere** on any screen, the research pages included.
+  - **Draft first:** a *New comment* card opens with just the comment box, an optional **voice note**, **Cancel** and **Post**. A draft isn't saved, numbered or given a status, and it has no replies.
+  - **Cancel or Esc:** throws the draft away, voice note included.
+  - **A draft with content:** must be posted or cancelled before starting another comment or opening another. Leaving the page discards it and says so.
+- **Posted comment:** **Post** saves it as **Open** and shows it as a message. Only then do replies and **Set as completed** appear. Its author can **Edit** the text: **Save** marks it *edited*, **Cancel** changes nothing.
+- **Reply:** every posted comment has a thread, and a reply can be text, a voice note, or both. Replies show author and time, and you can delete your own while the comment is still open.
 - **Status:**
   - A comment is **Open** until someone replies, then **Ongoing**, until someone presses **Set as completed**.
-  - A completed comment shows who completed it and when, takes no new replies, and can be **Reopen**ed.
+  - A completed comment shows who completed it and when. Its thread is locked (no new replies, no edits, no deleting replies), and it can be **Reopen**ed.
   - Pins on the screen are coloured by status: orange open, blue ongoing, green with a check for completed.
 - **All comments:** lists everything with its page, status, author and reply count. Filter with **All / Open / Ongoing / Completed**, each with its count. Choosing one goes to that page, scrolls to the spot and opens it.
 - **Commenting as:** comments and replies are signed with a name set in the list, kept per browser, so reviewers sharing a .txt can tell each other apart.

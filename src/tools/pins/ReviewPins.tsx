@@ -83,11 +83,15 @@ function Comments({ onHide }: { onHide: () => void }) {
   const [menu, setMenu] = useState(false)
   const [list, setList] = useState<'open' | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  /** A comment being written: not saved, not numbered, no status — until it is posted. */
+  const [draft, setDraft] = useState<PinNote | null>(null)
+  /** A posted comment whose text its author is changing. */
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   const [confirmAll, setConfirmAll] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [pending, setPending] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const { notes, setNotes, status, scope } = usePinSync(placing || !!openId)
+  const { notes, setNotes, status, scope } = usePinSync(placing || !!openId || !!draft)
   // The name comments and replies are signed with, kept per browser so reviewers can tell each other apart.
   const [name, setNameState] = useState<string>(() => readJSON(NAME_KEY, me.name))
   const setName = (v: string) => { setNameState(v); writeJSON(NAME_KEY, v) }
@@ -114,11 +118,28 @@ function Comments({ onHide }: { onHide: () => void }) {
   const say = (t: string) => { setToast(t); window.setTimeout(() => setToast((x) => (x === t ? null : x)), 2600) }
   const update = (id: string, patch: Partial<PinNote>) => setNotes((all) => all.map((n) => (n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n)))
 
-  const closeCard = useCallback(() => {
-    // A comment left empty (no text, no voice) is dropped rather than kept as a blank pin.
-    setNotes((all) => all.filter((n) => n.id !== openId || n.text.trim() !== '' || !!n.voice))
-    setOpenId(null)
-  }, [openId, setNotes])
+  const closeCard = useCallback(() => { setOpenId(null); setEditing(null) }, [])
+
+  const draftHasContent = !!draft && (draft.text.trim() !== '' || !!draft.voice)
+  /** Throws the draft (and any voice note recorded for it) away. */
+  const discardDraft = useCallback(() => {
+    setDraft((d) => { if (d?.voice) void deleteClip(voiceId(d.id)); return null })
+  }, [])
+  /** Before starting something else: an empty draft is dropped; one with content must be posted or cancelled first. */
+  const draftBlocks = () => {
+    if (!draft) return false
+    if (!draftHasContent) { discardDraft(); return false }
+    say('Post or cancel the comment you’re writing first')
+    return true
+  }
+  const postDraft = () => {
+    if (!draft || !draftHasContent) return
+    const now = new Date().toISOString()
+    const posted: PinNote = { ...draft, text: draft.text.trim(), createdAt: now, updatedAt: now }
+    setNotes((all) => [...all, posted])
+    setDraft(null)
+    setOpenId(posted.id)
+  }
 
   // Comment mode: a crosshair, and a click drops the comment right there — anywhere on the page.
   useEffect(() => {
@@ -137,9 +158,9 @@ function Comments({ onHide }: { onHide: () => void }) {
         vw: window.innerWidth, vh: window.innerHeight, scrollY: Math.round(window.scrollY),
         text: '', createdAt: now, updatedAt: now, author: name.trim() || me.name,
       }
-      setNotes((all) => [...all, n])
+      setDraft(n)
       setPlacing(false)
-      setOpenId(n.id)
+      setOpenId(null)
     }
     document.addEventListener('click', click, true)
     return () => {
@@ -148,10 +169,18 @@ function Comments({ onHide }: { onHide: () => void }) {
     }
   }, [placing, pathname, me.name, name, notes.length, setNotes])
 
+  const draftBlocksRef = useRef(draftBlocks)
+  draftBlocksRef.current = draftBlocks
+  // Leaving the page drops a comment that was never posted.
+  useEffect(() => {
+    if (draft && draft.page !== pathname) { if (draftHasContent) say('The comment you hadn’t posted was discarded'); discardDraft() }
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Other entry points: the dock's Comment button and list (a window event), and the C key.
   useEffect(() => {
     const onEvent = (e: Event) => {
       const what = (e as CustomEvent<'start' | 'list'>).detail
+      if (draftBlocksRef.current()) return
       setMenu(false); setOpenId(null)
       if (what === 'list') setList('open')
       else { setList(null); setPlacing(true) }
@@ -161,6 +190,7 @@ function Comments({ onHide }: { onHide: () => void }) {
       const t = e.target as HTMLElement
       if (t.closest('input, textarea, select, [contenteditable="true"]')) return
       e.preventDefault()
+      if (draftBlocksRef.current()) return
       setMenu(false); setList(null); setOpenId(null); setPlacing(true)
     }
     window.addEventListener(COMMENT_EVENT, onEvent)
@@ -173,6 +203,8 @@ function Comments({ onHide }: { onHide: () => void }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       if (confirmAll) setConfirmAll(false)
+      else if (draft) discardDraft()
+      else if (editing) setEditing(null)
       else if (openId) closeCard()
       else if (list) setList(null)
       else if (menu) setMenu(false)
@@ -180,7 +212,7 @@ function Comments({ onHide }: { onHide: () => void }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [confirmAll, openId, list, menu, placing, closeCard])
+  }, [confirmAll, openId, list, menu, placing, closeCard, draft, editing, discardDraft])
 
   // From the list: go to the page, scroll the spot into view, ping it, open the comment.
   useEffect(() => {
@@ -231,14 +263,16 @@ function Comments({ onHide }: { onHide: () => void }) {
   const flashEl = flash ? notes.find((n) => n.id === flash) : undefined
   const flashAt = flashEl ? anchor(flashEl, vp.w) : undefined
 
-  const card = (() => {
-    if (!open) return null
-    const a = anchor(open, vp.w)
+  const cardFor = (n: PinNote | null | undefined) => {
+    if (!n) return null
+    const a = anchor(n, vp.w)
     const py = a.y - window.scrollY
     const w = Math.min(340, vp.w - 24)
     const left = Math.min(Math.max(12, a.x - window.scrollX - w / 2), vp.w - w - 12)
     return py > vp.h / 2 ? { left, width: w, bottom: Math.max(12, vp.h - py + 22) } : { left, width: w, top: Math.max(12, Math.min(vp.h - 320, py + 22)) }
-  })()
+  }
+  const card = cardFor(open)
+  const draftCard = draft && draft.page === pathname ? cardFor(draft) : null
 
   const author = name.trim() || me.name
   const mine = (n: PinNote) => !n.author || n.author === author
@@ -257,11 +291,12 @@ function Comments({ onHide }: { onHide: () => void }) {
           <button key={n.id} className={`rp-pin ${openId === n.id ? 'open' : ''} st-${statusOf(n)}`} style={{ left: a.x, top: a.y }}
             title={`${STATUS_LABEL[statusOf(n)]} · ${n.text ? n.text.slice(0, 80) : n.voice ? 'Voice note' : 'Empty comment'}`}
             aria-label={`Comment ${number.get(n.id)}, ${STATUS_LABEL[statusOf(n)]}${n.text ? `: ${n.text.slice(0, 40)}` : ''}`}
-            onClick={() => { setMenu(false); setList(null); setOpenId(n.id) }}>
+            onClick={() => { if (draftBlocks()) return; setMenu(false); setList(null); setEditing(null); setOpenId(n.id) }}>
             {n.resolved ? <Check size={13} strokeWidth={3} /> : number.get(n.id)}
           </button>
         )
       })}
+      {draft && draft.page === pathname && (() => { const a = anchor(draft, vp.w); return <span className="rp-pin draft open" style={{ left: a.x, top: a.y }} aria-hidden>+</span> })()}
 
       {placing && (
         <>
@@ -278,7 +313,7 @@ function Comments({ onHide }: { onHide: () => void }) {
         {...dragHandlers(
           (e) => setBtn(clamp({ x: e.clientX - BTN / 2, y: e.clientY - BTN / 2 })),
           // One click starts commenting; the ⋯ button beside it holds everything else.
-          () => { setMenu(false); setOpenId(null); setList(null); if (placing) setPlacing(false); else setPlacing(true) },
+          () => { if (draftBlocks()) return; setMenu(false); setOpenId(null); setList(null); if (placing) setPlacing(false); else setPlacing(true) },
           () => setBtn((b: { x: number; y: number }) => { writeJSON(BUTTON_KEY, b); return b }),
         )}
       >
@@ -287,7 +322,7 @@ function Comments({ onHide }: { onHide: () => void }) {
       </button>
       {!placing && (
         <button className="rp-more" style={{ left: Math.max(4, btn.x - 30), top: btn.y + BTN / 2 - 13 }} aria-label="More comment options" aria-expanded={menu}
-          title="All comments, export, import" onClick={() => { setOpenId(null); setList(null); setMenu((m) => !m) }}>⋯</button>
+          title="All comments, export, import" onClick={() => { if (draftBlocks()) return; setOpenId(null); setList(null); setMenu((m) => !m) }}>⋯</button>
       )}
 
       {menu && (
@@ -304,34 +339,66 @@ function Comments({ onHide }: { onHide: () => void }) {
 
       <input ref={fileRef} type="file" accept=".txt,text/plain" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; setMenu(false); if (f) void importTxt(f) }} />
 
-      {open && card && (
+      {draft && draftCard && (
+        <div className="rp-card" style={draftCard} role="dialog" aria-label="New comment">
+          <div className="rp-card-head">
+            <b>New comment</b>
+            <span>{author} · <span className="mono">{draft.page}</span></span>
+          </div>
+          <div className="rp-card-body">
+            <textarea autoFocus rows={3} maxLength={MAX_TEXT} placeholder="Write your comment…" value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} aria-label="Comment"
+              onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); postDraft() } }} />
+            <VoiceNote key={draft.id} clipId={voiceId(draft.id)} ms={draft.voice?.ms} editable onChange={(ms) => setDraft((d) => (d ? { ...d, voice: ms === undefined ? undefined : { ms } } : d))} />
+          </div>
+          <div className="rp-card-foot">
+            <span className="muted" style={{ fontSize: 12 }}>Text, a voice note, or both</span>
+            <span style={{ flex: 1 }} />
+            <button className="btn sm ghost" onClick={discardDraft}>Cancel</button>
+            <button className="btn sm primary" onClick={postDraft} disabled={!draftHasContent}>Post</button>
+          </div>
+        </div>
+      )}
+
+      {open && card && !draft && (
         <div className="rp-card" style={card} role="dialog" aria-label={`Comment ${number.get(open.id)}`}>
           <div className="rp-card-head">
             <b>Comment {number.get(open.id)} <span className={`rp-status-tag ${statusOf(open)}`}>{STATUS_LABEL[statusOf(open)]}</span></b>
-            <span>{open.author ?? 'Someone'} · {ago(open.createdAt)} · <span className="mono">{open.page}</span></span>
+            <span>{open.author ?? 'Someone'} · {ago(open.createdAt)}{open.editedAt ? ' · edited' : ''} · <span className="mono">{open.page}</span></span>
           </div>
           <div className="rp-card-body">
-            {mine(open) && !open.resolved ? (
-              <textarea autoFocus={!open.text && !open.voice} rows={3} maxLength={MAX_TEXT} placeholder="Write a comment — or record a voice note below." value={open.text} onChange={(e) => update(open.id, { text: e.target.value })} aria-label="Comment" />
+            {editing?.id === open.id ? (
+              <>
+                <textarea autoFocus rows={3} maxLength={MAX_TEXT} value={editing.text} onChange={(e) => setEditing({ id: open.id, text: e.target.value })} aria-label="Edit comment" />
+                <VoiceNote key={`e-${open.id}`} clipId={voiceId(open.id)} ms={open.voice?.ms} editable onChange={(ms) => update(open.id, { voice: ms === undefined ? undefined : { ms } })} />
+                <div className="rp-edit-foot">
+                  <button className="btn sm ghost" onClick={() => setEditing(null)}>Cancel</button>
+                  <button className="btn sm primary" disabled={!editing.text.trim() && !open.voice} onClick={() => { if (editing.text.trim() !== open.text) update(open.id, { text: editing.text.trim(), editedAt: new Date().toISOString() }); setEditing(null) }}>Save</button>
+                </div>
+              </>
             ) : (
-              open.text ? <div className="rp-msg"><p>{open.text}</p></div> : null
+              <>
+                {open.text && <div className="rp-msg"><p>{open.text}</p></div>}
+                {open.voice && <VoiceNote key={open.id} clipId={voiceId(open.id)} ms={open.voice.ms} editable={false} onChange={() => {}} />}
+                {mine(open) && !open.resolved && <button className="rp-edit" onClick={() => setEditing({ id: open.id, text: open.text })}>Edit</button>}
+              </>
             )}
-            <VoiceNote key={open.id} clipId={voiceId(open.id)} ms={open.voice?.ms} editable={mine(open) && !open.resolved} onChange={(ms) => update(open.id, { voice: ms === undefined ? undefined : { ms } })} />
             {open.resolved && <p className="rp-done-note"><CheckCircle2 size={13} /> Completed{open.resolvedBy ? ` by ${open.resolvedBy}` : ''}{open.resolvedAt ? ` · ${ago(open.resolvedAt)}` : ''}</p>}
-            {(open.text || open.voice) && (
+            {editing?.id !== open.id && (
               <Thread key={`t-${open.id}`} note={open} me={author} ago={ago}
                 onReply={(r) => update(open.id, { replies: [...(open.replies ?? []), r] })}
                 onDelete={(r) => update(open.id, { replies: (open.replies ?? []).filter((x) => x.id !== r.id) })} />
             )}
           </div>
-          <div className="rp-card-foot">
-            {mine(open) && <button className="btn sm ghost danger" onClick={() => { removeNote(open); setNotes((all) => all.filter((n) => n.id !== open.id)); setOpenId(null) }}><Trash2 size={13} /> Delete</button>}
-            <span style={{ flex: 1 }} />
-            {(open.text || open.voice) && (open.resolved
-              ? <button className="btn sm" onClick={() => update(open.id, { resolved: false, resolvedBy: undefined, resolvedAt: undefined })}><RotateCcw size={13} /> Reopen</button>
-              : <button className="btn sm" onClick={() => { update(open.id, { resolved: true, resolvedBy: author, resolvedAt: new Date().toISOString() }); say('Set as completed') }}><CheckCircle2 size={13} /> Set as completed</button>)}
-            <button className="btn sm primary" onClick={closeCard}>Close</button>
-          </div>
+          {editing?.id !== open.id && (
+            <div className="rp-card-foot">
+              {mine(open) && <button className="btn sm ghost danger" onClick={() => { removeNote(open); setNotes((all) => all.filter((n) => n.id !== open.id)); setOpenId(null) }}><Trash2 size={13} /> Delete</button>}
+              <span style={{ flex: 1 }} />
+              {open.resolved
+                ? <button className="btn sm" onClick={() => update(open.id, { resolved: false, resolvedBy: undefined, resolvedAt: undefined })}><RotateCcw size={13} /> Reopen</button>
+                : <button className="btn sm" onClick={() => { update(open.id, { resolved: true, resolvedBy: author, resolvedAt: new Date().toISOString() }); say('Set as completed') }}><CheckCircle2 size={13} /> Set as completed</button>}
+              <button className="btn sm primary" onClick={closeCard}>Close</button>
+            </div>
+          )}
         </div>
       )}
 
