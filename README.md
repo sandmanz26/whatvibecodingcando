@@ -122,11 +122,17 @@ Inherited properties are judged only where they're set. Each off-token value com
 - **Managing recordings:** download the audio, rename, delete.
 
 ### Comments
-- **Voice notes:** a comment can be a voice note as well as (or instead of) text: **Record voice note** in its card, with a live level meter. The list marks it with 🎙 and its length. The .txt export notes the voice note's length, but the audio stays in the browser that recorded it.
-- **How to comment** (works on every screen, the research pages included): press **Comment** in the dock (or press **C**, or click the round comment button), then click **anywhere** on the screen — the comment is placed on that spot, not tied to an element. Type, then Close.
-- **All comments** (the speech-bubbles icon in the dock, or ⋯ beside the comment button) lists every comment with its page; choosing one goes to that page, scrolls to the spot and opens it. No replies or statuses: a comment is a note on a spot.
-- Comments made with the earlier element-pinned version still load and still follow their element.
-- The `.txt` export is human-readable and lossless. Importing merges notes by id, and the file wins.
+- **Write:**
+  - Press **Comment** in the dock (or **C**, or the round comment button), then click **anywhere** on any screen, the research pages included.
+  - Write the comment, record a **voice note**, or both. The comment sits on that spot; it isn't tied to an element.
+- **Reply:** every comment has a thread, and a reply can be text, a voice note, or both. Replies show author and time, and you can delete your own.
+- **Status:**
+  - A comment is **Open** until someone replies, then **Ongoing**, until someone presses **Set as completed**.
+  - A completed comment shows who completed it and when, takes no new replies, and can be **Reopen**ed.
+  - Pins on the screen are coloured by status: orange open, blue ongoing, green with a check for completed.
+- **All comments:** lists everything with its page, status, author and reply count. Filter with **All / Open / Ongoing / Completed**, each with its count. Choosing one goes to that page, scrolls to the spot and opens it.
+- **Commenting as:** comments and replies are signed with a name set in the list, kept per browser, so reviewers sharing a .txt can tell each other apart.
+- **The .txt export** is lossless for text, replies, status and who completed what. Voice notes are listed with their length, but the audio stays in the browser that recorded it.
 
 ### Voice privacy
 The microphone starts only when someone presses a record button, and a visible indicator shows while it is on. Audio is kept in this browser's IndexedDB (`market-voice`). Nothing is uploaded or transcribed.

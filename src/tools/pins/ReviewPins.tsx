@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { MessageSquarePlus, MessageSquare, X, List, Download, Upload, Trash2, EyeOff } from 'lucide-react'
+import { MessageSquarePlus, MessageSquare, X, List, Download, Upload, Trash2, EyeOff, CheckCircle2, RotateCcw, Check } from 'lucide-react'
 import { APP, TOOL_DOM, isEmbedded, readJSON, useFlag, writeJSON } from '../shared'
 import { useStore } from '../../store/store'
-import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, toTxt, txtFileName, voiceId, type PinNote } from './format'
+import { fromTxt, MAX_NOTES, MAX_TEXT, pinTop, replyVoiceId, statusOf, STATUS_LABEL, toTxt, txtFileName, voiceId, type CommentStatus, type PinNote } from './format'
+import { Thread } from './Thread'
 import { VoiceNote } from '../voice/VoiceNote'
 import { clock, deleteClip } from '../voice/audio'
 import { STATUS_TEXT, usePinSync } from './useSync'
 
 const BUTTON_KEY = `${APP}.reviewPins.button`
+const NAME_KEY = `${APP}.reviewPins.name`
 /** Fire with detail 'start' (comment mode) or 'list' (open the list) from anywhere in the app. */
 export const COMMENT_EVENT = 'market:comments'
 const BTN = 44
@@ -86,6 +88,10 @@ function Comments({ onHide }: { onHide: () => void }) {
   const [pending, setPending] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const { notes, setNotes, status, scope } = usePinSync(placing || !!openId)
+  // The name comments and replies are signed with, kept per browser so reviewers can tell each other apart.
+  const [name, setNameState] = useState<string>(() => readJSON(NAME_KEY, me.name))
+  const setName = (v: string) => { setNameState(v); writeJSON(NAME_KEY, v) }
+  const [filter, setFilter] = useState<CommentStatus | 'all'>('all')
 
   const [btn, setBtn] = useState(() => readJSON(BUTTON_KEY, { x: window.innerWidth - BTN - 20, y: window.innerHeight - BTN - 88 }))
   const clamp = useCallback((p: { x: number; y: number }) => ({ x: Math.min(Math.max(8, p.x), window.innerWidth - BTN - 8), y: Math.min(Math.max(8, p.y), window.innerHeight - BTN - 8) }), [])
@@ -129,7 +135,7 @@ function Comments({ onHide }: { onHide: () => void }) {
         id: uid(), page: pathname,
         x: Math.round((e.clientX / window.innerWidth) * 1000) / 10, y: Math.round((e.clientY / window.innerHeight) * 1000) / 10,
         vw: window.innerWidth, vh: window.innerHeight, scrollY: Math.round(window.scrollY),
-        text: '', createdAt: now, updatedAt: now, author: me.name,
+        text: '', createdAt: now, updatedAt: now, author: name.trim() || me.name,
       }
       setNotes((all) => [...all, n])
       setPlacing(false)
@@ -140,7 +146,7 @@ function Comments({ onHide }: { onHide: () => void }) {
       delete document.documentElement.dataset.commenting
       document.removeEventListener('click', click, true)
     }
-  }, [placing, pathname, me.name, notes.length, setNotes])
+  }, [placing, pathname, me.name, name, notes.length, setNotes])
 
   // Other entry points: the dock's Comment button and list (a window event), and the C key.
   useEffect(() => {
@@ -234,18 +240,25 @@ function Comments({ onHide }: { onHide: () => void }) {
     return py > vp.h / 2 ? { left, width: w, bottom: Math.max(12, vp.h - py + 22) } : { left, width: w, top: Math.max(12, Math.min(vp.h - 320, py + 22)) }
   })()
 
-  const mine = (n: PinNote) => !n.author || n.author === me.name
+  const author = name.trim() || me.name
+  const mine = (n: PinNote) => !n.author || n.author === author
+  const removeNote = (n: PinNote) => {
+    if (n.voice) void deleteClip(voiceId(n.id))
+    n.replies?.forEach((r) => { if (r.voice) void deleteClip(replyVoiceId(r.id)) })
+  }
+  const counts = { all: notes.length, open: 0, ongoing: 0, done: 0 } as Record<CommentStatus | 'all', number>
+  notes.forEach((n) => counts[statusOf(n)]++)
 
   return createPortal(
     <div className="rp-root" data-review-pins>
       {here.map((n) => {
         const a = anchor(n, vp.w)
         return (
-          <button key={n.id} className={`rp-pin ${openId === n.id ? 'open' : ''}`} style={{ left: a.x, top: a.y }}
-            title={n.text ? n.text.slice(0, 80) : 'Empty comment'}
-            aria-label={`Comment ${number.get(n.id)}${n.text ? `: ${n.text.slice(0, 40)}` : ''}`}
+          <button key={n.id} className={`rp-pin ${openId === n.id ? 'open' : ''} st-${statusOf(n)}`} style={{ left: a.x, top: a.y }}
+            title={`${STATUS_LABEL[statusOf(n)]} · ${n.text ? n.text.slice(0, 80) : n.voice ? 'Voice note' : 'Empty comment'}`}
+            aria-label={`Comment ${number.get(n.id)}, ${STATUS_LABEL[statusOf(n)]}${n.text ? `: ${n.text.slice(0, 40)}` : ''}`}
             onClick={() => { setMenu(false); setList(null); setOpenId(n.id) }}>
-            {number.get(n.id)}
+            {n.resolved ? <Check size={13} strokeWidth={3} /> : number.get(n.id)}
           </button>
         )
       })}
@@ -294,17 +307,29 @@ function Comments({ onHide }: { onHide: () => void }) {
       {open && card && (
         <div className="rp-card" style={card} role="dialog" aria-label={`Comment ${number.get(open.id)}`}>
           <div className="rp-card-head">
-            <b>Comment {number.get(open.id)}</b>
+            <b>Comment {number.get(open.id)} <span className={`rp-status-tag ${statusOf(open)}`}>{STATUS_LABEL[statusOf(open)]}</span></b>
             <span>{open.author ?? 'Someone'} · {ago(open.createdAt)} · <span className="mono">{open.page}</span></span>
           </div>
-          {mine(open) ? (
-            <textarea autoFocus rows={3} maxLength={MAX_TEXT} placeholder="What should change here? Type, or record a voice note." value={open.text} onChange={(e) => update(open.id, { text: e.target.value })} aria-label="Comment" />
-          ) : (
-            open.text ? <div className="rp-msg"><p>{open.text}</p></div> : null
-          )}
-          <VoiceNote key={open.id} clipId={voiceId(open.id)} ms={open.voice?.ms} editable={mine(open)} onChange={(ms) => update(open.id, { voice: ms === undefined ? undefined : { ms } })} />
+          <div className="rp-card-body">
+            {mine(open) && !open.resolved ? (
+              <textarea autoFocus={!open.text && !open.voice} rows={3} maxLength={MAX_TEXT} placeholder="Write a comment — or record a voice note below." value={open.text} onChange={(e) => update(open.id, { text: e.target.value })} aria-label="Comment" />
+            ) : (
+              open.text ? <div className="rp-msg"><p>{open.text}</p></div> : null
+            )}
+            <VoiceNote key={open.id} clipId={voiceId(open.id)} ms={open.voice?.ms} editable={mine(open) && !open.resolved} onChange={(ms) => update(open.id, { voice: ms === undefined ? undefined : { ms } })} />
+            {open.resolved && <p className="rp-done-note"><CheckCircle2 size={13} /> Completed{open.resolvedBy ? ` by ${open.resolvedBy}` : ''}{open.resolvedAt ? ` · ${ago(open.resolvedAt)}` : ''}</p>}
+            {(open.text || open.voice) && (
+              <Thread key={`t-${open.id}`} note={open} me={author} ago={ago}
+                onReply={(r) => update(open.id, { replies: [...(open.replies ?? []), r] })}
+                onDelete={(r) => update(open.id, { replies: (open.replies ?? []).filter((x) => x.id !== r.id) })} />
+            )}
+          </div>
           <div className="rp-card-foot">
-            <button className="btn sm ghost danger" onClick={() => { if (open.voice) void deleteClip(voiceId(open.id)); setNotes((all) => all.filter((n) => n.id !== open.id)); setOpenId(null) }}><Trash2 size={13} /> Delete</button>
+            {mine(open) && <button className="btn sm ghost danger" onClick={() => { removeNote(open); setNotes((all) => all.filter((n) => n.id !== open.id)); setOpenId(null) }}><Trash2 size={13} /> Delete</button>}
+            <span style={{ flex: 1 }} />
+            {(open.text || open.voice) && (open.resolved
+              ? <button className="btn sm" onClick={() => update(open.id, { resolved: false, resolvedBy: undefined, resolvedAt: undefined })}><RotateCcw size={13} /> Reopen</button>
+              : <button className="btn sm" onClick={() => { update(open.id, { resolved: true, resolvedBy: author, resolvedAt: new Date().toISOString() }); say('Set as completed') }}><CheckCircle2 size={13} /> Set as completed</button>)}
             <button className="btn sm primary" onClick={closeCard}>Close</button>
           </div>
         </div>
@@ -317,16 +342,23 @@ function Comments({ onHide }: { onHide: () => void }) {
             <span className="muted">{notes.length}</span>
             <button className="btn ghost sm icon" style={{ marginLeft: 'auto' }} onClick={() => setList(null)} aria-label="Close list"><X size={15} /></button>
           </div>
+          <div className="rp-filters" role="group" aria-label="Show comments">
+            {(['all', 'open', 'ongoing', 'done'] as const).map((f) => (
+              <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f === 'all' ? 'All' : STATUS_LABEL[f]} <span>{counts[f]}</span></button>
+            ))}
+          </div>
+          <label className="rp-name">Commenting as <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} aria-label="Your name for comments" /></label>
           {notes.length === 0 && <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>No comments yet. Press Comment (or C) and click anywhere on a screen.</p>}
+          {notes.length > 0 && filter !== 'all' && counts[filter] === 0 && <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>No {STATUS_LABEL[filter].toLowerCase()} comments.</p>}
           <ol>
-            {[...ordered].reverse().map((n) => (
-              <li key={n.id}>
+            {[...ordered].reverse().filter((n) => filter === 'all' || statusOf(n) === filter).map((n) => (
+              <li key={n.id} className={`st-${statusOf(n)}`}>
                 <button onClick={() => goTo(n)}>
                   <span className="rp-num">{number.get(n.id)}</span>
                   <span style={{ minWidth: 0 }}>
                     <span className="rp-where mono">{n.page}</span>
                     <span className="rp-text">{n.voice && <span className="rp-voice">🎙 {clock(n.voice.ms)}</span>}{n.text || (n.voice ? 'Voice note' : 'Empty comment')}</span>
-                    <span className="rp-meta">{n.author ?? 'Someone'} · {ago(n.createdAt)}</span>
+                    <span className="rp-meta"><span className={`rp-status-tag ${statusOf(n)}`}>{STATUS_LABEL[statusOf(n)]}</span> {n.author ?? 'Someone'} · {ago(n.createdAt)}{n.replies?.length ? ` · ${n.replies.length} repl${n.replies.length === 1 ? 'y' : 'ies'}` : ''}</span>
                   </span>
                 </button>
               </li>
@@ -341,7 +373,7 @@ function Comments({ onHide }: { onHide: () => void }) {
           <p>This removes them for everyone on this deployment{status === 'local' || status === 'error' ? ' (here: this browser)' : ''}. It can’t be undone — save a .txt first if you might need them.</p>
           <div className="rp-card-foot">
             <button className="btn sm" onClick={() => setConfirmAll(false)}>Keep comments</button>
-            <button className="btn sm danger" onClick={() => { notes.forEach((n) => { if (n.voice) void deleteClip(voiceId(n.id)) }); setNotes([]); setConfirmAll(false); say('All comments deleted') }}>Delete {notes.length}</button>
+            <button className="btn sm danger" onClick={() => { notes.forEach(removeNote); setNotes([]); setConfirmAll(false); say('All comments deleted') }}>Delete {notes.length}</button>
           </div>
         </div>
       )}

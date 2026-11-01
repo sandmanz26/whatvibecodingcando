@@ -172,20 +172,14 @@ html[data-ut-running] .rp-root { display: none; }
 /* ---------- comments ---------- */
 .rp-fab { width: 44px; height: 44px; }
 .rp-pin.lost { opacity: 0.55; background: var(--ink-3, #75736d); }
-.rp-replies { position: absolute; top: -7px; right: -9px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; background: #fff; color: #1f201d; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
 .rp-outline { position: fixed; pointer-events: none; border: 2px solid #eb6834; border-radius: 6px; background: rgba(235, 104, 52, 0.08); transition: all .08s; }
 .rp-outline.flash { border-color: #2a78d6; background: rgba(42, 120, 214, 0.1); animation: rp-flash 1.8s ease-out forwards; }
 @keyframes rp-flash { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
-.rp-card { max-height: min(70vh, 560px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .rp-card-head { flex-direction: column; gap: 2px; margin-bottom: 0; }
 .rp-card-head span { color: var(--ink-3, #75736d); font-size: 12px; }
 .rp-msg { font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2, #f3f2ef); }
 .rp-msg span { color: var(--ink-3, #75736d); font-size: 11.5px; }
 .rp-msg p { margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; }
-.rp-msg.reply { margin-left: 14px; }
-.rp-reply { display: flex; gap: 6px; }
-.rp-reply input { flex: 1; height: 30px; border: 1px solid var(--line-strong, #ccc); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; background: var(--surface, #fff); color: inherit; outline: none; }
-.rp-reply input:focus { border-color: var(--accent, #2a78d6); }
 .rp-where { display: block; font-size: 12px; color: var(--ink-3, #75736d); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rp-meta { display: block; font-size: 11.5px; color: var(--ink-3, #75736d); margin-top: 2px; }
 .rp-sheet .seg button { height: 24px; font-size: 12px; }
@@ -255,3 +249,39 @@ html[data-commenting] body, html[data-commenting] body * { cursor: crosshair !im
 .rp-voice { display: inline-block; margin-right: 6px; font-size: 11.5px; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .vo-dot { animation: none; } }
 @media (max-width: 640px) { .vo-page, .vo-pill .muted { display: none; } }
+
+/* ---------- comment threads and status ---------- */
+.rp-card { display: flex; flex-direction: column; gap: 8px; max-height: min(560px, calc(100vh - 24px)); }
+.rp-card-head { flex-wrap: wrap; }
+.rp-card-body { overflow-y: auto; min-height: 0; margin: 0 -2px; padding: 0 2px; }
+.rp-card-foot { align-items: center; flex-wrap: wrap; }
+.rp-status-tag { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; margin-left: 4px; border-radius: 9px; font-size: 11px; font-weight: 650; vertical-align: 1px; background: var(--surface-3); color: var(--ink-2); }
+.rp-status-tag.open { background: #fde8dc; color: #9a3b12; }
+.rp-status-tag.ongoing { background: #e3eefc; color: #1c4f8f; }
+.rp-status-tag.done { background: #ddf3e4; color: #1d6b36; }
+.rp-pin.st-ongoing { background: #2a78d6; }
+.rp-pin.st-done { background: #2f9e57; opacity: .75; }
+.rp-pin.open { opacity: 1; background: var(--primary); color: var(--primary-ink); border-color: var(--primary-ink); }
+.rp-done-note { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; color: #1d6b36; }
+.rp-thread { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.rp-replies { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rp-replies li { padding: 6px 8px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+.rp-replies li p { margin: 2px 0 0 18px; white-space: pre-wrap; }
+.rp-replies .vn { margin-left: 18px; }
+.rp-reply-head { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-3); }
+.rp-reply-head b { color: var(--ink); font-weight: 600; }
+.rp-reply-head .btn { margin-left: auto; }
+.rp-compose textarea { font-size: 13px; }
+.rp-compose-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.rp-compose-foot .vn { margin-top: 6px; flex: 1; min-width: 0; }
+.rp-compose-foot > .btn { margin-top: 6px; }
+.rp-filters { display: flex; gap: 4px; padding: 8px 12px 4px; flex-wrap: wrap; }
+.rp-filters button { height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--line); background: var(--surface); font: inherit; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.rp-filters button span { opacity: .6; margin-left: 2px; }
+.rp-filters button[aria-pressed='true'] { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+.rp-name { display: flex; align-items: center; gap: 6px; padding: 4px 12px 8px; font-size: 12px; color: var(--ink-3); border-bottom: 1px solid var(--line); }
+.rp-name input { flex: 1; min-width: 0; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font: inherit; font-size: 12.5px; color: var(--ink); }
+.rp-sheet li.st-done .rp-text { color: var(--ink-3); }
+.rp-card-head, .rp-card-foot { flex: none; }
+.rp-card-body { flex: 1 1 auto; }
+.rp-replies li p { font-size: 13px; font-weight: 400; line-height: 1.45; }

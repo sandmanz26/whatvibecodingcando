@@ -26,14 +26,23 @@ export interface PinNote {
   author?: string
   replies?: Reply[]
   resolved?: boolean
+  /** who set it as completed, and when */
+  resolvedBy?: string
+  resolvedAt?: string
   /** a voice note: the audio lives in this browser's IndexedDB under voiceId(id) */
   voice?: { ms: number }
 }
 
-/** Where a comment's voice note is kept (see tools/voice/audio.ts). */
+/** Where a comment's or a reply's voice note is kept (see tools/voice/audio.ts). */
 export const voiceId = (noteId: string) => `pin-${noteId}`
+export const replyVoiceId = (replyId: string) => `reply-${replyId}`
 
-export interface Reply { id: string; author: string; text: string; at: string }
+export interface Reply { id: string; author: string; text: string; at: string; voice?: { ms: number } }
+
+export type CommentStatus = 'open' | 'ongoing' | 'done'
+/** Open until someone replies, then ongoing, until someone sets it as completed. */
+export const statusOf = (n: PinNote): CommentStatus => (n.resolved ? 'done' : n.replies?.length ? 'ongoing' : 'open')
+export const STATUS_LABEL: Record<CommentStatus, string> = { open: 'Open', ongoing: 'Ongoing', done: 'Completed' }
 
 export const MAX_NOTES = 500
 export const MAX_TEXT = 4000
@@ -57,7 +66,12 @@ export function validNote(n: unknown): PinNote | null {
   if (label) note.label = label
   if (author) note.author = author
   if (ex !== null && ey !== null) { note.ex = ex; note.ey = ey }
-  if (o.resolved === true) note.resolved = true
+  if (o.resolved === true) {
+    note.resolved = true
+    const by = str(o.resolvedBy, 80), at = str(o.resolvedAt, 40)
+    if (by) note.resolvedBy = by
+    if (at) note.resolvedAt = at
+  }
   const v = o.voice as Record<string, unknown> | undefined
   const vms = v && typeof v === 'object' ? num(v.ms, 0, 3_600_000) : null
   if (vms !== null) note.voice = { ms: vms }
@@ -65,7 +79,9 @@ export function validNote(n: unknown): PinNote | null {
     note.replies = o.replies.slice(0, 100).map((rp) => {
       const q = (rp ?? {}) as Record<string, unknown>
       const rid = str(q.id, 64), ra = str(q.author, 80), rt = str(q.text, MAX_TEXT), rat = str(q.at, 40)
-      return rid && ra && rt !== null && rat ? { id: rid, author: ra, text: rt, at: rat } : null
+      const qv = q.voice as Record<string, unknown> | undefined
+      const rms = qv && typeof qv === 'object' ? num(qv.ms, 0, 3_600_000) : null
+      return rid && ra && rt !== null && rat ? { id: rid, author: ra, text: rt, at: rat, ...(rms !== null ? { voice: { ms: rms } } : {}) } : null
     }).filter((x): x is Reply => !!x)
   }
   return note
@@ -102,6 +118,8 @@ export function toTxt(list: PinNote[], app = 'Marketplace', now = new Date()): s
     ...(n.ex !== undefined ? [`anchor: ${n.ex}, ${n.ey}`] : []),
     ...(n.author ? [`author: ${n.author}`] : []),
     `status: ${n.resolved ? 'resolved' : 'open'}`,
+    ...(n.resolvedBy ? [`completed_by: ${n.resolvedBy}`] : []),
+    ...(n.resolvedAt ? [`completed: ${n.resolvedAt}`] : []),
     // Replies as one JSON line: still readable, and lossless for multi-line text.
     ...(n.replies?.length ? [`replies: ${JSON.stringify(n.replies)}`] : []),
     // The audio itself stays in the browser that recorded it; the .txt notes that there was one.
@@ -138,7 +156,7 @@ export function fromTxt(txt: string): PinNote[] {
     let replies: unknown = undefined
     try { replies = meta.replies ? JSON.parse(meta.replies) : undefined } catch { /* skip broken replies */ }
     const note = validNote({ id, page: meta.page, x, y, vw, vh, scrollY: Number(meta.scroll), text: body.join('\n'), createdAt: meta.created, updatedAt: meta.updated,
-      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, resolved: meta.status === 'resolved', replies,
+      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, resolved: meta.status === 'resolved', resolvedBy: meta.completed_by, resolvedAt: meta.completed, replies,
       voice: meta.voice ? { ms: (parseInt(meta.voice, 10) || 0) * 1000 } : undefined })
     if (note) out.push(note)
   }
