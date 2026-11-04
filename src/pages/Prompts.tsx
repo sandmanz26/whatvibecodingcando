@@ -11,7 +11,7 @@ const GROUPS = ['All', 'Research', 'Feedback', 'Design', 'Reporting', 'Everythin
 /** Where each tool can be tried in this demo. */
 const TRY: Partial<Record<string, string>> = {
   sessions: '/console/insights', heatmap: '/console/insights', usability: '/console/tests', fivesec: '/console/fivesec', doors: '/console/doors',
-  gaze: '/console/gaze', narration: '/console/narration', 'design-tokens': '/console/design', 'ds-check': '/console/dscheck', report: '/console/report', repo: '/console/repo', comments: '/',
+  gaze: '/console/gaze', narration: '/console/narration', 'design-tokens': '/console/design', 'ds-check': '/console/dscheck', report: '/console/report', repo: '/console/repo', compare: '/console/compare', comments: '/',
 }
 
 /** Copies text, falling back to a hidden textarea where the Clipboard API isn't allowed. */

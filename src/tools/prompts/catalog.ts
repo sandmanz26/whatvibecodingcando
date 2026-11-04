@@ -161,6 +161,23 @@ Research console screen "Sessions":
 - Export and import a lossless .txt; voice notes are listed by length only.`,
   },
   {
+    id: 'compare', title: 'Component review (A vs B)', group: 'Feedback',
+    summary: 'Pick two components from the real screens, compare their rendered styles side by side, and keep notes.',
+    needs: ['Frontend only'],
+    skill: 'Add a component review: pick two components from the real screens, compare their rendered styles side by side, and keep notes about A, B or both.',
+    spec: `Build a component review screen in the research console. Work out the states first; the flow must follow them.
+
+1. New review (a draft, NOT saved yet): two slots, A and B, and an optional title. Each slot has "Pick component".
+2. Picking: a dialog shows the real app in an iframe at a chosen device width (mobile / tablet / desktop), with quick links to the main screens and a Navigate mode to reach others. Hover outlines, a click selects (snapping to the nearest control), and the selection stays marked. "Wider" / "Narrower" step to the parent or back to the part clicked, so a whole card can be chosen. "Use as A/B" confirms; Cancel or Esc keeps the earlier choice. If the screen changed after the click, say so and ask to pick again.
+3. On "Use", take a snapshot: page (keep only non-free-text filters, never a typed search), device, a stable selector, a short name, and the computed styles: size, font size/weight/line height/family, text colour, background, border, corner radius, padding, shadow. Name the design token behind a colour or radius when one matches.
+4. Save is enabled only when both slots are filled and they are not the same component on the same screen and device (the same component on two devices is allowed). The title defaults to "A name vs B name". Cancel with changes asks before discarding.
+5. Saved review: both components shown cropped from the live screen (load the page in a non-interactive iframe at the slot's device width, find the selector, scroll the frame — not the page — and clip to its box; if it isn't found, say it may need an action first instead of showing the wrong area). Below, a style table A | B with differing rows highlighted and a count, from the snapshots.
+6. Notes: only on a saved review, saved as they are added. Each note is about A, B or both, with author ("writing as" name kept per browser) and time; authors can delete their own. Filter All / A / B / Both with counts.
+7. Edit renames or replaces a component; notes stay, and a note written before its component was replaced is marked as about the earlier one. Delete asks first.
+
+- Store reviews in localStorage. Never store field values or typed text from the screens.`,
+  },
+  {
     id: 'narration', title: 'Narrated walkthroughs', group: 'Feedback',
     summary: 'Explain screens out loud while browsing; each screen becomes a playable chapter.',
     needs: ['Microphone', 'Frontend only'],
@@ -252,10 +269,10 @@ Research console screen "Sessions":
     id: 'everything', title: 'The whole research console', group: 'Everything',
     summary: 'All of the above, separate from your product, with a floating research dock.',
     needs: ['Camera & microphone for some tools'],
-    skill: 'Set up the whole research console: click tracking and sessions, heatmaps, usability tests, 5-second tests, fake doors, eye tracking, comments with voice, narration, design tokens, design system check, research report and insight repository.',
+    skill: 'Set up the whole research console: click tracking and sessions, heatmaps, usability tests, 5-second tests, fake doors, eye tracking, comments with voice, component review, narration, design tokens, design system check, research report and insight repository.',
     spec: `Set up a full UX research console around this app.
 
-- The tools: click tracking with sessions and replay, heatmaps, usability tests, 5-second tests, fake doors, webcam eye tracking, comments with a draft → post flow and voice notes, narrated walkthroughs, a design-token simulator with UI-library looks, a design system check, a research report and an insight repository.
+- The tools: click tracking with sessions and replay, heatmaps, usability tests, 5-second tests, fake doors, webcam eye tracking, comments with a draft → post flow and voice notes, a component review (A vs B with notes), narrated walkthroughs, a design-token simulator with UI-library looks, a design system check, a research report and an insight repository.
 - Build it in stages and check with me after each: tracking and sessions first, then feedback tools, then design tools, then reporting.
 - Give the research tools their own routes with a top bar ("Research console", a tab per tool, "Back to the app").
 - Add a floating, draggable research dock (position remembered, arrow keys move it). It holds the session indicator, Comment and All comments, the microphone, the active design variant's name, and a link to the console. Hide it inside iframes.

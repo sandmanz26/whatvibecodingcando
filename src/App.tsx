@@ -21,6 +21,7 @@ import InsightRepo from './pages/InsightRepo'
 import DesignCheck from './pages/DesignCheck'
 import Narration from './pages/Narration'
 import Prompts from './pages/Prompts'
+import Compare from './pages/Compare'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="repo" element={<InsightRepo />} />
             <Route path="dscheck" element={<DesignCheck />} />
             <Route path="narration" element={<Narration />} />
+            <Route path="compare" element={<Compare />} />
             <Route path="prompts" element={<Prompts />} />
           </Route>
         </Routes>

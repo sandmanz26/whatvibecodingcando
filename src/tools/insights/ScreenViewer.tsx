@@ -11,7 +11,7 @@ export const DEVICES: Record<Device, { w: number; h: number; label: string }> = 
   desktop: { w: 1280, h: 800, label: 'Desktop · 1280' },
 }
 
-export interface Picked { sel: string; label: string; page: string }
+export interface Picked { sel: string; label: string; page: string; /** the element chosen and the one actually clicked, for pickers that read more */ el?: Element; target?: Element }
 
 interface Props {
   page: string
@@ -113,9 +113,9 @@ export function ScreenViewer({ page, device, mode, focus, dot, task, onPick, max
         e.stopPropagation()
         const t = e.target as Element
         if (!t || !('closest' in t)) return
-        const { sel, label } = describeTarget(t)
+        const { sel, label, el } = describeTarget(t)
         const path = (f?.contentWindow?.location.hash.replace(/^#/, '').split('?')[0]) || '/'
-        onPick?.({ sel, label, page: path })
+        onPick?.({ sel, label, page: path, el, target: t })
       }
       doc.addEventListener('mouseover', over, true)
       doc.addEventListener('click', click, true)

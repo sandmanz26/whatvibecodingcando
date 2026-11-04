@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles } from 'lucide-react'
+import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles, Columns2 } from 'lucide-react'
 import { Toasts } from './ui'
 
 /**
@@ -9,7 +9,16 @@ import { Toasts } from './ui'
  */
 export function ResearchLayout() {
   const { pathname } = useLocation()
-  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    // The tool tabs scroll sideways when they don't fit; keep the current one in view.
+    const seg = document.querySelector<HTMLElement>('.research-bar .seg')
+    const on = seg?.querySelector<HTMLElement>('a.on')
+    if (seg && on) {
+      const s = seg.getBoundingClientRect(), o = on.getBoundingClientRect()
+      if (o.left < s.left || o.right > s.right) seg.scrollLeft += o.left - s.left - (s.width - o.width) / 2
+    }
+  }, [pathname])
   return (
     <div className="research">
       <header className="topbar research-bar no-print">
@@ -24,6 +33,7 @@ export function ResearchLayout() {
           <NavLink to="/console/dscheck" className={({ isActive }) => (isActive ? 'on' : '')}><ScanSearch size={13} /> DS check</NavLink>
           <NavLink to="/console/report" className={({ isActive }) => (isActive ? 'on' : '')}><FileText size={13} /> Report</NavLink>
           <NavLink to="/console/repo" className={({ isActive }) => (isActive ? 'on' : '')}><Lightbulb size={13} /> Insights</NavLink>
+          <NavLink to="/console/compare" className={({ isActive }) => (isActive ? 'on' : '')}><Columns2 size={13} /> Compare</NavLink>
           <NavLink to="/console/narration" className={({ isActive }) => (isActive ? 'on' : '')}><Mic size={13} /> Narration</NavLink>
           <NavLink to="/console/prompts" className={({ isActive }) => (isActive ? 'on' : '')}><Sparkles size={13} /> Prompts</NavLink>
         </nav>

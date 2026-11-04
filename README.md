@@ -136,6 +136,25 @@ Inherited properties are judged only where they're set. Each off-token value com
 - **Commenting as:** comments and replies are signed with a name set in the list, kept per browser, so reviewers sharing a .txt can tell each other apart.
 - **The .txt export** is lossless for text, replies, status and who completed what. Voice notes are listed with their length, but the audio stays in the browser that recorded it.
 
+### Component review (A vs B)
+`#/console/compare` puts two components from the app side by side, so a reviewer can compare them and keep notes.
+
+1. **New review.** This is a draft, not saved yet. Pick component A and component B.
+2. **Picker.** It shows the real screen at mobile, tablet or desktop width, with quick links to the main screens and Navigate mode for others.
+   - A click selects the nearest control. **Wider** and **Narrower** step out to the element around it or back in to the part clicked, so a whole card can be chosen.
+   - **Use as A/B** confirms. Cancel or Esc keeps the earlier choice.
+3. **Snapshot.** On Use, the component's rendered styles are saved. These are size, font, colours, border, radius, padding and shadow, with the design token named when one matches. The page, device, a selector and a short name are saved too.
+   - A search query is kept only for the preset demo screen, never one somebody typed. No field values are saved.
+4. **Save.** It needs both components, and they can't be the same component on the same screen and device. The same component on two devices is allowed. Cancel with changes asks before discarding.
+5. **Saved review.**
+   - Each component is shown cropped from the live screen, in a non-clickable frame. If it can't be found (for example, it needs an open menu first), the page says so.
+   - A style table highlights what differs.
+6. **Notes.** Notes are added to a saved review and saved straight away.
+   - Each note is about A, B or both, filtered by those with counts. It shows the author's name (shared with Comments) and time. Authors delete their own.
+   - **Edit** renames or replaces a component. A note written before its component was replaced is marked as about the earlier one.
+
+Stored in `market.compare` (this browser only).
+
 ### Voice privacy
 The microphone starts only when someone presses a record button, and a visible indicator shows while it is on. Audio is kept in this browser's IndexedDB (`market-voice`). Nothing is uploaded or transcribed.
 

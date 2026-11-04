@@ -599,7 +599,9 @@ html[data-ut-running] .dock { display: none; }
 /* ---------- research console: apart from the product ---------- */
 .research { min-height: 100%; background: var(--page); }
 .research-bar { gap: 14px; }
-.research-bar .seg { overflow-x: auto; max-width: 100%; flex-wrap: nowrap; }
+.research-bar .seg { overflow-x: auto; min-width: 0; flex: 0 1 auto; flex-wrap: nowrap; scrollbar-width: thin; }
+.research-bar .seg a { white-space: nowrap; flex: none; }
+.research-mark, .research-bar > .btn { white-space: nowrap; flex: none; }
 .research-mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; }
 
 .dock-rec { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.7); font: inherit; font-size: 12.5px; white-space: nowrap; }
