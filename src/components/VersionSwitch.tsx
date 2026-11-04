@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { GripVertical, Moon, Sun, MessageSquarePlus, MessagesSquare, FlaskConical, Mic } from 'lucide-react'
+import { GripVertical, Moon, Sun, MessageSquarePlus, MessagesSquare, FlaskConical, Mic, Sparkles } from 'lucide-react'
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
 import { getFlag, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
 import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
@@ -96,6 +96,7 @@ export function VersionSwitch() {
         <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
         <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
         <button className="dock-icon" onClick={toggleTheme} aria-label="Toggle theme" title="Toggle theme">{theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}</button>
+        <button className="dock-icon" onClick={() => nav('/console/prompts')} aria-label="Prompts for your own Claude" title="Get the prompts to build these tools with your own Claude"><Sparkles size={15} /></button>
         <button className="dock-icon" onClick={() => nav('/console/insights')} aria-label="Research console" title="Research console: sessions, heatmaps, usability tests"><FlaskConical size={15} /></button>
       </div>
     </>

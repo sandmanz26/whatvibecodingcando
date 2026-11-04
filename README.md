@@ -156,6 +156,17 @@ Rules for those endpoints:
 - Send `Cache-Control: no-store`.
 - **The endpoints are unauthenticated.** Anyone who can reach them can read or clear the data. That is acceptable only because they store nothing personal.
 
+## Prompts for visitors
+
+`#/console/prompts` (dock: the sparkles button, or "Prompts" in the console bar) lists every research tool as a prompt a visitor can paste into their own Claude, ideally Claude Code in their project.
+
+- **Personalised:** pick a framework (React, Next.js, Vue, Svelte, plain JS, not sure) and routing (hash, normal URLs, not sure). Every prompt updates. The choice is remembered in `market.prompts.ctx`.
+- **Two modes:**
+  - **Full prompts** (default, nothing to install) spell out each tool's states, cancel and edge paths, and privacy rules (never record typed text or field values), plus the ground rules and verification steps. The ground rules are: read the project and show a plan first, keep research tools apart from the product, and stay frontend-only. The verification steps are: typecheck, build, and a browser test of the cancel paths, then report what wasn't tested.
+  - **Skill mode** gives short prompts that lean on the ux-research-kit skill (below) and shows the install commands.
+- Each card has **Copy prompt**, **Show prompt**, and **Try it here** (opens the tool in this demo). **Download all (.md)** saves every prompt in one file.
+- The prompts live in `src/tools/prompts/catalog.ts`. When a tool's behaviour changes, update its prompt too.
+
 ## Installable skill: ux-research-kit
 
 The research tools are also packaged as a Claude Code skill for other projects, in `plugins/ux-research-kit/`: framework-agnostic TypeScript modules (tracking and sessions, heatmaps and replay, 5-second tests, fake doors, eye tracking, design tokens and UI-library palettes), specs per module, the privacy rules, and a verification checklist. Claude copies what a project needs, wires it to its router, and builds the console screens in that project's own components.

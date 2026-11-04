@@ -671,3 +671,18 @@ html[data-ut-running] .dock { display: none; }
   .report { border: 0; box-shadow: none; padding: 0; max-width: none; }
   .finding { break-inside: avoid; }
 }
+
+/* ---------- prompts for visitors ---------- */
+.prompt-how ol { margin: 0; padding-left: 20px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.prompt-how li b { display: block; font-size: 13.5px; }
+.prompt-how li span { display: block; font-size: 12.5px; margin-top: 2px; }
+.prompt-ctx { display: grid; grid-template-columns: 220px 220px 1fr; gap: 16px; align-items: end; }
+.prompt-install { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr auto; gap: 8px 12px; align-items: center; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.prompt-install pre { margin: 0; padding: 8px 12px; }
+.prompt-install > .muted { grid-column: 1 / -1; }
+.prompt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.prompt-card { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.prompt-card h3 { font-size: 15px; }
+.prompt-card > p { font-size: 13.5px; color: var(--ink-2); }
+.prompt-text { max-height: 420px; font-size: 12px; }
+@media (max-width: 900px) { .prompt-how ol, .prompt-ctx, .prompt-grid { grid-template-columns: 1fr; } .prompt-install { grid-template-columns: 1fr; } }

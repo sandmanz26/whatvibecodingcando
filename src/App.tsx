@@ -20,6 +20,7 @@ import Report from './pages/Report'
 import InsightRepo from './pages/InsightRepo'
 import DesignCheck from './pages/DesignCheck'
 import Narration from './pages/Narration'
+import Prompts from './pages/Prompts'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
@@ -59,6 +60,7 @@ export default function App() {
             <Route path="repo" element={<InsightRepo />} />
             <Route path="dscheck" element={<DesignCheck />} />
             <Route path="narration" element={<Narration />} />
+            <Route path="prompts" element={<Prompts />} />
           </Route>
         </Routes>
         {/* Research tools sit around both versions of the app. */}
