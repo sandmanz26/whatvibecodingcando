@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Square, Video } from 'lucide-react'
 import { APP, currentPath, isConsole, isEmbedded } from '../shared'
 import { CALIBRATION, VALIDATION, features, fit, isBlink, loadLandmarker, predict, startCamera, stopCamera, type Features, type Model } from './engine'
-import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP, appendGaze, saveGazeSession, type GazePoint } from './store'
+import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP, appendGaze, gazeFrame, saveGazeSession, setGazeClickHook, type GazePoint } from './store'
 import { OneEuro } from './analysis'
 import { runningTask } from '../tests/store'
 import { TOOL_DOM } from '../shared'
@@ -142,10 +142,19 @@ export function GazeRunner() {
       const sx = filt.current.x.filter(p.x, now), sy = filt.current.y.filter(p.y, now)
       const x = Math.min(window.innerWidth, Math.max(0, sx)), y = Math.min(window.innerHeight, Math.max(0, sy))
       setDot({ x, y })
-      if (now - lastSample < SAMPLE_MS || document.visibilityState !== 'visible' || isConsole(currentPath())) return
+      const fr = gazeFrame()
+      // The research console is never studied itself, except through a frame that hosts the app.
+      if (now - lastSample < SAMPLE_MS || document.visibilityState !== 'visible' || (!fr && isConsole(currentPath()))) return
       lastSample = now
-      const ctx = runningTask()
       const ms = Date.now()
+      if (fr) {
+        const m = fr.map(x, y)
+        if (!m) return
+        const c = fr.ctx()
+        buffer.current.push({ sid: sid.current, t: new Date(ms).toISOString(), ms, page: m.page, x: Math.round(m.x * 10) / 10, y: Math.round(m.y), vw: m.vw, vh: m.vh, ...(c ?? {}) })
+        return
+      }
+      const ctx = runningTask()
       buffer.current.push({
         sid: sid.current, t: new Date(ms).toISOString(), ms, page: currentPath(),
         x: Math.round((x / window.innerWidth) * 1000) / 10, y: Math.round(y + window.scrollY), vw: window.innerWidth, vh: window.innerHeight,
@@ -154,20 +163,24 @@ export function GazeRunner() {
     }
     // Every click is a free calibration point: people look at what they click. The model is refitted
     // with the calibration plus the latest clicks, so it keeps up when the head moves.
-    const onClick = (e: PointerEvent) => {
+    const learn = (cx: number, cy: number) => {
       const lf = lastF.current
-      if (!lf || performance.now() - lf.at > 120 || !(e.target instanceof Element) || e.target.closest(`${TOOL_DOM}, [data-gaze]`)) return
-      if (isBlink(model.current!, lf.f)) return
-      clickSamples.current = [...clickSamples.current, { f: lf.f, x: e.clientX, y: e.clientY }].slice(-30)
+      if (!lf || performance.now() - lf.at > 120 || isBlink(model.current!, lf.f)) return
+      clickSamples.current = [...clickSamples.current, { f: lf.f, x: cx, y: cy }].slice(-30)
       const clicks = clickSamples.current.flatMap((c) => [c, c, c])
       model.current = fit([...samples.current, ...clicks])
       writeSaved({ ...(readSaved() as Saved), model: model.current })
     }
+    const onClick = (e: PointerEvent) => {
+      if (!(e.target instanceof Element) || e.target.closest(`${TOOL_DOM}, [data-gaze]`)) return
+      learn(e.clientX, e.clientY)
+    }
+    setGazeClickHook(learn)
     document.addEventListener('pointerdown', onClick, true)
     const flush = window.setInterval(() => appendGaze(buffer.current.splice(0)), 2000)
     const onHide = () => appendGaze(buffer.current.splice(0))
     window.addEventListener('pagehide', onHide)
-    return () => { collector.current = null; document.removeEventListener('pointerdown', onClick, true); window.clearInterval(flush); window.removeEventListener('pagehide', onHide); appendGaze(buffer.current.splice(0)) }
+    return () => { collector.current = null; setGazeClickHook(null); document.removeEventListener('pointerdown', onClick, true); window.clearInterval(flush); window.removeEventListener('pagehide', onHide); appendGaze(buffer.current.splice(0)) }
   }, [phase])
 
   // Calibration and checking: look at the dot, click it, keep looking while frames are collected.

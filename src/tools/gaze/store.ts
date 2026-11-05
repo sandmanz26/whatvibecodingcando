@@ -43,3 +43,25 @@ export const saveGazeSession = (s: GazeSession) => writeJSON(SESSIONS_KEY, [...l
 export function clearGaze() {
   try { localStorage.removeItem(POINTS_KEY); localStorage.removeItem(SESSIONS_KEY) } catch { /* ignore */ }
 }
+
+/* ---------- recording inside a frame (a run recorded on the Heatmap page) ---------- */
+
+/**
+ * When the app being studied runs in a frame on the page (Heatmap → Record a run here), gaze is
+ * measured on the whole window and must be turned into a point on the framed page. The page that
+ * hosts the frame registers how; with none registered, gaze is the window's own page.
+ */
+export interface GazeFrame {
+  /** window coordinates → the framed page's point, or null when the gaze is outside the frame */
+  map(x: number, y: number): { page: string; x: number; y: number; vw: number; vh: number } | null
+  /** the test run and task the samples belong to, if any */
+  ctx(): { test: string; task: string; tt: number } | null
+}
+let frame: GazeFrame | null = null
+export const setGazeFrame = (f: GazeFrame | null) => { frame = f }
+export const gazeFrame = () => frame
+
+/** Clicks inside a frame don't reach the window: the frame's host forwards them for calibration. */
+let clickHook: ((x: number, y: number) => void) | null = null
+export const setGazeClickHook = (h: typeof clickHook) => { clickHook = h }
+export const noteGazeClick = (x: number, y: number) => clickHook?.(x, y)

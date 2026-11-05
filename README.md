@@ -81,6 +81,14 @@ The dock is the set of tools shown to visitors. From left to right:
   - **How it is drawn.** Every click is a soft blob. Blobs add up and are coloured blue → red, and the densest spot reaches red. Each click is placed on the element it hit, on the whole page at one device width, with the fold marked.
   - **Sample data.** With nothing recorded for that task, screen and width, it shows clearly labelled sample data: 12 made-up participants clicking the screen's real controls, more often toward the goal. No statistics are invented for it.
 
+- **Recording from the Heatmap page.** **Record a run here** (or **Record browsing here**) opens the shop in a panel on the same page.
+  - **A run.** You do the selected task at the top of the panel, optionally with webcam eye tracking. Clicks (where and on what, never typed text) and the pages visited are recorded exactly as the participant runner does, with the same success, timeout and give-up rules.
+  - **When it ends.** The run is saved as a participant result and the heatmap shows it; cancelling saves nothing.
+  - **Eye tracking in the panel.** Gaze is mapped from the window onto the framed page, and clicks inside the frame are forwarded to keep the calibration accurate.
+  - **Browsing.** Clicks are saved as an everyday session, with what each click did (navigated, changed the screen, or nothing).
+  - **Editing tasks.** **Change task** and **New task** edit tasks in place: prompt, start page, time limit, and success as reaching a page or clicking an element picked on the real screen.
+  - **Page tabs.** Every page a task touched has a tab, in the order people went, with its click and gaze counts. "First clicks" are the first click on each page, so later pages of a task have a first-click map too.
+  - **Other widths.** When a page has data only at another width, the page says so and switches to it.
 - **Eyes** (on the Heatmap, the **Eyes** layer): webcam eye tracking read as eye movement, per usability task.
   - **In a test.** With **Eye tracking (webcam)** on in a test, participants are asked before the first task to turn on the camera and calibrate (13 dots, then 5 to measure accuracy in px). Saying no, a camera error, or a poor calibration lets them go on without it. Every gaze sample is tagged with the participant's run, the task and the ms since it started.
   - **Reading the eyes.**

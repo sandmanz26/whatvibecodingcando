@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { RefreshCw, ExternalLink, Info, Check, X, Target, Eye, MousePointerClick, Play, Pause } from 'lucide-react'
+import { RefreshCw, ExternalLink, Info, Check, X, Target, Eye, MousePointerClick, Play, Pause, Circle, Pencil, Plus } from 'lucide-react'
 import { Switch } from '../components/ui'
 import { DEVICES, type Device } from '../tools/insights/ScreenViewer'
 import { layoutOf, loadEvents, type ClickEvent } from '../tools/insights/store'
@@ -8,7 +8,9 @@ import { endSession, flushNow } from '../tools/insights/tracker'
 import { LEGEND, drawHeat, rng, sampleTaps, type HeatPoint } from '../tools/insights/heat'
 import { setFlag, useFlag } from '../tools/shared'
 import { nameOf } from '../tools/compare/store'
-import { loadSessions, loadTests, summarize, type UsabilityTest } from '../tools/tests/store'
+import { loadSessions, loadTests, saveTests, summarize, type TestTask, type UsabilityTest } from '../tools/tests/store'
+import { RunHere } from './heatmap/RunHere'
+import { TaskEdit } from './heatmap/TaskEdit'
 import { loadGaze, loadGazeSessions, timeOf } from '../tools/gaze/store'
 import { aoiStats, fixationsOf, idtFor, saccadesOf, type Aoi, type Fixation } from '../tools/gaze/analysis'
 import { sampleGaze } from '../tools/gaze/sample'
@@ -46,11 +48,13 @@ const short = (s: string, n = 70) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 export default function Heatmap() {
   const [params, setParams] = useSearchParams()
   const recording = useFlag('insights')
-  const tests = useMemo(() => loadTests(), [])
+  const [tests, setTests] = useState(loadTests)
   const [ver, setVer] = useState(0)
   const sessions = useMemo(() => (ver >= 0 ? loadSessions() : []), [ver])
   const [clicks, setClicks] = useState<ClickEvent[]>([])
 
+  // Clicks: where they clicked. Eyes: where they looked (webcam eye tracking), read as fixations.
+  const layer = params.get('layer') === 'eyes' ? 'eyes' : 'clicks'
   // ut / utask, not test / task: ?test= is how a participant's link starts a usability test run.
   const source = params.get('source') === 'browsing' ? 'browsing' : 'test'
   const test: UsabilityTest | undefined = tests.find((t) => t.id === params.get('ut')) ?? tests[0]
@@ -66,8 +70,8 @@ export default function Heatmap() {
   const [radius, setRadius] = useState(30)
   const [opacity, setOpacity] = useState(0.8)
   const [hover, setHover] = useState<string | null>(null)
-  // Clicks: where they clicked. Eyes: where they looked (webcam eye tracking), read as fixations.
-  const layer = params.get('layer') === 'eyes' ? 'eyes' : 'clicks'
+  const [recordingRun, setRecordingRun] = useState(false)
+  const [editing, setEditing] = useState<'edit' | 'new' | null>(null)
   const [pidx, setPidx] = useState(0)
   const [playT, setPlayT] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -83,8 +87,16 @@ export default function Heatmap() {
   const taps: Tap[] = useMemo(() => {
     if (source === 'test') {
       if (!test || !task) return []
-      return sessions.filter((s) => s.testId === test.id).flatMap((s) => s.attempts.filter((a) => a.taskId === task.id).flatMap((a) =>
-        a.taps.map((t, i) => ({ pid: s.id, page: t.page, vw: t.vw, sel: t.sel, ex: t.ex ?? 50, ey: t.ey ?? 50, x: t.x, y: t.y, label: t.label, first: i === 0, hit: t.hit, ok: a.outcome === 'success' }))))
+      // "First" is the first click on each page of an attempt: on the start page that is the task's
+      // first click; on a later page, where they went first once they got there.
+      return sessions.filter((s) => s.testId === test.id).flatMap((s) => s.attempts.filter((a) => a.taskId === task.id).flatMap((a) => {
+        const seenPage = new Set<string>()
+        return a.taps.map((t) => {
+          const first = !seenPage.has(t.page)
+          seenPage.add(t.page)
+          return { pid: s.id, page: t.page, vw: t.vw, sel: t.sel, ex: t.ex ?? 50, ey: t.ey ?? 50, x: t.x, y: t.y, label: t.label, first, hit: t.hit, ok: a.outcome === 'success' }
+        })
+      }))
     }
     const seen = new Set<string>()
     return clicks.map((c) => {
@@ -95,12 +107,22 @@ export default function Heatmap() {
     })
   }, [source, test, task, sessions, clicks])
 
+  const gaze = useMemo(() => (ver >= 0 ? loadGaze() : []), [ver])
+  const testRuns = useMemo(() => new Set(sessions.filter((x) => x.testId === test?.id).map((x) => x.id)), [sessions, test?.id])
+  const gazeHereAll = useMemo(() => gaze.filter((p) => (source === 'test' ? p.task === task?.id && !!p.test && testRuns.has(p.test) : !p.test)), [gaze, source, task?.id, testRuns])
+  // Every page this task (or browsing) touched, in the order people went: the start page, then the
+  // pages they visited (with or without a click there), then any other page with clicks or gaze.
   const pages = useMemo(() => {
+    const visited = source === 'test' && test && task
+      ? sessions.filter((x) => x.testId === test.id).flatMap((x) => x.attempts.filter((a) => a.taskId === task.id).flatMap((a) => a.pages))
+      : []
     const base = source === 'test' ? [task?.startPage ?? '/'] : SCREENS
-    return [...new Set([...base, ...taps.map((t) => t.page)])]
-  }, [source, task, taps])
+    return [...new Set([...base, ...visited, ...taps.map((t) => t.page), ...gazeHereAll.map((g) => g.page)])]
+  }, [source, test, task, sessions, taps, gazeHereAll])
+  const pageCount = (p: string) => ({ clicks: taps.filter((t) => t.page === p).length, eyes: gazeHereAll.filter((g) => g.page === p).length })
   const page = pages.includes(params.get('page') ?? '') ? params.get('page')! : pages[0]
-  const device: Device = (['mobile', 'tablet', 'desktop'] as Device[]).includes(params.get('device') as Device) ? params.get('device') as Device : busiest(taps.filter((t) => t.page === page).map((t) => t.vw))
+  const device: Device = (['mobile', 'tablet', 'desktop'] as Device[]).includes(params.get('device') as Device) ? params.get('device') as Device
+    : busiest(layer === 'eyes' ? gazeHereAll.filter((g) => g.page === page).map((g) => g.vw) : taps.filter((t) => t.page === page).map((t) => t.vw))
   const d = DEVICES[device]
   const onPage = taps.filter((t) => t.page === page && layoutOf(t.vw) === device)
   const sample = onPage.length === 0
@@ -112,7 +134,6 @@ export default function Heatmap() {
   const targetSel = source === 'test' && task?.success.kind === 'element' && task.success.page === page ? task.success.sel : null
 
   /* ---------- eyes: gaze samples → fixations, per person ---------- */
-  const gaze = useMemo(() => (ver >= 0 ? loadGaze() : []), [ver])
   const gazeAcc = useMemo(() => new Map((ver >= 0 ? loadGazeSessions() : []).map((g) => [g.sid, g.accuracy])), [ver])
   const testOutcome = useMemo(() => {
     const m = new Map<string, { ok: boolean; firstRight: boolean | null; acc?: number }>()
@@ -151,8 +172,11 @@ export default function Heatmap() {
       .filter((p) => p.fixations.length > 0)
   }, [eyeSample, realEyes, aois, source, test?.id, task?.id, page, device, accuracy, who, testOutcome])
   const person = eyePeople[Math.min(pidx, Math.max(0, eyePeople.length - 1))]
-  const pathEnd = person ? Math.max(...person.fixations.map((f) => f.start + f.dur)) - person.start : 0
-  const shownFix: Fixation[] = person ? person.fixations.filter((f) => playT === null || f.start - person.start <= playT) : []
+  // Playback runs from the first fixation (no blank lead-in); the clock still shows time since the task began.
+  const pathBase = person ? person.fixations[0].start : 0
+  const pathEnd = person ? Math.max(...person.fixations.map((f) => f.start + f.dur)) - pathBase : 0
+  const lead = person ? pathBase - person.start : 0
+  const shownFix: Fixation[] = person ? person.fixations.filter((f) => playT === null || f.start - pathBase <= playT) : []
   const aoiTable = useMemo(() => aoiStats(aois, eyePeople), [aois, eyePeople])
   const allFix = eyePeople.flatMap((p) => p.fixations)
   const sacc = eyePeople.flatMap((p) => saccadesOf(p.fixations))
@@ -165,7 +189,8 @@ export default function Heatmap() {
     if (!playing) return
     let raf = 0, last = performance.now()
     const tick = (now: number) => {
-      setPlayT((t) => { const n = (t ?? 0) + (now - last); if (n >= pathEnd) { setPlaying(false); return null } return n })
+      // A frame's timestamp can be slightly before the moment playback started: never step backwards.
+      setPlayT((t) => { const n = Math.max(0, (t ?? 0) + Math.max(0, now - last)); if (n >= pathEnd) { setPlaying(false); return null } return n })
       last = now
       raf = requestAnimationFrame(tick)
     }
@@ -281,7 +306,10 @@ export default function Heatmap() {
           <h1>Heatmap</h1>
           <p>Where participants clicked while doing a usability task, added up and drawn as heat over the screen: blue where a few clicked, red where most did. Start with <b>first clicks</b>: people whose first click is on the right path usually finish the task. For one person’s path step by step, see <Link to="/console/sessions">Sessions</Link>.</p>
         </div>
-        <div className="actions"><button className="btn" onClick={() => void refresh()}><RefreshCw size={14} /> Refresh</button></div>
+        <div className="actions">
+          <button className="btn primary" onClick={() => setRecordingRun(true)} disabled={source === 'test' && !task}><Circle size={12} fill="currentColor" /> {source === 'test' ? 'Record a run here' : 'Record browsing here'}</button>
+          <button className="btn" onClick={() => void refresh()}><RefreshCw size={14} /> Refresh</button>
+        </div>
       </div>
 
       <section className="card hm-controls">
@@ -309,9 +337,6 @@ export default function Heatmap() {
           )}
         </div>
         <div className="row wrap" style={{ gap: 8 }}>
-          <select className="select hm-select" value={page} onChange={(e) => set({ page: e.target.value, device: null })} aria-label="Screen">
-            {pages.map((p, i) => <option key={p} value={p}>{p}{source === 'test' && i === 0 ? ' (start)' : ''}</option>)}
-          </select>
           <div className="seg" role="group" aria-label="Device">{(Object.keys(DEVICES) as Device[]).map((x) => <button key={x} aria-pressed={device === x} onClick={() => set({ device: x })}>{x[0].toUpperCase() + x.slice(1)}</button>)}</div>
           {layer === 'clicks' ? (
             <div className="seg" role="group" aria-label="Clicks">
@@ -351,19 +376,41 @@ export default function Heatmap() {
               <div><dt>First click right</dt><dd className="num">{pct(stats.firstCorrect, stats.firstTotal)}</dd></div>
             </dl>
           )}
-          <Link className="btn sm" to={`/console/tests/${test!.id}`}>Test results</Link>
+          <span className="row" style={{ gap: 6 }}>
+            <button className="btn sm" onClick={() => setEditing('edit')}><Pencil size={13} /> Change task</button>
+            <button className="btn sm" onClick={() => setEditing('new')}><Plus size={13} /> New task</button>
+            <Link className="btn sm ghost" to={`/console/tests/${test!.id}`}>Results</Link>
+          </span>
         </section>
       )}
 
+      <nav className="hm-pages" aria-label="Pages">
+        {pages.map((p, i) => {
+          const c = pageCount(p)
+          return (
+            <button key={p} aria-pressed={page === p} onClick={() => set({ page: p, device: null })}>
+              <span className="mono">{p}</span>
+              <small>{source === 'test' && i === 0 && <em>start</em>}{c.clicks} click{c.clicks === 1 ? '' : 's'}{c.eyes ? <> · <Eye size={11} /> {c.eyes}</> : null}</small>
+            </button>
+          )
+        })}
+      </nav>
+      {(() => {
+        // Recorded here, but at another width: say so, instead of an empty (or sample) map.
+        const here = layer === 'eyes' ? gazeHereAll.filter((g) => g.page === page) : taps.filter((t) => t.page === page)
+        const other = (['mobile', 'tablet', 'desktop'] as Device[]).filter((x) => x !== device && here.some((h) => layoutOf(h.vw) === x))
+        const none = !here.some((h) => layoutOf(h.vw) === device)
+        return none && other.length ? <p className="hm-sample"><Info size={14} /> <span>Nothing at {device} width on this page, but there is at {other.map((o, k) => <span key={o}>{k ? ', ' : ''}<button className="link-btn" onClick={() => set({ device: o })}>{o}</button></span>)} width.</span></p> : null
+      })()}
       {layer === 'eyes' && (
         <p className="hm-sample"><Info size={14} /> <span>{eyeSample
-          ? <>No one has done this {source === 'test' ? 'task' : 'screen'} with eye tracking on at {device} width yet, so this shows <b>sample gaze</b>: 8 made-up people’s raw webcam-like samples (30 a second, with noise), run through the same fixation algorithm as real data. It shows how the view reads; it is not a result. {source === 'test' ? <>Turn on <b>Eye tracking</b> in <Link to={`/console/tests/${test?.id}/edit`}>the test</Link> and share its link.</> : <>Start a session from <Link to="/console/gaze">Eye tracking</Link>.</>}</>
+          ? <>No one has done this {source === 'test' ? 'task' : 'screen'} with eye tracking on at {device} width yet, so this shows <b>sample gaze</b>: 8 made-up people’s raw webcam-like samples (30 a second, with noise), run through the same fixation algorithm as real data. It shows how the view reads; it is not a result. Press <b>{source === 'test' ? 'Record a run here' : 'Record browsing here'}</b> and tick “also record where I look”.</>
           : <>Eyes: {eyePeople.length} {eyePeople.length === 1 ? 'person' : 'people'} with eye tracking, median accuracy ±{accuracy ?? '?'} px. Webcam tracking is good for areas, not single words: read fixations as “around here”.</>}</span></p>
       )}
       {layer === 'clicks' && sample && (
         <p className="hm-sample"><Info size={14} /> <span>{source === 'test'
-          ? <>No participant has done this task on this screen at {device} width yet, so this shows <b>sample data</b>: {SAMPLE_PEOPLE} made-up participants clicking this screen’s real buttons and links, more often on the way to the goal. It shows how the map reads; it is not a result. Share the test link from <Link to={`/console/tests/${test?.id}`}>the test</Link> to collect real clicks.</>
-          : <>No recorded taps on this screen at {device} width yet, so this shows <b>sample data</b>, not real visitors. {recording ? 'Use the shop in another tab, then Refresh.' : 'Switch recording on and use the shop to see real taps.'}</>}</span></p>
+          ? <>No participant has done this task on this screen at {device} width yet, so this shows <b>sample data</b>: {SAMPLE_PEOPLE} made-up participants clicking this screen’s real buttons and links, more often on the way to the goal. It shows how the map reads; it is not a result. Press <b>Record a run here</b> to do the task yourself on this page, or share the test link from <Link to={`/console/tests/${test?.id}`}>the test</Link>.</>
+          : <>No recorded taps on this screen at {device} width yet, so this shows <b>sample data</b>, not real visitors. Press <b>Record browsing here</b> to click around the shop on this page{recording ? ', or use the shop in another tab and Refresh' : ''}.</>}</span></p>
       )}
 
       <div className="hm-grid">
@@ -420,7 +467,7 @@ export default function Heatmap() {
               <div className="row" style={{ gap: 8 }}>
                 <button className="btn sm icon" onClick={() => { if (!playing && (playT === null || playT >= pathEnd)) setPlayT(0); setPlaying((v) => !v) }} aria-label={playing ? 'Pause' : 'Play the scanpath'}>{playing ? <Pause size={13} /> : <Play size={13} />}</button>
                 <input type="range" min={0} max={Math.max(1, Math.round(pathEnd))} value={playT === null ? Math.round(pathEnd) : Math.round(playT)} onChange={(e) => { setPlaying(false); const v = Number(e.target.value); setPlayT(v >= pathEnd ? null : v) }} aria-label="Scanpath time" style={{ flex: 1 }} />
-                <span className="num muted" style={{ fontSize: 12 }}>{((playT ?? pathEnd) / 1000).toFixed(1)} s</span>
+                <span className="num muted" style={{ fontSize: 12 }}>{((lead + (playT ?? pathEnd)) / 1000).toFixed(1)} s</span>
               </div>
             </div>
           ) : <p className="muted" style={{ fontSize: 13 }}>No fixations here.</p>}
@@ -457,6 +504,18 @@ export default function Heatmap() {
         </aside>
         )}
       </div>
+      {recordingRun && (
+        <RunHere test={source === 'test' ? test : undefined} task={source === 'test' ? task : undefined} startPage={source === 'test' ? task?.startPage ?? '/' : page}
+          onClose={(saved) => { setRecordingRun(false); if (saved) { void refresh(); set({ page: saved.page, device: null }) } }} />
+      )}
+      {editing && test && (
+        <TaskEdit task={editing === 'edit' ? task : undefined} results={editing === 'edit' && stats ? stats.attempts : 0} onCancel={() => setEditing(null)}
+          onSave={(t: TestTask) => {
+            const next = tests.map((x) => (x.id === test.id ? { ...x, tasks: editing === 'edit' ? x.tasks.map((k) => (k.id === t.id ? t : k)) : [...x.tasks, t], updatedAt: new Date().toISOString() } : x))
+            saveTests(next); setTests(next); setEditing(null)
+            set({ utask: t.id, page: null, device: null })
+          }} />
+      )}
     </main>
   )
 }
