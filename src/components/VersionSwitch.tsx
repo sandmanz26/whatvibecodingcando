@@ -7,7 +7,8 @@ import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/track
 import { DESIGN_EVENT, loadDesign } from '../tools/design/tokens'
 import { presetOf } from '../tools/design/presets'
 import { INSPECT_EVENT, INSPECT_STATE } from '../tools/inspect/Inspector'
-import { LATEST, VERSIONS, setVersion, useVersion, versionOf } from '../lib/version'
+import { LATEST, VERSIONS, setShowingChanges, setVersion, useCommentCounts, useShowingChanges, useVersion, versionOf } from '../lib/version'
+import { TokenSwitcher } from '../tools/design/TokenSwitcher'
 import { useStore } from '../store/store'
 
 const POS_KEY = 'market.dock'
@@ -24,6 +25,8 @@ export function VersionSwitch() {
   const recording = useFlag('insights')
   const [session, setSession] = useState(sessionState)
   const [design, setDesign] = useState(loadDesign)
+  const version = useVersion()
+  const verCount = useCommentCounts()[version]?.total ?? 0
   const [inspecting, setInspecting] = useState(false)
   useEffect(() => {
     const sync = (e: Event) => setInspecting(!!(e as CustomEvent<boolean>).detail)
@@ -92,11 +95,11 @@ export function VersionSwitch() {
           : <span className="dock-rec" title="Recording is on. A session starts counting when the main page opens."><i /> Starts on home</span>)}
         {design && <button className="dock-rec" onClick={() => nav('/console/design')} title="A simulated design is on in this browser">{presetOf(design.preset).name}</button>}
         <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
-        <button className="dock-icon" onClick={() => comment('list')} aria-label="All comments" title="All comments"><MessagesSquare size={15} /></button>
+        <button className="dock-icon dock-count" onClick={() => comment('list')} aria-label={`All comments, ${verCount} on v${version}`} title={`All comments on v${version}`}><MessagesSquare size={15} />{verCount > 0 && <span>{verCount}</span>}</button>
         <VersionMenu />
         <span className="dock-sep" aria-hidden />
         <button className="dock-icon" onClick={() => nav('/console/compare')} aria-label="Compare components" title="Compare two components side by side"><Columns2 size={15} /></button>
-        <button className="dock-icon" onClick={() => nav('/console/design')} aria-label="Design tokens" title="Design tokens: try, upload and compare"><Palette size={15} /></button>
+        <TokensMenu />
         <button className={`dock-icon ${inspecting ? 'on' : ''}`} onClick={() => window.dispatchEvent(new Event(INSPECT_EVENT))} aria-label="Inspect styles" aria-pressed={inspecting} title="Inspect: hover anything to see its colours, font and whether they are design tokens (I)"><ScanSearch size={15} /></button>
         <button className="dock-icon" onClick={() => nav('/console/sessions')} aria-label="Sessions" title="Sessions: what each person tapped, in order"><MousePointerClick size={15} /></button>
         <button className="dock-icon" onClick={() => nav('/console/heatmap')} aria-label="Heatmap" title="Heatmap: where people tap on each screen"><Flame size={15} /></button>
@@ -105,10 +108,8 @@ export function VersionSwitch() {
   )
 }
 
-/** Switch the shop between its released versions, with what each one added. */
-function VersionMenu() {
-  const version = useVersion()
-  const { toast } = useStore()
+/** A dock button with a panel above it (or below, when the dock sits near the top). Outside click or Esc closes. */
+function DockPopover({ button, label, children, className = '' }: { button: (open: boolean) => React.ReactNode; label: string; className?: string; children: (close: () => void) => React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [down, setDown] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -120,29 +121,55 @@ function VersionMenu() {
     window.addEventListener('keydown', key)
     return () => { window.removeEventListener('pointerdown', out); window.removeEventListener('keydown', key) }
   }, [open])
-  const pick = (id: string) => {
-    setOpen(false)
-    if (id === version) return
-    setVersion(id)
-    const v = versionOf(id)
-    toast(`Now on v${v.id} · ${v.name}`)
-  }
   return (
-    <div className="dock-ver" ref={box}>
-      <button className={`dock-verbtn ${open ? 'on' : ''}`} onClick={() => { setDown((box.current?.getBoundingClientRect().top ?? 999) < 380); setOpen((o) => !o) }} aria-haspopup="menu" aria-expanded={open} title="Switch the shop between its versions">
-        <GitBranch size={14} /> v{version}
-      </button>
-      {open && (
-        <div className={`dock-vermenu ${down ? 'down' : ''}`} role="menu" aria-label="Versions">
-          <div className="dock-verhead"><b>Versions</b><span>Each release turns features on. Switch to see the shop as it was.</span></div>
-          {[...VERSIONS].reverse().map((v) => (
-            <button key={v.id} role="menuitemradio" aria-checked={v.id === version} className={v.id === version ? 'on' : ''} onClick={() => pick(v.id)}>
-              <span className="dock-verrow"><b>v{v.id}</b><span>{v.name}</span>{v.id === LATEST && <em>Latest</em>}<small>{v.date}</small></span>
-              {v.adds.length ? v.adds.map((a) => <span key={a.feature} className="dock-veradd">+ {a.text}</span>) : <span className="dock-veradd muted">The first release</span>}
-            </button>
-          ))}
+    <div className={`dock-ver ${down ? 'down' : ''} ${className}`} ref={box}>
+      <span onClick={() => { setDown((box.current?.getBoundingClientRect().top ?? 999) < 420); setOpen((o) => !o) }} aria-label={label}>{button(open)}</span>
+      {open && children(() => setOpen(false))}
+    </div>
+  )
+}
+
+/** Switch the shop between its released versions: what each added and how many comments it has. */
+function VersionMenu() {
+  const version = useVersion()
+  const counts = useCommentCounts()
+  const showing = useShowingChanges()
+  const { toast } = useStore()
+  return (
+    <DockPopover label="Versions" button={(open) => (
+      <button className={`dock-verbtn ${open ? 'on' : ''}`} aria-haspopup="menu" aria-expanded={open} title="Switch the shop between its versions"><GitBranch size={14} /> v{version}</button>
+    )}>
+      {(close) => (
+        <div className="dock-vermenu" role="menu" aria-label="Versions">
+          <div className="dock-verhead"><b>Versions</b><span>Each release turns features on. Comments belong to the version they were made on.</span></div>
+          <label className="dock-showchg"><input type="checkbox" checked={showing} onChange={(e) => setShowingChanges(e.target.checked)} /> Outline what each version added</label>
+          {[...VERSIONS].reverse().map((v) => {
+            const c = counts[v.id]
+            return (
+              <button key={v.id} role="menuitemradio" aria-checked={v.id === version} className={v.id === version ? 'on' : ''} onClick={() => {
+                close()
+                if (v.id === version) return
+                setVersion(v.id)
+                toast(`Now on v${v.id} · ${versionOf(v.id).name}`)
+              }}>
+                <span className="dock-verrow"><b>v{v.id}</b><span>{v.name}</span>{v.id === LATEST && <em>Latest</em>}<small>{v.date}</small></span>
+                {v.adds.length ? v.adds.map((a) => <span key={a.feature} className="dock-veradd">+ {a.text}</span>) : <span className="dock-veradd muted">The first release</span>}
+                <span className="dock-vercount">{c ? `${c.total} comment${c.total === 1 ? '' : 's'}${c.unresolved ? ` · ${c.unresolved} not completed` : ''}` : 'No comments'}</span>
+              </button>
+            )
+          })}
         </div>
       )}
-    </div>
+    </DockPopover>
+  )
+}
+
+function TokensMenu() {
+  return (
+    <DockPopover label="Design tokens" className="tk-anchor" button={(open) => (
+      <button className={`dock-icon ${open ? 'on' : ''}`} aria-label="Design tokens" aria-expanded={open} title="Design tokens: switch the look live, or use your own"><Palette size={15} /></button>
+    )}>
+      {(close) => <TokenSwitcher onClose={close} />}
+    </DockPopover>
   )
 }

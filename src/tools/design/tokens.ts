@@ -15,7 +15,7 @@ export interface TokenTree { [key: string]: TokenTree | Token | string | undefin
 export type Scope = 'light' | 'dark'
 export type DesignDoc = Partial<Record<Scope, TokenTree>> & { $description?: string }
 
-export interface Design { doc: DesignDoc; preset: string }
+export interface Design { doc: DesignDoc; preset: string; /** the uploaded token set it came from, if any */ from?: string }
 
 export const SCOPES: Scope[] = ['light', 'dark']
 const KEY = `${APP}.design`

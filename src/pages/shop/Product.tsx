@@ -5,7 +5,7 @@ import { PRODUCTS, category, product, seller } from '../../data/shop'
 import { answer, score, suggestedQuestions, understand } from '../../lib/ai'
 import { useStore } from '../../store/store'
 import { Empty, Placeholder, Price, ProductCard, Stars } from '../../components/ui'
-import { rememberViewed, useFeature } from '../../lib/version'
+import { featureMark, rememberViewed, useFeature } from '../../lib/version'
 
 export default function Product() {
   const { id = '' } = useParams()
@@ -164,7 +164,7 @@ export default function Product() {
       </section>
 
       {sticky && pastBuy && (
-        <div className="buybar" role="region" aria-label="Buy">
+        <div className="buybar" role="region" aria-label="Buy" {...featureMark('stickyBuy')}>
           <div className="buybar-in container">
             <div style={{ minWidth: 0 }}><b className="buybar-title">{p.title}</b><Price p={p} /></div>
             <span className="muted buybar-opts">{Object.keys(p.options ?? {}).length ? (missing.length ? `Choose ${missing.join(' and ').toLowerCase()}` : Object.values(opts).join(' · ')) : `Qty ${qty}`}</span>

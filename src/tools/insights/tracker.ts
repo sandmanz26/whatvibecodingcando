@@ -84,8 +84,10 @@ function labelFor(el: Element): string {
     const f = el as HTMLInputElement
     return clip(squash(f.placeholder) || squash(f.name) || `${el.tagName.toLowerCase()}${f.type ? `[${f.type}]` : ''}`, 100)
   }
-  // First line only: a card's name, not the content inside it.
-  const text = squash(((el as HTMLElement).innerText ?? el.textContent ?? '').split('\n').find((l) => l.trim()))
+  // First line only: a card's name, not the content inside it. Image placeholders' words ("Icon",
+  // "Product photo") are skipped, so a card is named by its own text.
+  const imgs = new Set(Array.from(el.querySelectorAll('[role="img"]')).map((i) => i.textContent?.trim()))
+  const text = squash(((el as HTMLElement).innerText ?? el.textContent ?? '').split('\n').find((l) => l.trim() && !imgs.has(l.trim())))
   return clip(text || squash(el.getAttribute('title')) || el.tagName.toLowerCase(), 100)
 }
 

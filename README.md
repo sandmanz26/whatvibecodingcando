@@ -51,17 +51,34 @@ Research tools are not part of the marketplace: click tracking and sessions, hea
 ### The dock
 The dock is the set of tools shown to visitors. From left to right:
 - **Comment** and **All comments**. The round floating comment button is hidden because it did the same thing.
-- **Version** (`v2.0`): switches the shop between its releases. Each version turns product features on, and the menu says what each one added. The point it makes: with vibe coding, shipping or rolling back a feature is a small change. Versions are in `src/lib/version.ts`; the product reads features, never version numbers.
+- **Version** (`v2.0`): switches the shop between its releases. Each release turns product features on. Versions are in `src/lib/version.ts`; the product reads features, never version numbers.
   - **v1.0:** launch.
-  - **v1.1:** an Add button on product cards. A product with sizes or colours opens its page instead.
-  - **v1.2:** a sticky buy bar on product pages. It shows once the page's own buttons scroll away, and asks for a missing size before adding.
-  - **v2.0:** "Pick up where you left off" on Home.
-- **Compare components**, **Design tokens**: open those pages.
+  - **v1.1:** an Add to cart row on every product card. A product with sizes or colours opens its page instead.
+  - **v1.2:** a countdown to the end of today's deals on Home, and a sticky buy bar on product pages that asks for a missing size before adding.
+  - **v2.0:** a redesigned Home (a dark band with one big AI search and ready-made requests) and "Pick up where you left off".
+  - **What changed:** after a switch, the version's features are outlined and labelled "New in v…" for a few seconds. "Outline what each version added" keeps the outlines on.
+  - **Comments belong to a version.** Each comment records the version it was made on. Pins, numbers and the list show the current version; "Show every version" lists all, tagged. Opening one from another version switches to it.
+    - A comment being written is discarded, with a message, when the version changes.
+    - Comments from before versions existed count as v2.0.
+  - **Counts.** The dock's comments button shows how many comments the current version has, and the menu shows the count for each version.
+- **Compare components**: opens the compare page.
+- **Design tokens** (live, without leaving the page):
+  - switch between the app's own look, the UI-library looks and saved sets;
+  - tweak primary, accent and corner radius;
+  - or open **Use your own tokens**: a template with the app's token names and values, where valid edits apply as you type. It can be downloaded, a .json or .css file can be uploaded, and the result saved as a set for Compare.
+  - Opening the template changes nothing until it is edited.
 - **Inspect** (or **I**): hover anything to see its font, size, weight, text and background colour (the background a person actually sees, even when it comes from a parent), border, radius and padding.
   - Each value is marked as a design token or "not a token" with the nearest one, to check what a vibe-coded screen really uses.
   - Click pins an element; the click never reaches the app. Esc unpins, Esc again stops.
   - It reads computed styles only, never field values.
-- **Sessions**, **Heatmap**: two separate pages now (`#/console/sessions`, `#/console/heatmap`). `#/console/insights` redirects to Sessions.
+- **Sessions**: one person's path, step by step (`#/console/sessions`; `#/console/insights` redirects there).
+- **Heatmap** (`#/console/heatmap`): a real density heatmap, not dots.
+  - **Drawing.** Every tap is a soft blob; blobs add up and are coloured blue → green → yellow → red, and the densest spot always reaches red.
+  - **Placement.** Each tap is placed on the element it hit, on the whole page at one device width, with the fold marked.
+  - **Controls.** Filter for rage taps or taps that did nothing, change spread and opacity, and see a "Most tapped" ranking whose rows highlight their element.
+  - **Data.** With no recorded taps for a screen and width it shows **sample data**: made-up taps built from that screen's real controls, clearly labelled as not real visitors. Recorded taps are used as soon as there are any.
+
+The research console's tools are in a grouped sidebar (Behaviour, Tests, Design, Findings, Use it yourself); on a phone it opens from the top bar.
 
 Hidden for now: narration (the microphone and ▶ Explain), the theme switch, and the Prompts and console buttons. Those pages are reached by URL (`#/console/narration`, `#/console/prompts`, `#/console/…`).
 

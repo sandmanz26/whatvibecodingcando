@@ -6,5 +6,5 @@
 - Frontend only (React + TypeScript + Vite). No backend: catalogue in `src/data/shop.ts`, simulated AI in `src/lib/ai.ts`, cart/orders in localStorage via `src/store/store.tsx`.
 - Before pushing: `npx tsc -b && npm run build` must pass.
 - **Git: always push finished work to `main`** (the owner asked for this explicitly). Push the working branch too if one is in use.
-- The dock is what visitors see: Comment, All comments, Version, Compare, Design tokens, Inspect, Sessions, Heatmap (README "The dock"). Narration, theme, Prompts and console buttons are hidden on purpose; reach those pages by URL. Shop features ship per version in `src/lib/version.ts`.
+- The dock is what visitors see: Comment, All comments, Version, Compare, Design tokens, Inspect, Sessions, Heatmap (README "The dock"). Narration, theme, Prompts and console buttons are hidden on purpose; reach those pages by URL. Shop features ship per version in `src/lib/version.ts`; mark a feature's element with `featureMark()` so "what changed" can outline it. Comments carry the version they were made on.
 - Research tools: read the README section "Research tools" before changing them. Never record typed text or field values; production default for click recording stays OFF until the owner decides on consent.

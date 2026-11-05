@@ -1,48 +1,65 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles, Columns2, Plug, Flame } from 'lucide-react'
+import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles, Columns2, Plug, Flame, Menu, X } from 'lucide-react'
 import { Toasts } from './ui'
+
+const GROUPS: { title: string; links: { to: string; icon: typeof Flame; label: string }[] }[] = [
+  { title: 'Behaviour', links: [
+    { to: '/console/sessions', icon: MousePointerClick, label: 'Sessions' },
+    { to: '/console/heatmap', icon: Flame, label: 'Heatmap' },
+    { to: '/console/gaze', icon: Eye, label: 'Eye tracking' },
+  ] },
+  { title: 'Tests', links: [
+    { to: '/console/tests', icon: ListChecks, label: 'Usability tests' },
+    { to: '/console/fivesec', icon: Timer, label: '5-second tests' },
+    { to: '/console/doors', icon: DoorOpen, label: 'Fake doors' },
+  ] },
+  { title: 'Design', links: [
+    { to: '/console/compare', icon: Columns2, label: 'Compare' },
+    { to: '/console/design', icon: Palette, label: 'Design tokens' },
+    { to: '/console/dscheck', icon: ScanSearch, label: 'DS check' },
+  ] },
+  { title: 'Findings', links: [
+    { to: '/console/narration', icon: Mic, label: 'Narration' },
+    { to: '/console/report', icon: FileText, label: 'Report' },
+    { to: '/console/repo', icon: Lightbulb, label: 'Insights' },
+  ] },
+  { title: 'Use it yourself', links: [
+    { to: '/console/prompts', icon: Sparkles, label: 'Prompts' },
+    { to: '/console/install', icon: Plug, label: 'Install' },
+  ] },
+]
 
 /**
  * The research console lives apart from the marketplace: it studies how people use the
  * marketplace (sessions, heatmaps, usability tests) and is not part of the product itself.
+ * Its tools are in a sidebar, grouped; on a phone the sidebar opens from the top bar.
  */
 export function ResearchLayout() {
   const { pathname } = useLocation()
-  useEffect(() => {
-    window.scrollTo(0, 0)
-    // The tool tabs scroll sideways when they don't fit; keep the current one in view.
-    const seg = document.querySelector<HTMLElement>('.research-bar .seg')
-    const on = seg?.querySelector<HTMLElement>('a.on')
-    if (seg && on) {
-      const s = seg.getBoundingClientRect(), o = on.getBoundingClientRect()
-      if (o.left < s.left || o.right > s.right) seg.scrollLeft += o.left - s.left - (s.width - o.width) / 2
-    }
-  }, [pathname])
+  const [open, setOpen] = useState(false)
+  useEffect(() => { window.scrollTo(0, 0); setOpen(false) }, [pathname])
+  const current = GROUPS.flatMap((g) => g.links).find((l) => pathname === l.to || pathname.startsWith(`${l.to}/`))
   return (
-    <div className="research">
-      <header className="topbar research-bar no-print">
-        <span className="research-mark"><FlaskConical size={15} /> Research console</span>
-        <nav className="seg" aria-label="Research tools">
-          <NavLink to="/console/sessions" className={({ isActive }) => (isActive ? 'on' : '')}><MousePointerClick size={13} /> Sessions</NavLink>
-          <NavLink to="/console/heatmap" className={({ isActive }) => (isActive ? 'on' : '')}><Flame size={13} /> Heatmap</NavLink>
-          <NavLink to="/console/tests" className={({ isActive }) => (isActive ? 'on' : '')}><ListChecks size={13} /> Usability tests</NavLink>
-          <NavLink to="/console/fivesec" className={({ isActive }) => (isActive ? 'on' : '')}><Timer size={13} /> 5-second tests</NavLink>
-          <NavLink to="/console/doors" className={({ isActive }) => (isActive ? 'on' : '')}><DoorOpen size={13} /> Fake doors</NavLink>
-          <NavLink to="/console/gaze" className={({ isActive }) => (isActive ? 'on' : '')}><Eye size={13} /> Eye tracking</NavLink>
-          <NavLink to="/console/design" className={({ isActive }) => (isActive ? 'on' : '')}><Palette size={13} /> Design tokens</NavLink>
-          <NavLink to="/console/dscheck" className={({ isActive }) => (isActive ? 'on' : '')}><ScanSearch size={13} /> DS check</NavLink>
-          <NavLink to="/console/report" className={({ isActive }) => (isActive ? 'on' : '')}><FileText size={13} /> Report</NavLink>
-          <NavLink to="/console/repo" className={({ isActive }) => (isActive ? 'on' : '')}><Lightbulb size={13} /> Insights</NavLink>
-          <NavLink to="/console/compare" className={({ isActive }) => (isActive ? 'on' : '')}><Columns2 size={13} /> Compare</NavLink>
-          <NavLink to="/console/narration" className={({ isActive }) => (isActive ? 'on' : '')}><Mic size={13} /> Narration</NavLink>
-          <NavLink to="/console/prompts" className={({ isActive }) => (isActive ? 'on' : '')}><Sparkles size={13} /> Prompts</NavLink>
-          <NavLink to="/console/install" className={({ isActive }) => (isActive ? 'on' : '')}><Plug size={13} /> Install</NavLink>
-        </nav>
-        <div className="spacer" />
-        <Link to="/" className="btn sm"><ArrowLeft size={14} /> Back to the shop</Link>
+    <div className={`research rs ${open ? 'menu-open' : ''}`}>
+      <header className="rs-top no-print">
+        <button className="btn ghost sm icon" onClick={() => setOpen((v) => !v)} aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open}>{open ? <X size={16} /> : <Menu size={16} />}</button>
+        <span className="research-mark"><FlaskConical size={15} /> {current?.label ?? 'Research console'}</span>
       </header>
-      <Outlet />
+      <aside className="rs-side no-print" aria-label="Research tools">
+        <span className="research-mark rs-brand"><FlaskConical size={15} /> Research console</span>
+        <Link to="/" className="btn sm rs-back"><ArrowLeft size={14} /> Back to the shop</Link>
+        <nav className="rs-nav">
+          {GROUPS.map((g) => (
+            <div key={g.title} className="rs-group">
+              <span className="rs-title">{g.title}</span>
+              {g.links.map(({ to, icon: Icon, label }) => <NavLink key={to} to={to} className={({ isActive }) => (isActive ? 'on' : '')}><Icon size={15} /> {label}</NavLink>)}
+            </div>
+          ))}
+        </nav>
+      </aside>
+      {open && <div className="rs-scrim" onClick={() => setOpen(false)} />}
+      <div className="rs-main"><Outlet /></div>
       <Toasts />
     </div>
   )

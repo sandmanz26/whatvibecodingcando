@@ -34,6 +34,7 @@ import { FiveSecRunner } from './tools/fivesec/Runner'
 import { FakeDoors } from './tools/doors/FakeDoors'
 import { GazeRunner } from './tools/gaze/GazeRunner'
 import Sessions from './pages/Sessions'
+import Heatmap from './pages/Heatmap'
 import UsabilityTests from './pages/UsabilityTests'
 import TestEditor from './pages/TestEditor'
 
@@ -67,7 +68,7 @@ export default function App() {
           <Route path="console" element={<ResearchLayout />}>
             <Route path="insights" element={<Navigate to="/console/sessions" replace />} />
             <Route path="sessions" element={<Sessions view="sessions" />} />
-            <Route path="heatmap" element={<Sessions key="heatmap" view="heatmap" />} />
+            <Route path="heatmap" element={<Heatmap />} />
             <Route path="tests" element={<UsabilityTests />} />
             <Route path="tests/:id" element={<UsabilityTests />} />
             <Route path="tests/:id/edit" element={<TestEditor />} />

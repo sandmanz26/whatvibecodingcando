@@ -33,6 +33,8 @@ export interface PinNote {
   resolvedAt?: string
   /** a voice note: the audio lives in this browser's IndexedDB under voiceId(id) */
   voice?: { ms: number }
+  /** the shop version it was made on (see src/lib/version.ts); none means before versions existed */
+  version?: string
 }
 
 /** Where a comment's or a reply's voice note is kept (see tools/voice/audio.ts). */
@@ -68,6 +70,8 @@ export function validNote(n: unknown): PinNote | null {
   if (label) note.label = label
   if (author) note.author = author
   if (ex !== null && ey !== null) { note.ex = ex; note.ey = ey }
+  const ver = str(o.version, 12)
+  if (ver && /^\d+\.\d+$/.test(ver)) note.version = ver
   const edited = str(o.editedAt, 40)
   if (edited) note.editedAt = edited
   if (o.resolved === true) {
@@ -121,6 +125,7 @@ export function toTxt(list: PinNote[], app = 'Marketplace', now = new Date()): s
     ...(n.sel ? [`selector: ${n.sel}`] : []),
     ...(n.ex !== undefined ? [`anchor: ${n.ex}, ${n.ey}`] : []),
     ...(n.author ? [`author: ${n.author}`] : []),
+    ...(n.version ? [`app_version: ${n.version}`] : []),
     ...(n.editedAt ? [`edited: ${n.editedAt}`] : []),
     `status: ${n.resolved ? 'resolved' : 'open'}`,
     ...(n.resolvedBy ? [`completed_by: ${n.resolvedBy}`] : []),
@@ -161,7 +166,7 @@ export function fromTxt(txt: string): PinNote[] {
     let replies: unknown = undefined
     try { replies = meta.replies ? JSON.parse(meta.replies) : undefined } catch { /* skip broken replies */ }
     const note = validNote({ id, page: meta.page, x, y, vw, vh, scrollY: Number(meta.scroll), text: body.join('\n'), createdAt: meta.created, updatedAt: meta.updated,
-      sel: meta.selector, label: meta.element, author: meta.author, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, editedAt: meta.edited, resolved: meta.status === 'resolved', resolvedBy: meta.completed_by, resolvedAt: meta.completed, replies,
+      sel: meta.selector, label: meta.element, author: meta.author, version: meta.app_version, ex: meta.anchor ? ex : undefined, ey: meta.anchor ? ey : undefined, editedAt: meta.edited, resolved: meta.status === 'resolved', resolvedBy: meta.completed_by, resolvedAt: meta.completed, replies,
       voice: meta.voice ? { ms: (parseInt(meta.voice, 10) || 0) * 1000 } : undefined })
     if (note) out.push(note)
   }

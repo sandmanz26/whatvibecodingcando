@@ -9,6 +9,7 @@ import { Thread } from './Thread'
 import { VoiceNote } from '../voice/VoiceNote'
 import { clock, deleteClip } from '../voice/audio'
 import { STATUS_TEXT, usePinSync } from './useSync'
+import { LEGACY_VERSION, getVersion, publishCommentCounts, setVersion, useVersion, type CommentCounts } from '../../lib/version'
 
 const BUTTON_KEY = `${APP}.reviewPins.button`
 /** The floating comment button duplicated the dock; kept in code, off for now. */
@@ -16,6 +17,7 @@ const SHOW_FAB = false
 const NAME_KEY = `${APP}.reviewPins.name`
 /** Fire with detail 'start' (comment mode) or 'list' (open the list) from anywhere in the app. */
 export const COMMENT_EVENT = 'market:comments'
+const verOf = (n: PinNote) => n.version ?? LEGACY_VERSION
 const BTN = 44
 const TAP_SLOP = 5
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
@@ -112,9 +114,35 @@ function Comments({ onHide }: { onHide: () => void }) {
     return () => { window.removeEventListener('resize', onResize); window.removeEventListener('scroll', onScroll); window.clearInterval(t) }
   }, [clamp])
 
-  const ordered = useMemo(() => [...notes].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [notes])
-  const number = useMemo(() => new Map(ordered.map((n, i) => [n.id, i + 1])), [ordered])
+  // Comments belong to the shop version they were made on: pins, numbers and the list show the current one.
+  const version = useVersion()
+  const all = useMemo(() => [...notes].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [notes])
+  const ordered = useMemo(() => all.filter((n) => verOf(n) === version), [all, version])
+  const [allVersions, setAllVersions] = useState(false)
+  const number = useMemo(() => {
+    const m = new Map<string, number>()
+    const per = new Map<string, number>()
+    for (const n of all) { const v = verOf(n); const k = (per.get(v) ?? 0) + 1; per.set(v, k); m.set(n.id, k) }
+    return m
+  }, [all])
   const here = ordered.filter((n) => n.page === pathname)
+  // Switching version: a comment being written or read belonged to the version before.
+  const firstVersion = useRef(true)
+  useEffect(() => {
+    if (firstVersion.current) { firstVersion.current = false; return }
+    setOpenId(null); setEditing(null)
+    setDraft((d) => {
+      if (d && (d.text.trim() || d.voice)) say('Your unposted comment was discarded because the version changed')
+      if (d?.voice) void deleteClip(voiceId(d.id))
+      return null
+    })
+  }, [version]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The dock shows how many comments each version has.
+  useEffect(() => {
+    const c: CommentCounts = {}
+    for (const n of notes) { const v = verOf(n); const x = (c[v] ??= { total: 0, unresolved: 0 }); x.total++; if (!n.resolved) x.unresolved++ }
+    publishCommentCounts(c)
+  }, [notes])
   const open = notes.find((n) => n.id === openId)
 
   const say = (t: string) => { setToast(t); window.setTimeout(() => setToast((x) => (x === t ? null : x)), 2600) }
@@ -158,7 +186,7 @@ function Comments({ onHide }: { onHide: () => void }) {
         id: uid(), page: pathname,
         x: Math.round((e.clientX / window.innerWidth) * 1000) / 10, y: Math.round((e.clientY / window.innerHeight) * 1000) / 10,
         vw: window.innerWidth, vh: window.innerHeight, scrollY: Math.round(window.scrollY),
-        text: '', createdAt: now, updatedAt: now, author: name.trim() || me.name,
+        text: '', createdAt: now, updatedAt: now, author: name.trim() || me.name, version: getVersion(),
       }
       setDraft(n)
       setPlacing(false)
@@ -236,6 +264,8 @@ function Comments({ onHide }: { onHide: () => void }) {
   const goTo = (n: PinNote) => {
     setList(null)
     setMenu(false)
+    // A comment from another version is shown on that version.
+    if (verOf(n) !== version) setVersion(verOf(n))
     if (n.page !== pathname) nav(n.page)
     setPending(n.id)
   }
@@ -282,8 +312,9 @@ function Comments({ onHide }: { onHide: () => void }) {
     if (n.voice) void deleteClip(voiceId(n.id))
     n.replies?.forEach((r) => { if (r.voice) void deleteClip(replyVoiceId(r.id)) })
   }
-  const counts = { all: notes.length, open: 0, ongoing: 0, done: 0 } as Record<CommentStatus | 'all', number>
-  notes.forEach((n) => counts[statusOf(n)]++)
+  const listed = allVersions ? all : ordered
+  const counts = { all: listed.length, open: 0, ongoing: 0, done: 0 } as Record<CommentStatus | 'all', number>
+  listed.forEach((n) => counts[statusOf(n)]++)
 
   return createPortal(
     <div className="rp-root" data-review-pins>
@@ -412,7 +443,7 @@ function Comments({ onHide }: { onHide: () => void }) {
         <div className="rp-sheet" role="dialog" aria-label="All comments">
           <div className="rp-sheet-head">
             <b>Comments</b>
-            <span className="muted">{notes.length}</span>
+            <span className="muted">{allVersions ? `all versions · ${all.length}` : `v${version} · ${ordered.length}`}</span>
             <button className="btn ghost sm icon" style={{ marginLeft: 'auto' }} onClick={() => setList(null)} aria-label="Close list"><X size={15} /></button>
           </div>
           <div className="rp-filters" role="group" aria-label="Show comments">
@@ -420,16 +451,17 @@ function Comments({ onHide }: { onHide: () => void }) {
               <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f === 'all' ? 'All' : STATUS_LABEL[f]} <span>{counts[f]}</span></button>
             ))}
           </div>
+          <label className="rp-allver"><input type="checkbox" checked={allVersions} onChange={(e) => setAllVersions(e.target.checked)} /> Show every version</label>
           <label className="rp-name">Commenting as <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} aria-label="Your name for comments" /></label>
-          {notes.length === 0 && <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>No comments yet. Press Comment (or C) and click anywhere on a screen.</p>}
-          {notes.length > 0 && filter !== 'all' && counts[filter] === 0 && <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>No {STATUS_LABEL[filter].toLowerCase()} comments.</p>}
+          {listed.length === 0 && <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>{allVersions ? 'No comments yet.' : `No comments on v${version} yet.`} Press Comment (or C) and click anywhere on a screen.</p>}
+          {listed.length > 0 && filter !== 'all' && counts[filter] === 0 && <p className="muted" style={{ padding: '18px 16px', fontSize: 13 }}>No {STATUS_LABEL[filter].toLowerCase()} comments.</p>}
           <ol>
-            {[...ordered].reverse().filter((n) => filter === 'all' || statusOf(n) === filter).map((n) => (
+            {[...listed].reverse().filter((n) => filter === 'all' || statusOf(n) === filter).map((n) => (
               <li key={n.id} className={`st-${statusOf(n)}`}>
                 <button onClick={() => goTo(n)}>
                   <span className="rp-num">{number.get(n.id)}</span>
                   <span style={{ minWidth: 0 }}>
-                    <span className="rp-where mono">{n.page}</span>
+                    <span className="rp-where mono">{allVersions && <span className="rp-ver">v{verOf(n)}</span>}{n.page}</span>
                     <span className="rp-text">{n.voice && <span className="rp-voice">🎙 {clock(n.voice.ms)}</span>}{n.text || (n.voice ? 'Voice note' : 'Empty comment')}</span>
                     <span className="rp-meta"><span className={`rp-status-tag ${statusOf(n)}`}>{STATUS_LABEL[statusOf(n)]}</span> {n.author ?? 'Someone'} · {ago(n.createdAt)}{n.replies?.length ? ` · ${n.replies.length} repl${n.replies.length === 1 ? 'y' : 'ies'}` : ''}</span>
                   </span>
