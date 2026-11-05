@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles, Columns2 } from 'lucide-react'
+import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles, Columns2, Plug } from 'lucide-react'
 import { Toasts } from './ui'
 
 /**
@@ -36,6 +36,7 @@ export function ResearchLayout() {
           <NavLink to="/console/compare" className={({ isActive }) => (isActive ? 'on' : '')}><Columns2 size={13} /> Compare</NavLink>
           <NavLink to="/console/narration" className={({ isActive }) => (isActive ? 'on' : '')}><Mic size={13} /> Narration</NavLink>
           <NavLink to="/console/prompts" className={({ isActive }) => (isActive ? 'on' : '')}><Sparkles size={13} /> Prompts</NavLink>
+          <NavLink to="/console/install" className={({ isActive }) => (isActive ? 'on' : '')}><Plug size={13} /> Install</NavLink>
         </nav>
         <div className="spacer" />
         <Link to="/" className="btn sm"><ArrowLeft size={14} /> Back to the shop</Link>

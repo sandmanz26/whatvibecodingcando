@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demo site · collaboration script</title>
+  <style>
+    /* A plain website with its own, deliberately aggressive CSS: the widget must not be affected by it. */
+    * { box-sizing: border-box; }
+    button { all: unset; background: #111; color: #fff; padding: 10px 18px; border-radius: 4px; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+    body { margin: 0; font: 17px/1.6 Georgia, serif; color: #222; background: #fbfaf7; }
+    header { display: flex; gap: 24px; align-items: center; padding: 18px 32px; border-bottom: 1px solid #e5e2da; }
+    header nav a { color: #222; margin-right: 16px; }
+    main { max-width: 960px; margin: 0 auto; padding: 48px 32px 160px; }
+    .hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; align-items: center; }
+    .art { aspect-ratio: 4 / 3; background: repeating-linear-gradient(45deg, #ece8de, #ece8de 10px, #f4f1ea 10px, #f4f1ea 20px); border-radius: 12px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 48px; }
+    .card { background: #fff; border: 1px solid #e5e2da; border-radius: 10px; padding: 18px; }
+    form { margin-top: 48px; display: flex; flex-wrap: wrap; gap: 8px; }
+    input { flex: 1 1 200px; min-width: 0; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
+    .note { margin-top: 40px; padding: 14px 16px; background: #fff7e6; border: 1px solid #f3d9a4; border-radius: 8px; font: 14px/1.5 system-ui, sans-serif; }
+    @media (max-width: 720px) { .hero, .cards { grid-template-columns: 1fr; } header { flex-wrap: wrap; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Demo Site</strong>
+    <nav><a href="#/">Home</a><a href="#/pricing">Pricing</a></nav>
+  </header>
+  <main id="app"></main>
+
+  <script>
+    // A tiny hash router, so the demo also has "pages" without reloading.
+    const pages = {
+      '/': `
+        <section class="hero">
+          <div>
+            <h1 id="headline">A plain website, not built with this app</h1>
+            <p>This page has its own HTML, CSS and JavaScript. One script tag at the bottom adds comments, replies and completion to it. Press <b>Comment</b> (or C) and click anything.</p>
+            <button id="cta">Start free trial</button>
+          </div>
+          <div class="art" role="img" aria-label="Illustration"></div>
+        </section>
+        <section class="cards">
+          <div class="card" id="card-fast"><h3>Fast</h3><p>Pins stick to the element they were dropped on, even when the layout changes.</p></div>
+          <div class="card" id="card-shared"><h3>Shared</h3><p>Replies and a completed state keep feedback moving.</p></div>
+          <div class="card" id="card-safe"><h3>Isolated</h3><p>The widget lives in a shadow root, so this page’s CSS can’t break it.</p></div>
+        </section>
+        <form onsubmit="event.preventDefault()">
+          <input placeholder="Type here: the C key doesn't start a comment while you type" aria-label="Email" />
+          <button type="submit">Subscribe</button>
+        </form>
+        <p class="note">Comments on this demo are saved in your browser only (no backend yet).</p>`,
+      '/pricing': `
+        <h1>Pricing</h1>
+        <section class="cards">
+          <div class="card" id="plan-free"><h3>Free</h3><p>For trying it out.</p></div>
+          <div class="card" id="plan-team"><h3>Team</h3><p>For a product team.</p></div>
+          <div class="card" id="plan-org"><h3>Organisation</h3><p>For many teams.</p></div>
+        </section>`,
+    }
+    const render = () => { const r = location.hash.slice(1) || '/'; document.getElementById('app').innerHTML = pages[r] || pages['/'] }
+    addEventListener('hashchange', render)
+    render()
+  </script>
+
+  <!-- The whole installation: -->
+  <script src="./embed/vibe.js" data-project="embed-demo" defer></script>
+</body>
+</html>

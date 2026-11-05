@@ -201,6 +201,27 @@ Rules for those endpoints:
 - Each card has **Copy prompt**, **Show prompt**, and **Try it here** (opens the tool in this demo). **Download all (.md)** saves every prompt in one file.
 - The prompts live in `src/tools/prompts/catalog.ts`. When a tool's behaviour changes, update its prompt too.
 
+## Installable script: collaboration on any website (SaaS, version 0.1)
+
+The first step towards a hosted product: one script tag adds comments to any site, whatever it is built with.
+
+```html
+<script src="https://YOUR-HOST/embed/vibe.js" data-project="my-app" defer></script>
+```
+
+- **Install page.** `#/console/install` builds the snippet: project, button position, the C shortcut and the accent colour.
+- **Demo.** `embed-demo.html` is a plain HTML site (its own CSS and a tiny hash router) with the script installed.
+- **Behaviour.** It is the same flow as the comments in this app:
+  - Comment (or C, ignored while typing) and click. A placing click never reaches the site.
+  - A draft is not saved until Post, and a draft with text must be posted or cancelled before anything else. Changing page discards it and says so.
+  - Replies make a comment Ongoing; Set as completed locks it until Reopen. Authors edit and delete their own.
+  - A list shows this page or all pages, filtered by Open, Ongoing and Completed. A comment on another page opens there.
+- **Pins stick to elements.** A pin is anchored to its element by a selector and its position on it, so it follows layout changes and scrolling. If the element is gone, the pin shows where it was, dashed, and says so.
+- **Pages.** A page is the path plus a hash route (`#/pricing`). Queries are left out.
+- **Isolation.** The UI lives in a shadow root, so the site's CSS can't reach it. Installing twice keeps the first, and the script never reads the site's field values.
+- **Build.** `npm run build` also builds `dist/embed/vibe.js` (`vite.embed.config.ts`, one IIFE file with React inside, about 77 kB gzipped).
+- **Storage.** Code is in `src/embed/`. For now there is `LocalBackend` (localStorage per project), so teammates don't see each other's comments yet. The widget only talks to a `Backend` interface (`list`, `upsert` one thread, `remove` one, `subscribe` to changes elsewhere). A shared database needs only a new implementation of that interface, plus decisions on accounts, project keys and allowed domains.
+
 ## Installable skill: ux-research-kit
 
 The research tools are also packaged as a Claude Code skill for other projects, in `plugins/ux-research-kit/`: framework-agnostic TypeScript modules (tracking and sessions, heatmaps and replay, 5-second tests, fake doors, eye tracking, design tokens and UI-library palettes), specs per module, the privacy rules, and a verification checklist. Claude copies what a project needs, wires it to its router, and builds the console screens in that project's own components.

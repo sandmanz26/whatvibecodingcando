@@ -23,6 +23,7 @@ import Narration from './pages/Narration'
 import Prompts from './pages/Prompts'
 import Compare from './pages/Compare'
 import TokenCompare from './pages/TokenCompare'
+import Install from './pages/Install'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="narration" element={<Narration />} />
             <Route path="compare" element={<Compare />} />
             <Route path="prompts" element={<Prompts />} />
+            <Route path="install" element={<Install />} />
           </Route>
         </Routes>
         {/* Research tools sit around both versions of the app. */}
