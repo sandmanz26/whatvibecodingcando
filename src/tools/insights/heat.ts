@@ -83,13 +83,14 @@ function rng(seed: string) {
 const gauss = (rand: () => number) => { let u = 0, v = 0; while (!u) u = rand(); while (!v) v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) }
 
 export interface SampleTap extends HeatPoint { sel: Element; dead: boolean }
+export { rng }
 
 /**
  * Made-up taps for showing how the heatmap reads, built from the real screen: people tap
  * controls far more than anything else, the search and main buttons most, and less the
  * further down the page something is. A few taps land on things that aren't controls (images).
  */
-export function sampleTaps(doc: Document, seed: string, foldH: number, count = 420): SampleTap[] {
+export function sampleTaps(doc: Document, seed: string, foldH: number, count = 420, boost?: (el: Element) => number): SampleTap[] {
   const rand = rng(seed)
   const cands: { el: Element; r: DOMRect; w: number; dead: boolean }[] = []
   const seen = new Set<Element>()
@@ -98,7 +99,7 @@ export function sampleTaps(doc: Document, seed: string, foldH: number, count = 4
     const r = el.getBoundingClientRect()
     if (r.width < 4 || r.height < 4) return
     seen.add(el)
-    cands.push({ el, r, w: weight * Math.exp(-r.top / (foldH * 1.8)), dead })
+    cands.push({ el, r, w: weight * Math.exp(-r.top / (foldH * 1.8)) * (boost?.(el) ?? 1), dead })
   }
   doc.querySelectorAll('input[type=search], input:not([type]), input[type=text]').forEach((e) => add(e, 7))
   doc.querySelectorAll('.btn.primary').forEach((e) => add(e, 5))

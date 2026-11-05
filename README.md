@@ -72,11 +72,14 @@ The dock is the set of tools shown to visitors. From left to right:
   - Click pins an element; the click never reaches the app. Esc unpins, Esc again stops.
   - It reads computed styles only, never field values.
 - **Sessions**: one person's path, step by step (`#/console/sessions`; `#/console/insights` redirects there).
-- **Heatmap** (`#/console/heatmap`): a real density heatmap, not dots.
-  - **Drawing.** Every tap is a soft blob; blobs add up and are coloured blue → green → yellow → red, and the densest spot always reaches red.
-  - **Placement.** Each tap is placed on the element it hit, on the whole page at one device width, with the fold marked.
-  - **Controls.** Filter for rage taps or taps that did nothing, change spread and opacity, and see a "Most tapped" ranking whose rows highlight their element.
-  - **Data.** With no recorded taps for a screen and width it shows **sample data**: made-up taps built from that screen's real controls, clearly labelled as not real visitors. Recorded taps are used as soon as there are any.
+- **Heatmap** (`#/console/heatmap`): a density heatmap for **usability testing**.
+  - **What it shows.** Pick a test and a task to see where participants clicked while doing it, added up over the screen.
+  - **Views.** **First clicks** is the main view, because a first click on the right path predicts success; **All clicks** is the other. You can also show only the participants who succeeded, or only those who didn't.
+  - **Target.** The task's target is outlined. The ranking marks each element ✓ or ✗ against the target, and the header gives the share of clicks on it, next to the task's participants, success rate, median time and first-click accuracy.
+  - **From test results.** Each task in Usability tests has **Open heatmap**. The heatmap's URL uses `ut`/`utask`, because `?test=` starts a participant's run.
+  - **Everyday browsing** is a second source: recorded visits, with rage and dead taps.
+  - **How it is drawn.** Every click is a soft blob. Blobs add up and are coloured blue → red, and the densest spot reaches red. Each click is placed on the element it hit, on the whole page at one device width, with the fold marked.
+  - **Sample data.** With nothing recorded for that task, screen and width, it shows clearly labelled sample data: 12 made-up participants clicking the screen's real controls, more often toward the goal. No statistics are invented for it.
 
 The research console's tools are in a grouped sidebar (Behaviour, Tests, Design, Findings, Use it yourself); on a phone it opens from the top bar.
 
