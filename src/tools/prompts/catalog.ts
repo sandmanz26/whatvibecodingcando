@@ -125,17 +125,23 @@ Research console screen "Sessions":
   },
   {
     id: 'gaze', title: 'Eye tracking (webcam)', group: 'Research',
-    summary: 'Estimates where people look with the webcam, after a short calibration.',
+    summary: 'Webcam eye tracking per usability task: fixations, scanpaths and areas of interest.',
     needs: ['Camera', '@mediapipe/tasks-vision (Apache-2.0)'],
     skill: 'Add webcam eye tracking with calibration, an accuracy check and a gaze heatmap.',
     spec: `Build webcam eye tracking with MediaPipe Face Landmarker (@mediapipe/tasks-vision, Apache-2.0, runs in the browser). Don't use WebGazer (GPL-3.0).
 
 - Consent first, in plain language: video stays in the browser and is never saved or sent; only the estimated point on the page is kept; stop any time. The camera starts only after "Turn on the camera".
 - Features per frame: where each iris sits between the eye corners and lids (divided by eye width), eye openness, and the head's direction from the facial transformation matrix.
-- Calibration: 9 dots (3×3 at 10/50/90%). Look at a dot and click it, then collect about 900 ms of frames (skip the first 150 ms); if fewer than 6 frames had a face, ask again. Fit a ridge regression (standardised features) for x and y.
-- Accuracy check: 4 more dots; report the mean error in px. Refuse recording if it's too far off (over ~220 px) and offer to recalibrate.
-- Recording: smoothed, about 15 points/s as {page, x %, y page px, window size}, only while the tab is visible, with a small pill showing "±N px" and a Stop button.
-- Heatmap: soft areas (webcam tracking is only good to ~100–200 px; say so), at the same page and layout bucket.
+- Calibration: 13 dots (3×3 plus 4 between), visited in a spread-out order. Look at a dot and click it, then collect about 900 ms of frames (skip the first 150 ms); if fewer than 6 frames had a face, ask again. Fit a ridge regression (standardised features) for x and y.
+- Accuracy check: 5 more dots; report the mean error in px. Refuse recording if it's too far off (over ~220 px) and offer to recalibrate.
+- Recording: about 30 samples/s as {page, x %, y page px, window size, epoch ms}, only while the tab is visible. Drop blinks (eye openness well below the calibration average). Smooth with a One-Euro filter, not a moving average, so saccades aren't smeared. Refit the model with every click (the click point is where they looked), keeping the latest 30, so it follows head movement. Show a small pill with "±N px" and a Stop button.
+- Eye movement, not just points:
+  - fixations with I-DT (dispersion threshold scaled to the measured accuracy, about 0.9 × accuracy, at least 100 ms, a gap over 150 ms ends one); merge adjacent fixations (gap ≤ 75 ms, ≤ half the dispersion apart); extend a fixation back over samples skipped while it settled;
+  - saccades between fixations; the scanpath per person (numbered circles sized by duration, joined in order, with playback);
+  - areas of interest with % of people who looked, time to first fixation and dwell;
+  - a heatmap weighted by fixation duration.
+- In usability tests: an option per test asks participants before the first task (they may decline and still do the test), and every sample carries the run and task, so all of the above can be read per task, next to where they clicked.
+- Unit-test the fixation code on synthetic gaze with known fixations, blinks and sweeps before trusting it.
 - Test without a face using Chromium's fake camera flags; check the consent, "looking for your face", retry and Cancel paths.`,
   },
   {
