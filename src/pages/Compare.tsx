@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Pencil, Trash2, Crosshair, Minimize2, Maximize2, ExternalLink, TriangleAlert } from 'lucide-react'
 import { useStore } from '../store/store'
 import { Empty, Modal } from '../components/ui'
 import { ScreenViewer, DEVICES, type Device, type Picked } from '../tools/insights/ScreenViewer'
 import { Crop } from '../tools/compare/Crop'
+import { buildSamples, markSeeded, wasSeeded } from '../tools/compare/samples'
 import { APP, readJSON, writeJSON } from '../tools/shared'
 import { MAX_NOTE, SCREENS, loadReviews, nameOf, rid, same, sameSpot, saveReviews, screenOf, snapshot, stale, type About, type CNote, type Review, type Side, type Slot } from '../tools/compare/store'
 
@@ -275,6 +276,23 @@ export default function Compare() {
   const r = list.find((x) => x.id === sel) ?? sorted[0]
   useEffect(() => { window.scrollTo(0, 0) }, [editing])
 
+  // Example reviews the first time the page opens empty, so it shows what it does. Deleting them is
+  // respected: they come back only from the button.
+  const [seeding, setSeeding] = useState(false)
+  const started = useRef(false)
+  const addSamples = async () => {
+    if (started.current) return
+    started.current = true
+    setSeeding(true)
+    const samples = await buildSamples('Sample')
+    markSeeded()
+    if (samples.length) { const next = [...loadReviews(), ...samples]; setList(next); saveReviews(next); setSel(samples[0].id) }
+    else toast('The sample components couldn’t be found on the screens.', 'error')
+    setSeeding(false)
+    started.current = false
+  }
+  useEffect(() => { if (!loadReviews().length && !wasSeeded()) void addSamples() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (editing) {
     const initial = editing === 'new' ? undefined : list.find((x) => x.id === editing)
     return (
@@ -306,14 +324,17 @@ export default function Compare() {
       </div>
 
       {!r ? (
-        <div className="card"><Empty title="No reviews yet"><span>Start a review: pick component A and component B from any screen, save, then write your notes.</span></Empty></div>
+        <div className="card"><Empty title={seeding ? 'Preparing sample reviews…' : 'No reviews yet'}>
+          <span>{seeding ? 'Capturing components from the real screens.' : 'Start a review: pick component A and component B from any screen, save, then write your notes.'}</span>
+          {!seeding && <button className="btn sm" onClick={() => void addSamples()}>Add sample reviews</button>}
+        </Empty></div>
       ) : (
         <div className="ses">
           <nav className="ses-list" aria-label="Reviews">
             {sorted.map((x) => (
               <button key={x.id} className={`ses-row ${x.id === r.id ? 'on' : ''}`} onClick={() => setSel(x.id)}>
                 <b>{x.title}</b>
-                <span className="muted">{x.notes.length} note{x.notes.length === 1 ? '' : 's'} · {when(x.updatedAt)}</span>
+                <span className="muted">{x.sample && <span className="badge outline" style={{ height: 18, marginRight: 6 }}>Sample</span>}{x.notes.length} note{x.notes.length === 1 ? '' : 's'} · {when(x.updatedAt)}</span>
               </button>
             ))}
           </nav>

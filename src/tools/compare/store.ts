@@ -25,7 +25,7 @@ export interface Slot {
   pickedAt: string
 }
 export interface CNote { id: string; author: string; text: string; about: About; at: string }
-export interface Review { id: string; title: string; a: Slot; b: Slot; notes: CNote[]; createdAt: string; updatedAt: string }
+export interface Review { id: string; title: string; a: Slot; b: Slot; notes: CNote[]; createdAt: string; updatedAt: string; /** made by the app as an example */ sample?: boolean }
 
 const KEY = `${APP}.compare`
 export const MAX_NOTE = 2000

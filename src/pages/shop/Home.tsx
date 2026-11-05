@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Sparkles, ArrowRight } from 'lucide-react'
-import { CATEGORIES, PRODUCTS } from '../../data/shop'
+import { CATEGORIES, PRODUCTS, product } from '../../data/shop'
+import { recentlyViewed, useFeature } from '../../lib/version'
 import { useStore } from '../../store/store'
 import { Placeholder, ProductCard } from '../../components/ui'
 
@@ -13,6 +14,8 @@ export default function Home() {
   const [text, setText] = useState('')
   const deals = PRODUCTS.filter((p) => p.oldPrice).slice(0, 6)
   const forYou = [...PRODUCTS].sort((a, b) => b.sold - a.sold).slice(0, 10)
+  const showRecent = useFeature('recentlyViewed')
+  const recent = showRecent ? recentlyViewed().map(product).filter((x): x is NonNullable<typeof x> => !!x).slice(0, 5) : []
 
   return (
     <>
@@ -32,6 +35,13 @@ export default function Home() {
         </div>
         <Placeholder label="Hero banner" ratio="4 / 3" className="hero-img" />
       </section>
+
+      {recent.length > 0 && (
+        <section className="block">
+          <div className="block-head"><h2>Pick up where you left off</h2></div>
+          <div className="p-grid five">{recent.map((p) => <ProductCard key={p.id} p={p} />)}</div>
+        </section>
+      )}
 
       <section className="block">
         <div className="block-head"><h2>Shop by category</h2></div>

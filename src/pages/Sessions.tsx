@@ -125,10 +125,11 @@ function Notes({ sid }: { sid: string }) {
   )
 }
 
-export default function Sessions() {
+/** Sessions and the heatmap are two pages over the same recorded clicks. */
+export default function Sessions({ view = 'sessions' }: { view?: 'sessions' | 'heatmap' }) {
   const recording = useFlag('insights')
   const [data, setData] = useState<Loaded | null>(null)
-  const [tab, setTab] = useState<'sessions' | 'heatmap'>('sessions')
+  const tab = view
   const [sid, setSid] = useState<string | null>(null)
   const [step, setStep] = useState<number | null>(null)
   const [confirm, setConfirm] = useState(false)
@@ -167,8 +168,13 @@ export default function Sessions() {
       
       <div className="page-head">
         <div>
-          <h1>Sessions</h1>
-          <p>What each person tapped, in order, and which screens they went through. A session starts counting when the main page opens, and ends when the tab closes, the participant presses End session, it sits idle for 30 minutes, or recording stops. Recording carries on into the next session until you stop it. Nothing anyone types is recorded.</p>
+          {tab === 'sessions' ? <>
+            <h1>Sessions</h1>
+            <p>What each person tapped, in order, and which screens they went through. A session starts counting when the main page opens, and ends when the tab closes, the participant presses End session, it sits idle for 30 minutes, or recording stops. Recording carries on into the next session until you stop it. Nothing anyone types is recorded.</p>
+          </> : <>
+            <h1>Heatmap</h1>
+            <p>Where people tap on each screen, from every recorded session, drawn on the real screen at one width. Switch to Elements to count taps per button or link. Nothing anyone types is recorded.</p>
+          </>}
         </div>
         <div className="actions">
           <label className="row" style={{ gap: 8, fontSize: 13 }}><Switch checked={recording} onChange={() => { if (recording) endSession('stopped'); setFlag('insights', !recording) }} label="Record sessions" /> Recording {recording ? 'on' : 'off'}</label>
@@ -177,13 +183,8 @@ export default function Sessions() {
         </div>
       </div>
 
-      <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'sessions'} onClick={() => setTab('sessions')}>Sessions<span className="count">{sessions.length}</span></button>
-        <button role="tab" aria-selected={tab === 'heatmap'} onClick={() => setTab('heatmap')}>Heatmap</button>
-      </div>
-
       {data && sessions.length === 0 ? (
-        <div className="card"><Empty title="No sessions yet">
+        <div className="card"><Empty title={tab === 'sessions' ? 'No sessions yet' : 'No taps recorded yet'}>
           <span style={{ maxWidth: 460 }}>{recording ? 'Use the app in another tab — open a few screens and tap around — then press Refresh.' : 'Recording is off. Switch it on above, use the app, then come back.'}</span>
         </Empty></div>
       ) : tab === 'sessions' ? (

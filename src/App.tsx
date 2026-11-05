@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { HeatmapOverlay, InsightsTracker } from './tools/insights/InsightsTools'
 import { ReviewPins } from './tools/pins/ReviewPins'
 import { UsabilityRunner } from './tools/tests/Runner'
@@ -28,6 +28,7 @@ import Landing from './pages/saas/Landing'
 import Signup from './pages/saas/Signup'
 import { PanelLayout, Overview, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
+import { Inspector } from './tools/inspect/Inspector'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
 import { FakeDoors } from './tools/doors/FakeDoors'
@@ -64,7 +65,9 @@ export default function App() {
           </Route>
           {/* Research tools: kept apart from the product they study. */}
           <Route path="console" element={<ResearchLayout />}>
-            <Route path="insights" element={<Sessions />} />
+            <Route path="insights" element={<Navigate to="/console/sessions" replace />} />
+            <Route path="sessions" element={<Sessions view="sessions" />} />
+            <Route path="heatmap" element={<Sessions key="heatmap" view="heatmap" />} />
             <Route path="tests" element={<UsabilityTests />} />
             <Route path="tests/:id" element={<UsabilityTests />} />
             <Route path="tests/:id/edit" element={<TestEditor />} />
@@ -104,6 +107,7 @@ function ResearchTools() {
       <FakeDoors />
       <GazeRunner />
       <NarrationRecorder />
+      <Inspector />
       <VersionSwitch />
     </>
   )

@@ -1,9 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { CircleAlert, Star, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { CircleAlert, Plus, Star, X } from 'lucide-react'
 import { useStore } from '../store/store'
 import { rp } from '../lib/ai'
 import type { Product } from '../data/shop'
+import { useFeature } from '../lib/version'
 
 /** Wireframe image: a grey box with a cross, labelled with what goes there. */
 export function Placeholder({ label = 'Image', ratio = '1 / 1', className = '' }: { label?: string; ratio?: string; className?: string }) {
@@ -30,7 +31,8 @@ export function Price({ p, size }: { p: Pick<Product, 'price' | 'oldPrice'>; siz
 const soldLabel = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k sold` : `${n} sold`)
 
 export function ProductCard({ p, why }: { p: Product; why?: string }) {
-  return (
+  const quick = useFeature('quickAdd')
+  const card = (
     <Link to={`/product/${p.id}`} className="pcard">
       <Placeholder label="Product photo" />
       <div className="pcard-body">
@@ -41,6 +43,19 @@ export function ProductCard({ p, why }: { p: Product; why?: string }) {
       </div>
     </Link>
   )
+  if (!quick) return card
+  // A button can't sit inside the card's link, so it sits beside it, over the photo.
+  return <div className="pcard-wrap">{card}<QuickAdd p={p} /></div>
+}
+
+/** v1.1: add straight from the card. A product with sizes or colours opens its page instead, to choose. */
+function QuickAdd({ p }: { p: Product }) {
+  const { add, toast } = useStore()
+  const nav = useNavigate()
+  const needs = Object.keys(p.options ?? {})
+  if (p.stock <= 0) return <span className="pcard-quick off">Sold out</span>
+  if (needs.length) return <button className="pcard-quick" onClick={() => { toast(`Choose a ${needs[0].toLowerCase()} first`); nav(`/product/${p.id}`) }} aria-label={`Choose options for ${p.title}`}><Plus size={13} /> Choose</button>
+  return <button className="pcard-quick" onClick={() => { add(p.id, 1, {}); toast(`Added: ${p.title}`) }} aria-label={`Add ${p.title} to cart`}><Plus size={13} /> Add</button>
 }
 
 export function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {

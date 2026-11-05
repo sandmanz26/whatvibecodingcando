@@ -46,7 +46,24 @@ src/
 
 ## Research tools (kept apart from the product)
 
-Research tools are not part of the marketplace: click tracking and sessions, heatmaps, usability tests, 5-second tests, fake doors, eye tracking, comments, design tokens and the dark/light theme. (The v1/v2 version switch is off while there is one version.) They live in the floating **research dock** and in the **Research console** (`#/console/*`, its own layout with "Back to the shop"); the product's navigation never links to them.
+Research tools are not part of the marketplace: click tracking and sessions, heatmaps, usability tests, 5-second tests, fake doors, eye tracking, comments, design tokens and more. They live in the floating **research dock** and in the **Research console** (`#/console/*`, its own layout with "Back to the shop"); the product's navigation never links to them.
+
+### The dock
+The dock is the set of tools shown to visitors. From left to right:
+- **Comment** and **All comments**. The round floating comment button is hidden because it did the same thing.
+- **Version** (`v2.0`): switches the shop between its releases. Each version turns product features on, and the menu says what each one added. The point it makes: with vibe coding, shipping or rolling back a feature is a small change. Versions are in `src/lib/version.ts`; the product reads features, never version numbers.
+  - **v1.0:** launch.
+  - **v1.1:** an Add button on product cards. A product with sizes or colours opens its page instead.
+  - **v1.2:** a sticky buy bar on product pages. It shows once the page's own buttons scroll away, and asks for a missing size before adding.
+  - **v2.0:** "Pick up where you left off" on Home.
+- **Compare components**, **Design tokens**: open those pages.
+- **Inspect** (or **I**): hover anything to see its font, size, weight, text and background colour (the background a person actually sees, even when it comes from a parent), border, radius and padding.
+  - Each value is marked as a design token or "not a token" with the nearest one, to check what a vibe-coded screen really uses.
+  - Click pins an element; the click never reaches the app. Esc unpins, Esc again stops.
+  - It reads computed styles only, never field values.
+- **Sessions**, **Heatmap**: two separate pages now (`#/console/sessions`, `#/console/heatmap`). `#/console/insights` redirects to Sessions.
+
+Hidden for now: narration (the microphone and ▶ Explain), the theme switch, and the Prompts and console buttons. Those pages are reached by URL (`#/console/narration`, `#/console/prompts`, `#/console/…`).
 
 Two of them sit *around* the product (not features of it). Each has its own flag and neither changes how the app behaves. Click recording pauses on the research console (`/console/*`); comments work on every screen. Each marks its own DOM (`data-insights-ignore`, `data-review-pins`) so neither records nor reacts to the other.
 
@@ -127,7 +144,7 @@ The report is made by fixed rules, not an AI model. The same data always gives t
 Inherited properties are judged only where they're set. Each off-token value comes with how often it's used, on which screens, the closest token, an example, "Show on screen" and "Keep in repository". The results also give a consistency score overall and per screen. If a design variant is applied in this browser, that variant is what gets checked.
 
 ### Narration (voice walkthroughs)
-`#/console/narration`, and the microphone button in the dock. Press it and explain the screens out loud while you go through the app.
+`#/console/narration` (the dock's microphone is hidden for now; recording starts from this page). Press it and explain the screens out loud while you go through the app.
 - **While recording:** a bar at the top shows the time, a level meter, the current screen and **Stop**. Leaving the page asks first.
 - **Chapters:** each screen you visit becomes a chapter. Screens passed through in under 1.2 s are folded into the next one.
 - **Playing back:**
@@ -137,7 +154,7 @@ Inherited properties are judged only where they're set. Each off-token value com
 - **Managing recordings:** download the audio, rename, delete.
 
 ### Comments
-- **Write:** press **Comment** in the dock (or **C**, or the round comment button), then click **anywhere** on any screen, the research pages included.
+- **Write:** press **Comment** in the dock (or **C**), then click **anywhere** on any screen, the research pages included.
   - **Draft first:** a *New comment* card opens with just the comment box, an optional **voice note**, **Cancel** and **Post**. A draft isn't saved, numbered or given a status, and it has no replies.
   - **Cancel or Esc:** throws the draft away, voice note included.
   - **A draft with content:** must be posted or cancelled before starting another comment or opening another. Leaving the page discards it and says so.
@@ -192,7 +209,7 @@ Rules for those endpoints:
 
 ## Prompts for visitors
 
-`#/console/prompts` (dock: the sparkles button, or "Prompts" in the console bar) lists every research tool as a prompt a visitor can paste into their own Claude, ideally Claude Code in their project.
+`#/console/prompts` ("Prompts" in the console bar) lists every research tool as a prompt a visitor can paste into their own Claude, ideally Claude Code in their project.
 
 - **Personalised:** pick a framework (React, Next.js, Vue, Svelte, plain JS, not sure) and routing (hash, normal URLs, not sure). Every prompt updates. The choice is remembered in `market.prompts.ctx`.
 - **Two modes:**

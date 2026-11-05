@@ -11,6 +11,8 @@ import { clock, deleteClip } from '../voice/audio'
 import { STATUS_TEXT, usePinSync } from './useSync'
 
 const BUTTON_KEY = `${APP}.reviewPins.button`
+/** The floating comment button duplicated the dock; kept in code, off for now. */
+const SHOW_FAB = false
 const NAME_KEY = `${APP}.reviewPins.name`
 /** Fire with detail 'start' (comment mode) or 'list' (open the list) from anywhere in the app. */
 export const COMMENT_EVENT = 'market:comments'
@@ -305,6 +307,8 @@ function Comments({ onHide }: { onHide: () => void }) {
       )}
       {flashAt && <span className="rp-ping" style={{ left: flashAt.x, top: flashAt.y }} aria-hidden />}
 
+      {/* The floating button and its ⋯ menu are hidden: the dock's Comment and All comments do the same. */}
+      {SHOW_FAB && (<>
       <button
         className={`rp-fab ${placing ? 'placing' : ''}`}
         style={{ left: btn.x, top: btn.y }}
@@ -324,6 +328,8 @@ function Comments({ onHide }: { onHide: () => void }) {
         <button className="rp-more" style={{ left: Math.max(4, btn.x - 30), top: btn.y + BTN / 2 - 13 }} aria-label="More comment options" aria-expanded={menu}
           title="All comments, export, import" onClick={() => { if (draftBlocks()) return; setOpenId(null); setList(null); setMenu((m) => !m) }}>⋯</button>
       )}
+
+      </>)}
 
       {menu && (
         <div className="rp-menu" style={menuStyle} role="menu">

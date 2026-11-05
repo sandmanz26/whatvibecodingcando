@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles, Columns2, Plug } from 'lucide-react'
+import { FlaskConical, ArrowLeft, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Palette, FileText, Lightbulb, ScanSearch, Mic, Sparkles, Columns2, Plug, Flame } from 'lucide-react'
 import { Toasts } from './ui'
 
 /**
@@ -24,7 +24,8 @@ export function ResearchLayout() {
       <header className="topbar research-bar no-print">
         <span className="research-mark"><FlaskConical size={15} /> Research console</span>
         <nav className="seg" aria-label="Research tools">
-          <NavLink to="/console/insights" className={({ isActive }) => (isActive ? 'on' : '')}><MousePointerClick size={13} /> Sessions</NavLink>
+          <NavLink to="/console/sessions" className={({ isActive }) => (isActive ? 'on' : '')}><MousePointerClick size={13} /> Sessions</NavLink>
+          <NavLink to="/console/heatmap" className={({ isActive }) => (isActive ? 'on' : '')}><Flame size={13} /> Heatmap</NavLink>
           <NavLink to="/console/tests" className={({ isActive }) => (isActive ? 'on' : '')}><ListChecks size={13} /> Usability tests</NavLink>
           <NavLink to="/console/fivesec" className={({ isActive }) => (isActive ? 'on' : '')}><Timer size={13} /> 5-second tests</NavLink>
           <NavLink to="/console/doors" className={({ isActive }) => (isActive ? 'on' : '')}><DoorOpen size={13} /> Fake doors</NavLink>

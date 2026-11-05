@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Sparkles, Store, Truck, ShieldCheck, Minus, Plus, MessageCircle } from 'lucide-react'
 import { PRODUCTS, category, product, seller } from '../../data/shop'
 import { answer, score, suggestedQuestions, understand } from '../../lib/ai'
 import { useStore } from '../../store/store'
 import { Empty, Placeholder, Price, ProductCard, Stars } from '../../components/ui'
+import { rememberViewed, useFeature } from '../../lib/version'
 
 export default function Product() {
   const { id = '' } = useParams()
@@ -16,6 +17,18 @@ export default function Product() {
   const [shot, setShot] = useState(0)
   const [qa, setQa] = useState<{ q: string; a: string }[]>([])
   const [question, setQuestion] = useState('')
+  const sticky = useFeature('stickyBuy')
+  const buyRow = useRef<HTMLDivElement>(null)
+  const [pastBuy, setPastBuy] = useState(false)
+  useEffect(() => { if (p) rememberViewed(p.id) }, [p])
+  // v1.2: the buy bar shows once the page's own buttons have scrolled up out of view.
+  useEffect(() => {
+    const el = buyRow.current
+    if (!sticky || !el) { setPastBuy(false); return }
+    const io = new IntersectionObserver(([e]) => setPastBuy(!e.isIntersecting && e.boundingClientRect.top < 0))
+    io.observe(el)
+    return () => io.disconnect()
+  }, [sticky, p?.id])
 
   const similar = useMemo(() => {
     if (!p) return []
@@ -28,7 +41,11 @@ export default function Product() {
   const s = seller(p.sellerId)!
   const missing = Object.keys(p.options ?? {}).filter((k) => !opts[k])
   const doAdd = (buy: boolean) => {
-    if (missing.length) { toast(`Choose a ${missing[0].toLowerCase()} first`, 'error'); return }
+    if (missing.length) {
+      toast(`Choose a ${missing[0].toLowerCase()} first`, 'error')
+      document.querySelector(`[data-opt="${missing[0]}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
     add(p.id, qty, opts)
     if (buy) nav('/cart')
     else toast('Added to cart')
@@ -54,7 +71,7 @@ export default function Product() {
           <div className="row wrap" style={{ gap: 10 }}><Stars value={p.rating} count={p.reviewCount} /><span className="muted">· {p.sold.toLocaleString('en-US')} sold</span></div>
           <Price p={p} size="lg" />
           {Object.entries(p.options ?? {}).map(([name, values]) => (
-            <div key={name} className="opt">
+            <div key={name} className="opt" data-opt={name}>
               <b>{name}{opts[name] ? `: ${opts[name]}` : ''}</b>
               <div className="row wrap" style={{ gap: 6 }}>
                 {values.map((v) => <button key={v} className="chip" aria-pressed={opts[name] === v} onClick={() => setOpts((o) => ({ ...o, [name]: v }))}>{v}</button>)}
@@ -70,7 +87,7 @@ export default function Product() {
               <span className="muted" style={{ fontSize: 12.5 }}>{p.stock} in stock</span>
             </div>
           </div>
-          <div className="row" style={{ gap: 8 }}>
+          <div className="row" style={{ gap: 8 }} ref={buyRow}>
             <button className="btn primary lg" onClick={() => doAdd(true)}>Buy now</button>
             <button id="add-to-cart" className="btn lg" onClick={() => doAdd(false)}>Add to cart</button>
           </div>
@@ -145,6 +162,17 @@ export default function Product() {
         <div className="block-head"><h2>Similar products</h2></div>
         <div className="p-grid five">{similar.map((x) => <ProductCard key={x.id} p={x} />)}</div>
       </section>
+
+      {sticky && pastBuy && (
+        <div className="buybar" role="region" aria-label="Buy">
+          <div className="buybar-in container">
+            <div style={{ minWidth: 0 }}><b className="buybar-title">{p.title}</b><Price p={p} /></div>
+            <span className="muted buybar-opts">{Object.keys(p.options ?? {}).length ? (missing.length ? `Choose ${missing.join(' and ').toLowerCase()}` : Object.values(opts).join(' · ')) : `Qty ${qty}`}</span>
+            <button className="btn lg" onClick={() => doAdd(false)}>Add to cart</button>
+            <button className="btn primary lg" onClick={() => doAdd(true)}>Buy now</button>
+          </div>
+        </div>
+      )}
     </>
   )
 }
