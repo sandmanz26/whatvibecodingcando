@@ -2,10 +2,7 @@ import { useMemo, useState } from 'react'
 import { Copy, ExternalLink, Check } from 'lucide-react'
 import { useStore } from '../store/store'
 import { Switch } from '../components/ui'
-
-/** Where this deployment serves the script (next to the app). */
-const scriptUrl = () => new URL('embed/vibe.js', window.location.href.split('#')[0]).href
-const demoUrl = () => new URL('embed-demo.html', window.location.href.split('#')[0]).href
+import { copyText, demoUrl, snippet as buildSnippet, validProjectId } from '../saas/snippet'
 
 export default function Install() {
   const { toast } = useStore()
@@ -14,22 +11,10 @@ export default function Install() {
   const [shortcut, setShortcut] = useState(true)
   const [color, setColor] = useState('#e8590c')
   const [copied, setCopied] = useState(false)
-  const valid = /^[\w-]{1,64}$/.test(project)
-
-  const snippet = useMemo(() => [
-    `<script src="${scriptUrl()}"`,
-    `  data-project="${valid ? project : 'my-app'}"`,
-    position === 'left' ? '  data-position="left"' : '',
-    shortcut ? '' : '  data-shortcut="off"',
-    color.toLowerCase() !== '#e8590c' ? `  data-color="${color}"` : '',
-    '  defer></script>',
-  ].filter(Boolean).join('\n'), [project, valid, position, shortcut, color])
-
+  const valid = validProjectId(project)
+  const snippet = useMemo(() => buildSnippet({ project, position, shortcut, color }), [project, position, shortcut, color])
   const copy = async () => {
-    try { await navigator.clipboard.writeText(snippet) } catch {
-      const ta = Object.assign(document.createElement('textarea'), { value: snippet })
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove()
-    }
+    if (!(await copyText(snippet))) return
     setCopied(true); toast('Snippet copied'); window.setTimeout(() => setCopied(false), 1800)
   }
 

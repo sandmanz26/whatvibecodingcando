@@ -50,7 +50,7 @@
           <input placeholder="Type here: the C key doesn't start a comment while you type" aria-label="Email" />
           <button type="submit">Subscribe</button>
         </form>
-        <p class="note">Comments on this demo are saved in your browser only (no backend yet).</p>`,
+        <p class="note">Comments on this demo are saved in your browser only (no backend yet). Project: <b id="proj"></b></p>`,
       '/pricing': `
         <h1>Pricing</h1>
         <section class="cards">
@@ -62,9 +62,17 @@
     const render = () => { const r = location.hash.slice(1) || '/'; document.getElementById('app').innerHTML = pages[r] || pages['/'] }
     addEventListener('hashchange', render)
     render()
+    const showProject = () => { const el = document.getElementById('proj'); if (el) el.textContent = (window.__vibeCollab && window.__vibeCollab.project) || '…' }
+    addEventListener('load', showProject); addEventListener('hashchange', () => setTimeout(showProject))
   </script>
 
   <!-- The whole installation: -->
   <script src="./embed/vibe.js" data-project="embed-demo" defer></script>
+  <script>
+    // Opened from the user panel as embed-demo.html?project=<id>: comments made here belong to that project.
+    // (A real site has just the one tag above, with its own project id.)
+    const want = new URLSearchParams(location.search).get('project')
+    if (want && /^[\w-]{1,64}$/.test(want)) document.querySelector('script[src="./embed/vibe.js"]').dataset.project = want
+  </script>
 </body>
 </html>

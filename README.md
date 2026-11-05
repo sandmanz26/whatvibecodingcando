@@ -222,6 +222,27 @@ The first step towards a hosted product: one script tag adds comments to any sit
 - **Build.** `npm run build` also builds `dist/embed/vibe.js` (`vite.embed.config.ts`, one IIFE file with React inside, about 77 kB gzipped).
 - **Storage.** Code is in `src/embed/`. For now there is `LocalBackend` (localStorage per project), so teammates don't see each other's comments yet. The widget only talks to a `Backend` interface (`list`, `upsert` one thread, `remove` one, `subscribe` to changes elsewhere). A shared database needs only a new implementation of that interface, plus decisions on accounts, project keys and allowed domains.
 
+## Website and user panel for the hosted product
+
+- **`#/landingpage`** is the product's website (working name in `src/saas/products.ts` → `BRAND`).
+  - Visitors pick the tools they want from a catalogue of 12 products, filtered by category, with a running "Your stack" summary.
+  - Each product says honestly where it works today: **On your site today** (in the script) or **Early access** (built and usable in the demo console).
+  - It also has how it works, a live demo of the script in an iframe, beta pricing and FAQ.
+  - The picks carry into sign-up.
+- **`#/app/signup`** has three steps: tools, project, you.
+  - Nothing is saved until the last step, Back keeps what was entered, and each step validates.
+  - There is no password, because there is no server: the page says the account lives in this browser.
+- **`#/app`** is the user panel:
+  - **Overview:** a setup checklist and comment counts.
+  - **Products:** turn tools on or off per project; early-access ones count as requested.
+  - **Install:** the project's snippet with `data-products`, widget options, and where to paste it (HTML, Vite, Next.js, CMS, or a prompt for Claude). It warns when the snippet changed since it was last copied.
+  - **Comments:** an inbox with filters, search, complete, reopen, delete and "open on site".
+  - **Team:** invites, kept as pending because no emails are sent yet.
+  - **Settings:** account, project, allowed domains, and deleting a project or the workspace by typing to confirm.
+  - Several projects are supported; a project id is fixed once created because the snippet and comments use it.
+- **Inbox without a backend.** The inbox reads comments through the script's `Backend` interface, so it shows those saved on this domain. Open `embed-demo.html?project=<id>` (the panel links to it) to see comments arrive in the panel.
+- **Code and storage.** Data is in `vibe.saas` (localStorage) and the code in `src/saas/` and `src/pages/saas/`. The research dock and tools are not mounted on these pages.
+
 ## Installable skill: ux-research-kit
 
 The research tools are also packaged as a Claude Code skill for other projects, in `plugins/ux-research-kit/`: framework-agnostic TypeScript modules (tracking and sessions, heatmaps and replay, 5-second tests, fake doors, eye tracking, design tokens and UI-library palettes), specs per module, the privacy rules, and a verification checklist. Claude copies what a project needs, wires it to its router, and builds the console screens in that project's own components.

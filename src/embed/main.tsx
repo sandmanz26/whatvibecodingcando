@@ -9,6 +9,7 @@
  *   data-position  "right" (default) or "left": where the buttons sit
  *   data-shortcut  "off" to turn off the C key
  *   data-color     the accent colour, as #rrggbb
+ *   data-products  products to run, comma separated (only "comments" exists so far); left out, all run
  *
  * The widget lives in a shadow root, so the site's CSS can't reach it and its CSS can't
  * reach the site. It never reads what visitors type into the site's own fields.
@@ -30,6 +31,8 @@ function boot() {
   const config: Config = { project, position: d.position === 'left' ? 'left' : 'right', shortcut: d.shortcut !== 'off' }
   const color = /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color! : '#e8590c'
   window.__vibeCollab = { version: VERSION, project }
+  // Turned off for this project in the panel: install nothing.
+  if (d.products !== undefined && !d.products.split(',').map((x) => x.trim()).includes('comments')) return
 
   const start = () => {
     const host = document.createElement('div')

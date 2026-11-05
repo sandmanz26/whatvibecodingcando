@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes } from 'react-router-dom'
+import { HashRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { HeatmapOverlay, InsightsTracker } from './tools/insights/InsightsTools'
 import { ReviewPins } from './tools/pins/ReviewPins'
 import { UsabilityRunner } from './tools/tests/Runner'
@@ -24,6 +24,9 @@ import Prompts from './pages/Prompts'
 import Compare from './pages/Compare'
 import TokenCompare from './pages/TokenCompare'
 import Install from './pages/Install'
+import Landing from './pages/saas/Landing'
+import Signup from './pages/saas/Signup'
+import { PanelLayout, Overview, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
@@ -38,6 +41,17 @@ export default function App() {
     <StoreProvider>
       <HashRouter>
         <Routes>
+          {/* The hosted product's website and user panel: their own look, no research tools. */}
+          <Route path="landingpage" element={<Landing />} />
+          <Route path="app/signup" element={<Signup />} />
+          <Route path="app" element={<PanelLayout />}>
+            <Route index element={<Overview />} />
+            <Route path="products" element={<Products />} />
+            <Route path="install" element={<PanelInstall />} />
+            <Route path="comments" element={<Comments />} />
+            <Route path="team" element={<Team />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
           <Route element={<Layout />}>
             <Route index element={<Home />} />
             <Route path="search" element={<Search />} />
@@ -69,18 +83,28 @@ export default function App() {
             <Route path="install" element={<Install />} />
           </Route>
         </Routes>
-        {/* Research tools sit around both versions of the app. */}
-        <DesignLayer />
-        <InsightsTracker />
-        <HeatmapOverlay />
-        <ReviewPins />
-        <UsabilityRunner />
-        <FiveSecRunner />
-        <FakeDoors />
-        <GazeRunner />
-        <NarrationRecorder />
-        <VersionSwitch />
+        <ResearchTools />
       </HashRouter>
     </StoreProvider>
+  )
+}
+
+/** Research tools sit around the marketplace and its console; never on the hosted product's own pages. */
+function ResearchTools() {
+  const { pathname } = useLocation()
+  if (pathname === '/landingpage' || pathname === '/app' || pathname.startsWith('/app/')) return null
+  return (
+    <>
+      <DesignLayer />
+      <InsightsTracker />
+      <HeatmapOverlay />
+      <ReviewPins />
+      <UsabilityRunner />
+      <FiveSecRunner />
+      <FakeDoors />
+      <GazeRunner />
+      <NarrationRecorder />
+      <VersionSwitch />
+    </>
   )
 }
