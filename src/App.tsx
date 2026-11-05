@@ -22,6 +22,7 @@ import DesignCheck from './pages/DesignCheck'
 import Narration from './pages/Narration'
 import Prompts from './pages/Prompts'
 import Compare from './pages/Compare'
+import TokenCompare from './pages/TokenCompare'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="doors" element={<FakeDoorsPage />} />
             <Route path="gaze" element={<EyeTracking />} />
             <Route path="design" element={<DesignTokens />} />
+            <Route path="design/compare" element={<TokenCompare />} />
             <Route path="report" element={<Report />} />
             <Route path="repo" element={<InsightRepo />} />
             <Route path="dscheck" element={<DesignCheck />} />

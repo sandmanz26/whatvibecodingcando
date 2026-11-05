@@ -196,7 +196,7 @@ Research console screen "Sessions":
   },
   {
     id: 'design-tokens', title: 'Design tokens & UI-library looks', group: 'Design',
-    summary: 'Edit tokens as JSON and preview them live, or try a Material / Ant / shadcn / Bootstrap look.',
+    summary: 'Edit tokens as JSON, upload token files and compare two sets side by side, or try a Material / Ant / shadcn / Bootstrap look.',
     needs: ['Frontend only'],
     skill: 'Add a design-token simulator with live preview and Material 3 / Ant Design / shadcn/ui / Bootstrap 5 looks.',
     spec: `Build a design-token simulator in the research console.
@@ -207,7 +207,12 @@ Research console screen "Sessions":
 - Generate CSS that applies only the changed tokens. A light token that dark mode doesn't redefine applies in both modes. Use selectors with html:root so they win.
 - Live preview: the app in a same-origin iframe, receiving the design by postMessage (the iframe answers "ready"); nothing is saved until "Apply in this browser", which puts the variant on the whole app (for a usability test) until "Turn off".
 - UI-library looks: Material 3, Ant Design, shadcn/ui, Bootstrap 5. Each is a token palette plus component rules under html[data-uilib="…"] that restyle the app's real components (buttons, inputs, chips, segmented controls, switches, tabs, cards, nav, dialogs) and use var(--primary) rather than hard-coded colours. Say clearly these imitate the look and don't install the library.
-- Show a table of what changes (token, scope, from, to, with swatches).`,
+- Show a table of what changes (token, scope, from, to, with swatches).
+- Upload & compare:
+  - Accept W3C tokens, Tokens Studio JSON and CSS variable files, keeping each as a named set. Resolve aliases ({a.b}) and var() references within the file. A whole path segment or selector named "dark" means dark mode; skip and count composite values, broken aliases and unsafe values.
+  - Map the app's tokens to the file's: filled in by name, same kind only, editable, and opened straight away when nothing matched.
+  - Compare any two looks (the app's own, a library look, an upload) on the same screen side by side, with WCAG contrast for the main text/background pairs and a table of differing tokens.
+  - A preview frame must ignore storage events once the console has sent it a design.`,
   },
   {
     id: 'ds-check', title: 'Design system check', group: 'Design',

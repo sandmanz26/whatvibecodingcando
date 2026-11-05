@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Upload, RotateCcw, Check, Wand2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Download, Upload, RotateCcw, Check, Wand2, Columns2 } from 'lucide-react'
 import { useStore } from '../store/store'
 import { ScreenViewer, DEVICES, type Device } from '../tools/insights/ScreenViewer'
 import { PRESETS, presetOf } from '../tools/design/presets'
@@ -89,6 +90,7 @@ export default function DesignTokens() {
           <h1>Design tokens</h1>
           <p>Try another set of design tokens, or another UI library’s look, on the real screens. Edit the JSON (W3C design-token style: the token’s name is the CSS variable it sets; top-level <span className="mono">light</span> and <span className="mono">dark</span> say where it applies). Apply it to use the variant in this browser, for example during a usability test.</p>
         </div>
+        <div className="actions"><Link className="btn primary" to="/console/design/compare"><Columns2 size={14} /> Upload & compare token sets</Link></div>
       </div>
 
       <section className="card">

@@ -79,6 +79,21 @@ Flags are stored in localStorage (`market.flags.insights`, `market.flags.reviewP
 ### Design tokens and UI-library looks
 `#/console/design`. Edit the app's design tokens as JSON (W3C design-token style: a token is an object with `$value`, its name is the CSS variable it sets; top-level `light` and `dark` say where it applies). The JSON starts from the app's own stylesheets. Pick a UI library look (Material 3, Ant Design, shadcn/ui, Bootstrap 5) to load its tokens and restyle the marketplace's components the way that library draws them; these imitate the look and don't load the library's code. Quick controls edit the main tokens; a live screen viewer previews any screen without saving; **Apply in this browser** puts the variant on the whole app (for example for a usability test) and the dock shows its name until it is turned off. Download/upload JSON; partial files are laid over the app's own tokens.
 
+**Upload & compare** (`#/console/design/compare`, from the Design tokens page).
+- **Upload.** Upload or drop token files: W3C design tokens, Tokens Studio JSON, or CSS custom properties. Two sample files are included.
+  - Aliases (`{color.brand.500}`) and `var(--x)` references inside a file are resolved.
+  - A `dark` set, group or selector becomes the dark-mode value.
+  - Composite tokens (typography and similar), unresolved aliases and unsafe values are skipped and counted.
+- **Mapping.** A file's names rarely match the app's, so each set keeps a mapping from the app's tokens to the file's.
+  - It is filled in by name on upload, and only tokens of the same kind can match.
+  - It is editable in **Map tokens**. An upload that matches nothing opens it straight away.
+- **Compare.** Choose any two looks (the app's own, the UI-library looks, or uploaded sets). You get:
+  - both on the same screen and device, side by side;
+  - a WCAG contrast check for the main text and background pairs in light and dark;
+  - a table of every token value that differs.
+- **Apply.** **Use in this browser** applies either look.
+- **Storage.** Sets are stored in `market.tokenSets` (this browser only, 2 MB per file, up to 3,000 tokens).
+
 ### Research report
 `#/console/report`. One page built from everything the tools collected (sessions, usability tests, 5-second tests, fake doors, eye tracking, researcher notes and comments). It has:
 - **In short**: the top findings in one line each.

@@ -13,12 +13,16 @@ export function DesignLayer() {
   const [design, setDesign] = useState<Design | null>(loadDesign)
 
   useEffect(() => {
-    const sync = () => setDesign(loadDesign())
+    // Inside the console's screen viewer the console decides what is shown: once it sends a preview,
+    // this browser's saved variant (and any other storage write) must not replace it.
+    let previewing = false
+    const sync = () => { if (!previewing) setDesign(loadDesign()) }
     window.addEventListener(DESIGN_EVENT, sync)
     window.addEventListener('storage', sync)
     if (!isEmbedded) return () => { window.removeEventListener(DESIGN_EVENT, sync); window.removeEventListener('storage', sync) }
     const onMsg = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== window.parent || e.data?.type !== DESIGN_MESSAGE) return
+      previewing = true
       setDesign(e.data.design ?? null)
     }
     window.addEventListener('message', onMsg)
