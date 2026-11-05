@@ -28,6 +28,8 @@ export interface UsabilityTest {
   name: string
   intro: string
   tasks: TestTask[]
+  /** ask participants to turn on webcam eye tracking before the first task (they may decline) */
+  eyeTracking?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -67,9 +69,22 @@ export interface TestSession {
   finishedAt?: string
   vw: number
   attempts: Attempt[]
+  /** eye tracking for this participant, when they agreed and calibrated */
+  gaze?: { accuracy: number }
 }
 
 const TESTS_KEY = `${APP}.tests`
+export const RUN_KEY = `${APP}.tests.run`
+
+/** The task a participant is doing right now in this tab, if any (read by eye tracking to tag its samples). */
+export function runningTask(): { session: string; testId: string; taskId: string; startedAt: number } | null {
+  try {
+    const r = JSON.parse(sessionStorage.getItem(RUN_KEY) ?? 'null') as { sessionId: string; testId: string; index: number; phase: string; startedAt: number } | null
+    if (!r || r.phase !== 'doing') return null
+    const task = loadTests().find((t) => t.id === r.testId)?.tasks[r.index]
+    return task ? { session: r.sessionId, testId: r.testId, taskId: task.id, startedAt: r.startedAt } : null
+  } catch { return null }
+}
 const SESSIONS_KEY = `${APP}.tests.sessions`
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
@@ -77,6 +92,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10)
 const SEED: UsabilityTest[] = [{
   id: 'basics',
   name: 'Shopping with AI',
+  eyeTracking: true,
   intro: 'Imagine you are shopping online. You’ll get three short tasks. There are no wrong answers — we’re testing the design, not you.',
   createdAt: '2026-10-26T09:00:00.000Z',
   updatedAt: '2026-10-26T09:00:00.000Z',

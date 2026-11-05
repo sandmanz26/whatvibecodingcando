@@ -112,6 +112,12 @@ export function predict(m: Model, f: Features): { x: number; y: number } {
   return { x: dot(m.wx), y: dot(m.wy) }
 }
 
-/** Calibration dots, as fractions of the window: a 3 × 3 grid, then four to check accuracy. */
-export const CALIBRATION = [0.1, 0.5, 0.9].flatMap((y) => [0.1, 0.5, 0.9].map((x) => ({ x, y })))
-export const VALIDATION = [{ x: 0.3, y: 0.3 }, { x: 0.7, y: 0.3 }, { x: 0.3, y: 0.7 }, { x: 0.7, y: 0.7 }]
+/** Calibration dots, as fractions of the window: a 3 × 3 grid plus four between them (13), then four to check accuracy. */
+export const CALIBRATION = [
+  ...[0.1, 0.5, 0.9].flatMap((y) => [0.1, 0.5, 0.9].map((x) => ({ x, y }))),
+  { x: 0.3, y: 0.3 }, { x: 0.7, y: 0.3 }, { x: 0.3, y: 0.7 }, { x: 0.7, y: 0.7 },
+  // Visited in a spread-out order (5 and 13 share no factor, so every dot comes up once).
+].map((_, i, a) => a[(i * 5) % a.length])
+export const VALIDATION = [{ x: 0.2, y: 0.2 }, { x: 0.8, y: 0.2 }, { x: 0.5, y: 0.5 }, { x: 0.2, y: 0.8 }, { x: 0.8, y: 0.8 }]
+/** Eye openness is feature 4; a blink drops it well below the calibration average. */
+export const isBlink = (m: Model, f: Features) => f[4] < m.mean[4] * 0.55

@@ -2,17 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CheckCircle2, Clock, Flag, TimerOff, ListChecks } from 'lucide-react'
-import { APP, TOOL_DOM, isEmbedded } from '../shared'
+import { TOOL_DOM, isEmbedded } from '../shared'
+import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP } from '../gaze/store'
 import { describeTarget } from '../insights/tracker'
-import { loadSessions, loadTests, pageMatches, uid, upsertSession, type Attempt, type Outcome, type TaskTap, type TestSession, type UsabilityTest } from './store'
+import { RUN_KEY, loadSessions, loadTests, pageMatches, uid, upsertSession, type Attempt, type Outcome, type TaskTap, type TestSession, type UsabilityTest } from './store'
 
-const RUN_KEY = `${APP}.tests.run`
 
 interface Run {
   sessionId: string
   testId: string
   index: number
-  phase: 'intro' | 'ready' | 'doing' | 'result' | 'finished'
+  phase: 'intro' | 'eyes' | 'ready' | 'doing' | 'result' | 'finished'
+  /** eye tracking is on for this run */
+  eyes?: boolean
   startedAt: number
   taps: TaskTap[]
   pages: string[]
@@ -69,6 +71,31 @@ export function UsabilityRunner() {
   }, [run])
 
   const task = test && run ? test.tasks[run.index] : undefined
+
+  // Eye tracking: while the participant calibrates, the test waits; then it goes on, with or without it.
+  useEffect(() => {
+    if (run?.phase !== 'eyes') return
+    const ready = (e: Event) => {
+      const r = runRef.current
+      if (!r) return
+      const accuracy = (e as CustomEvent<{ accuracy: number }>).detail?.accuracy
+      const s = loadSessions().find((x) => x.id === r.sessionId)
+      if (s && accuracy !== undefined) upsertSession({ ...s, gaze: { accuracy } })
+      setRun({ ...r, phase: 'ready', eyes: true })
+    }
+    const ended = () => { const r = runRef.current; if (r) setRun({ ...r, phase: 'ready', eyes: false }) }
+    window.addEventListener(GAZE_READY, ready)
+    window.addEventListener(GAZE_ENDED, ended)
+    return () => { window.removeEventListener(GAZE_READY, ready); window.removeEventListener(GAZE_ENDED, ended) }
+  }, [run?.phase, setRun])
+  // If the participant stops eye tracking mid-test, the test carries on without it.
+  useEffect(() => {
+    const ended = () => { const r = runRef.current; if (r?.eyes) setRun({ ...r, eyes: false }) }
+    window.addEventListener(GAZE_ENDED, ended)
+    return () => window.removeEventListener(GAZE_ENDED, ended)
+  }, [setRun])
+  // The camera goes off when the test ends or is closed.
+  useEffect(() => { if (run?.phase === 'finished') window.dispatchEvent(new Event(GAZE_STOP)) }, [run?.phase])
 
   const finish = useCallback((outcome: Outcome, markLastTapHit = false) => {
     const r = runRef.current
@@ -147,7 +174,10 @@ export function UsabilityRunner() {
       startedAt: new Date().toISOString(), vw: window.innerWidth, attempts: [],
     }
     upsertSession(session)
-    setRun({ ...run, phase: 'ready' })
+    if (test.eyeTracking) {
+      setRun({ ...run, phase: 'eyes' })
+      window.dispatchEvent(new Event(GAZE_START))
+    } else setRun({ ...run, phase: 'ready' })
   }
   const startTask = () => {
     nav(task.startPage)
@@ -160,7 +190,7 @@ export function UsabilityRunner() {
     if (run.index + 1 < test.tasks.length) setRun({ ...run, index: run.index + 1, phase: 'ready', taps: [], pages: [] })
     else setRun({ ...run, phase: 'finished' })
   }
-  const close = () => setRun(null)
+  const close = () => { if (run.eyes || run.phase === 'eyes') window.dispatchEvent(new Event(GAZE_STOP)); setRun(null) }
 
   const step = <span className="ut-step">Task {run.index + 1} of {test.tasks.length}</span>
   const remaining = task.limitSec * 1000 - (now - run.startedAt)
@@ -182,6 +212,7 @@ export function UsabilityRunner() {
           <li>{test.tasks.length} task{test.tasks.length === 1 ? '' : 's'}, each with a time limit.</li>
           <li>Think out loud if someone is with you. Skip a task any time with “Give up”.</li>
           <li>We record where you tap and how long it takes — never what you type.</li>
+          {test.eyeTracking && <li>This test can also use your webcam to estimate where you look. You’ll be asked first, and you can say no.</li>}
         </ul>
         <label className="ut-field">
           <span>Nickname or code <em>(optional)</em></span>

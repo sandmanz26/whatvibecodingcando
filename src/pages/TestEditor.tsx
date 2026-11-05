@@ -83,6 +83,10 @@ export default function TestEditor() {
           <span className="hint">Shown before the first task. Set the scene; don’t hint at answers.</span>
           <textarea id="tintro" className="textarea" rows={2} value={test.intro} onChange={(e) => setTest({ ...test, intro: e.target.value })} />
         </div>
+        <label className="row" style={{ gap: 10, alignItems: 'flex-start', fontSize: 13.5 }}>
+          <input type="checkbox" checked={!!test.eyeTracking} onChange={(e) => setTest({ ...test, eyeTracking: e.target.checked })} style={{ marginTop: 3 }} />
+          <span><b>Eye tracking (webcam)</b><br /><span className="muted">Before the first task, participants are asked to turn on their camera and calibrate (about a minute). They can say no and still do the test. Their fixations and scanpaths show per task in the Heatmap’s Eyes view.</span></span>
+        </label>
       </section>
 
       <datalist id="app-pages">{pages.map((p) => <option key={p} value={p} />)}</datalist>

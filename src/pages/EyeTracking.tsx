@@ -36,7 +36,7 @@ export default function EyeTracking() {
       </div>
 
       {points.length === 0 ? (
-        <div className="card"><Empty title="No gaze data yet"><span style={{ maxWidth: 480 }}>Start a session: the participant allows the camera, follows nine dots, sees how accurate the calibration is, then uses the app. Press Stop on the small bar when done, then come back here.</span></Empty></div>
+        <div className="card"><Empty title="No gaze data yet"><span style={{ maxWidth: 480 }}>Start a session: the participant allows the camera, follows 13 dots, sees how accurate the calibration is, then uses the app. Press Stop on the small bar when done, then come back here.</span></Empty></div>
       ) : (
         <div className="grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) 260px', alignItems: 'start' }}>
           <section className="card">

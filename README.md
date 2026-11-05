@@ -81,6 +81,24 @@ The dock is the set of tools shown to visitors. From left to right:
   - **How it is drawn.** Every click is a soft blob. Blobs add up and are coloured blue → red, and the densest spot reaches red. Each click is placed on the element it hit, on the whole page at one device width, with the fold marked.
   - **Sample data.** With nothing recorded for that task, screen and width, it shows clearly labelled sample data: 12 made-up participants clicking the screen's real controls, more often toward the goal. No statistics are invented for it.
 
+- **Eyes** (on the Heatmap, the **Eyes** layer): webcam eye tracking read as eye movement, per usability task.
+  - **In a test.** With **Eye tracking (webcam)** on in a test, participants are asked before the first task to turn on the camera and calibrate (13 dots, then 5 to measure accuracy in px). Saying no, a camera error, or a poor calibration lets them go on without it. Every gaze sample is tagged with the participant's run, the task and the ms since it started.
+  - **Reading the eyes.**
+    - MediaPipe Face Landmarker, in the browser, gives where each iris sits in its eye, how open the eyes are, and the head's pose.
+    - A ridge regression maps those to the screen. It is refitted with every click while recording, since people look at what they click, so it follows head movement.
+    - About 30 samples a second; blinks (eye openness well below the calibration average) are dropped; a One-Euro filter smooths fixations without smearing saccades.
+  - **Pattern of movement** (`src/tools/gaze/analysis.ts`):
+    - **Fixations** come from I-DT (dispersion threshold, scaled to the measured accuracy, min 100 ms). Adjacent fixations are merged, and a fixation is extended back over samples skipped while it settled.
+    - **Saccades** are the jumps between fixations (amplitude, duration, angle).
+  - **What it shows.**
+    - An **attention heatmap** weighted by fixation duration.
+    - The **scanpath** of each person (numbered fixations sized by duration, joined in order), with play and a time slider.
+    - **Areas of interest:** the task's target, then the screen's main parts. For each: the share of people who looked, time to first fixation (median from the start of the task), and dwell.
+    - For the target: how many looked at it, and how many looked at it yet clicked something else first.
+  - **Accuracy.** Webcam tracking is good to about ±100–200 px, so read fixations as areas. The page shows the median accuracy.
+  - **Sample data.** With no eye data for that task, screen and width it shows sample gaze: raw webcam-like samples run through the same algorithm, clearly labelled.
+  - **Tests.** The algorithms are checked against known fixations (positions within 15 px; durations within a sample or two in 7 of 8 random noise runs).
+
 The research console's tools are in a grouped sidebar (Behaviour, Tests, Design, Findings, Use it yourself); on a phone it opens from the top bar.
 
 Hidden for now: narration (the microphone and ▶ Explain), the theme switch, and the Prompts and console buttons. Those pages are reached by URL (`#/console/narration`, `#/console/prompts`, `#/console/…`).

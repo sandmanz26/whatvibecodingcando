@@ -470,3 +470,21 @@ html.inspecting, html.inspecting * { cursor: crosshair !important; }
 .hm-rank-label svg { vertical-align: -2px; margin-right: 4px; }
 .hm-ok { color: var(--good-ink); }
 .hm-no { color: var(--critical-ink); }
+.hm-path { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.hm-path line { stroke: #1f201d; stroke-width: 2; stroke-opacity: .75; }
+.hm-path circle { fill: rgba(235, 104, 52, .55); stroke: #1f201d; stroke-width: 1.5; }
+.hm-path circle.now { fill: rgba(235, 104, 52, .95); stroke-width: 3; }
+.hm-path text { fill: #fff; font: 700 10.5px var(--font); text-anchor: middle; paint-order: stroke; stroke: rgba(0,0,0,.6); stroke-width: 2px; }
+.hm-eyestats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.hm-eyestats div { padding: 8px; border-radius: 8px; background: var(--surface-2); }
+.hm-eyestats dt { font-size: 11px; color: var(--ink-3); }
+.hm-eyestats dd { margin: 0; font-weight: 700; font-size: 15px; }
+.hm-insight { margin: 0; padding: 10px; border-radius: 8px; background: var(--accent-wash); font-size: 13px; }
+.hm-play { display: flex; flex-direction: column; gap: 8px; }
+.hm-aoi { width: 100%; border-collapse: collapse; font-size: 12px; }
+.hm-aoi th, .hm-aoi td { text-align: left; padding: 5px 4px; border-top: 1px solid var(--line); }
+.hm-aoi thead th { border-top: 0; color: var(--ink-3); font-weight: 550; }
+.hm-aoi td:first-child { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-aoi tr.target td { font-weight: 650; background: rgba(30,158,74,.08); }
+.hm-aoi tbody tr:hover td { background: var(--surface-2); }
+.hm-side h3 { margin-top: 4px; }

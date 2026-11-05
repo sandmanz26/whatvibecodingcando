@@ -15,13 +15,26 @@ export interface GazePoint {
   y: number
   vw: number
   vh: number
+  /** epoch ms, for fixation timing (older points only have t) */
+  ms?: number
+  /** usability test: the participant's session, the task, and ms since that task started */
+  test?: string
+  task?: string
+  tt?: number
 }
+
+/** A usability test asks for eye tracking, and hears back when it is ready or ended. */
+export const GAZE_START = 'market:gaze-start'
+export const GAZE_READY = 'market:gaze-ready'
+export const GAZE_ENDED = 'market:gaze-ended'
+export const GAZE_STOP = 'market:gaze-stop'
+export const timeOf = (p: GazePoint) => p.ms ?? Date.parse(p.t)
 
 export interface GazeSession { sid: string; start: string; vw: number; accuracy: number | null }
 
 const POINTS_KEY = `${APP}.gaze.points`
 const SESSIONS_KEY = `${APP}.gaze.sessions`
-const MAX = 20000
+const MAX = 40000
 
 export const loadGaze = () => readJSON<GazePoint[]>(POINTS_KEY, [])
 export const appendGaze = (pts: GazePoint[]) => { if (pts.length) writeJSON(POINTS_KEY, [...loadGaze(), ...pts].slice(-MAX)) }

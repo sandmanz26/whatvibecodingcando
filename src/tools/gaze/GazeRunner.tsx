@@ -3,17 +3,20 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Square, Video } from 'lucide-react'
 import { APP, currentPath, isConsole, isEmbedded } from '../shared'
-import { CALIBRATION, VALIDATION, features, fit, loadLandmarker, predict, startCamera, stopCamera, type Features, type Model } from './engine'
-import { appendGaze, saveGazeSession, type GazePoint } from './store'
+import { CALIBRATION, VALIDATION, features, fit, isBlink, loadLandmarker, predict, startCamera, stopCamera, type Features, type Model } from './engine'
+import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP, appendGaze, saveGazeSession, type GazePoint } from './store'
+import { OneEuro } from './analysis'
+import { runningTask } from '../tests/store'
+import { TOOL_DOM } from '../shared'
 
 type Phase = 'off' | 'consent' | 'loading' | 'calibrate' | 'validate' | 'checked' | 'recording' | 'error'
 
 const RUN_KEY = `${APP}.gaze.run`
-interface Saved { sid: string; model: Model; accuracy: number }
+interface Saved { sid: string; model: Model; accuracy: number; forTest?: boolean; calib?: { f: Features; x: number; y: number }[] }
 const readSaved = (): Saved | null => { try { return JSON.parse(sessionStorage.getItem(RUN_KEY) ?? 'null') } catch { return null } }
 const writeSaved = (s: Saved | null) => { try { s ? sessionStorage.setItem(RUN_KEY, JSON.stringify(s)) : sessionStorage.removeItem(RUN_KEY) } catch { /* ignore */ } }
 
-const SAMPLE_MS = 66
+const SAMPLE_MS = 33
 const COLLECT_MS = 900
 
 /**
@@ -40,8 +43,16 @@ export function GazeRunner() {
   const samples = useRef<{ f: Features; x: number; y: number }[]>([])
   const checks = useRef<{ px: number; py: number; x: number; y: number }[]>([])
   const model = useRef<Model | null>(readSaved()?.model ?? null)
+  if (!samples.current.length && readSaved()?.calib) samples.current = readSaved()!.calib!
   const sid = useRef<string>(readSaved()?.sid ?? '')
-  const smooth = useRef<{ x: number; y: number } | null>(null)
+  const filt = useRef({ x: new OneEuro(), y: new OneEuro() })
+  /** Started by a usability test: it waits for us, and hears when we are ready or stop. */
+  const [forTest, setForTest] = useState(() => !!readSaved()?.forTest)
+  const forTestRef = useRef(forTest)
+  forTestRef.current = forTest
+  /** The latest frame's features, and clicks used to keep the calibration accurate while recording. */
+  const lastF = useRef<{ f: Features; at: number } | null>(null)
+  const clickSamples = useRef<{ f: Features; x: number; y: number }[]>([])
   const buffer = useRef<GazePoint[]>([])
 
   // ?gaze starts it; the parameter is then removed from the address.
@@ -54,7 +65,9 @@ export function GazeRunner() {
     if (phase === 'off') setPhase('consent')
   }, [search, pathname, nav, phase])
 
-  const shutdown = useCallback(() => {
+  const shutdown = useCallback((notify = true) => {
+    if (notify && forTestRef.current) window.dispatchEvent(new Event(GAZE_ENDED))
+    setForTest(false)
     appendGaze(buffer.current.splice(0))
     stopCamera(stream.current)
     stream.current = null
@@ -63,6 +76,14 @@ export function GazeRunner() {
     setPhase('off')
     setDot(null)
   }, [])
+
+  useEffect(() => {
+    const start = () => { setForTest(true); setPhase((p) => (p === 'off' ? 'consent' : p)) }
+    const stop = () => shutdown(false)
+    window.addEventListener(GAZE_START, start)
+    window.addEventListener(GAZE_STOP, stop)
+    return () => { window.removeEventListener(GAZE_START, start); window.removeEventListener(GAZE_STOP, stop) }
+  }, [shutdown])
 
   const camera = useCallback(async (next: Phase) => {
     setPhase('loading')
@@ -97,7 +118,7 @@ export function GazeRunner() {
           last = now
           const f = features(lm, video.current, now)
           setFace(!!f)
-          if (f) collector.current?.(f)
+          if (f) { lastF.current = { f, at: now }; collector.current?.(f) }
         }
         raf = requestAnimationFrame(tick)
       }
@@ -106,25 +127,47 @@ export function GazeRunner() {
     return () => { live = false; cancelAnimationFrame(raf) }
   }, [phase])
 
-  // Recording: predicted, smoothed, written as page coordinates about 15 times a second.
+  // Recording: about 30 samples a second, blinks dropped, smoothed with a One-Euro filter (steady
+  // while the eye rests, quick when it jumps), written as page coordinates. In a usability test each
+  // sample is tagged with the task and the time since it started, so fixations can be read per task.
   useEffect(() => {
     if (phase !== 'recording' || !model.current) return
     let lastSample = 0
+    filt.current.x.reset(); filt.current.y.reset()
     collector.current = (f) => {
-      const p = predict(model.current!, f)
-      const s = smooth.current ? { x: smooth.current.x * 0.7 + p.x * 0.3, y: smooth.current.y * 0.7 + p.y * 0.3 } : p
-      smooth.current = s
-      const x = Math.min(window.innerWidth, Math.max(0, s.x)), y = Math.min(window.innerHeight, Math.max(0, s.y))
-      setDot({ x, y })
+      const m = model.current!
+      if (isBlink(m, f)) return
       const now = performance.now()
+      const p = predict(m, f)
+      const sx = filt.current.x.filter(p.x, now), sy = filt.current.y.filter(p.y, now)
+      const x = Math.min(window.innerWidth, Math.max(0, sx)), y = Math.min(window.innerHeight, Math.max(0, sy))
+      setDot({ x, y })
       if (now - lastSample < SAMPLE_MS || document.visibilityState !== 'visible' || isConsole(currentPath())) return
       lastSample = now
-      buffer.current.push({ sid: sid.current, t: new Date().toISOString(), page: currentPath(), x: Math.round((x / window.innerWidth) * 1000) / 10, y: Math.round(y + window.scrollY), vw: window.innerWidth, vh: window.innerHeight })
+      const ctx = runningTask()
+      const ms = Date.now()
+      buffer.current.push({
+        sid: sid.current, t: new Date(ms).toISOString(), ms, page: currentPath(),
+        x: Math.round((x / window.innerWidth) * 1000) / 10, y: Math.round(y + window.scrollY), vw: window.innerWidth, vh: window.innerHeight,
+        ...(ctx ? { test: ctx.session, task: ctx.taskId, tt: ms - ctx.startedAt } : {}),
+      })
     }
+    // Every click is a free calibration point: people look at what they click. The model is refitted
+    // with the calibration plus the latest clicks, so it keeps up when the head moves.
+    const onClick = (e: PointerEvent) => {
+      const lf = lastF.current
+      if (!lf || performance.now() - lf.at > 120 || !(e.target instanceof Element) || e.target.closest(`${TOOL_DOM}, [data-gaze]`)) return
+      if (isBlink(model.current!, lf.f)) return
+      clickSamples.current = [...clickSamples.current, { f: lf.f, x: e.clientX, y: e.clientY }].slice(-30)
+      const clicks = clickSamples.current.flatMap((c) => [c, c, c])
+      model.current = fit([...samples.current, ...clicks])
+      writeSaved({ ...(readSaved() as Saved), model: model.current })
+    }
+    document.addEventListener('pointerdown', onClick, true)
     const flush = window.setInterval(() => appendGaze(buffer.current.splice(0)), 2000)
     const onHide = () => appendGaze(buffer.current.splice(0))
     window.addEventListener('pagehide', onHide)
-    return () => { collector.current = null; window.clearInterval(flush); window.removeEventListener('pagehide', onHide); appendGaze(buffer.current.splice(0)) }
+    return () => { collector.current = null; document.removeEventListener('pointerdown', onClick, true); window.clearInterval(flush); window.removeEventListener('pagehide', onHide); appendGaze(buffer.current.splice(0)) }
   }, [phase])
 
   // Calibration and checking: look at the dot, click it, keep looking while frames are collected.
@@ -162,9 +205,11 @@ export function GazeRunner() {
   const recalibrate = () => { samples.current = []; checks.current = []; setStep(0); setHint(''); setPhase('calibrate') }
   const record = () => {
     sid.current = Math.random().toString(36).slice(2, 10)
-    writeSaved({ sid: sid.current, model: model.current!, accuracy: accuracy ?? 0 })
+    clickSamples.current = []
+    writeSaved({ sid: sid.current, model: model.current!, accuracy: accuracy ?? 0, forTest, calib: samples.current })
     saveGazeSession({ sid: sid.current, start: new Date().toISOString(), vw: window.innerWidth, accuracy })
     setPhase('recording')
+    if (forTest) window.dispatchEvent(new CustomEvent(GAZE_READY, { detail: { accuracy: accuracy ?? 0 } }))
   }
 
   if (phase === 'off' || isEmbedded) return null
@@ -183,7 +228,7 @@ export function GazeRunner() {
               <p className={face ? 'gz-ok' : 'gz-bad'}>{face ? 'Eyes found' : 'Looking for your face…'}</p>
               {hint && <p className="gz-bad">{hint}</p>}
             </div>
-            <button className="btn sm ghost" onClick={shutdown}>Cancel</button>
+            <button className="btn sm ghost" onClick={() => shutdown()}>Cancel</button>
           </div>
           <button className={`gz-target ${busy ? 'busy' : ''} ${phase === 'validate' ? 'check' : ''}`} style={{ left: `${targets[step].x * 100}%`, top: `${targets[step].y * 100}%` }} onClick={look} aria-label="Calibration dot" />
         </div>
@@ -202,7 +247,8 @@ export function GazeRunner() {
                 <ul className="gz-list">
                   <li>The video stays in this browser. No video or pictures are saved or sent anywhere.</li>
                   <li>Only the estimated point you look at on each page is kept.</li>
-                  <li>First a short calibration: 9 dots, then 4 to check accuracy. About a minute.</li>
+                  <li>First a short calibration: {CALIBRATION.length} dots, then {VALIDATION.length} to check accuracy. About a minute.</li>
+                  {forTest && <li>If you’d rather not, the test goes on without it.</li>}
                   <li>You can stop at any time with the Stop button.</li>
                 </ul>
               )}
@@ -217,9 +263,13 @@ export function GazeRunner() {
               )}
             </div>
             <div className="modal-foot">
-              {phase === 'consent' && <><button className="btn" onClick={shutdown}>Not now</button><button className="btn primary" onClick={() => void camera('calibrate')}>Turn on the camera</button></>}
-              {phase === 'error' && <button className="btn" onClick={shutdown}>Close</button>}
-              {phase === 'checked' && <><button className="btn" onClick={recalibrate}>Calibrate again</button><button className="btn primary" onClick={record} disabled={quality === 'poor'}>Start recording</button></>}
+              {phase === 'consent' && <><button className="btn" onClick={() => shutdown()}>{forTest ? 'No, continue without' : 'Not now'}</button><button className="btn primary" onClick={() => void camera('calibrate')}>Turn on the camera</button></>}
+              {phase === 'error' && <button className="btn" onClick={() => shutdown()}>{forTest ? 'Continue without eye tracking' : 'Close'}</button>}
+              {phase === 'checked' && <>
+                <button className="btn" onClick={recalibrate}>Calibrate again</button>
+                {forTest && quality === 'poor' && <button className="btn" onClick={() => shutdown()}>Continue without eye tracking</button>}
+                <button className="btn primary" onClick={record} disabled={quality === 'poor'}>{forTest ? 'Continue to the test' : 'Start recording'}</button>
+              </>}
             </div>
           </div>
         </>
@@ -232,7 +282,7 @@ export function GazeRunner() {
             <i className={face ? 'on' : ''} /> {face ? 'Eye tracking' : 'Can’t see your eyes'}
             <span className="muted num">±{accuracy} px</span>
             <button className="btn ghost sm icon" onClick={() => setShowDot((v) => !v)} aria-label={showDot ? 'Hide my gaze' : 'Show my gaze'} title={showDot ? 'Hide my gaze' : 'Show my gaze'}>{showDot ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-            <button className="btn sm" onClick={shutdown}><Square size={12} /> Stop</button>
+            <button className="btn sm" onClick={() => shutdown()}><Square size={12} /> Stop</button>
           </div>
         </>
       )}
