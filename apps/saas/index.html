@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Vibe Collab — collaboration and UX research for vibe-coded products</title>
+    <script>
+      try { var t = localStorage.getItem('market:theme'); if (t) document.documentElement.dataset.theme = t } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // The hosted product opens on its website; the demo shop and console stay reachable by URL.
+      if (!location.hash || location.hash === "#/") location.replace(location.pathname + location.search + "#/landingpage")
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

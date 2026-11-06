@@ -1,12 +1,18 @@
-# Marketplace prototype — notes for Claude
+# Vibe coding monorepo — notes for Claude
+
+- **Layout:** `apps/content` (the content site, deployed from the root's `dist/`), `apps/saas` (Vibe Collab, the SaaS, a copy of the content app that opens on the website), `packages/core` (`@vibe/core`: embed widget + `Backend` interface, heatmap renderer, eye-movement analysis — shared by both). Paths below are relative to an app (`src/...` means `apps/<app>/src/...`); the embed script and the gaze analysis live in `packages/core/src`.
+- The apps are separate copies. When the owner asks for a change, make it in the app they mean; if it is a tool both apps have, ask or apply it to both. Code that must stay identical goes in `packages/core`.
+- Everything already built (embed, landing, panel, research tools) is part of the SaaS too; the owner wants it there.
+- Before pushing: `npm run typecheck && npm run build:all` at the root must pass.
+
+## Each app
 
 - Two parts, kept apart: the product (lo-fi grey-wireframe AI marketplace, buyer side only, `src/pages/shop`, `src/components/Layout.tsx`) and the UX research tools (`src/tools`, research console pages in `src/pages`, the dock). Never link research tools from the product's navigation.
-- Third part: the installable collaboration script (`src/embed/`, built to `dist/embed/vibe.js` by `vite.embed.config.ts`; install page `src/pages/Install.tsx`; demo `public/embed-demo.html`). It runs on other people's sites: keep it in its shadow root, never read the host's field values, and store data only through the `Backend` interface in `src/embed/store.ts`.
+- Third part: the installable collaboration script (`packages/core/src/embed/`, built to `dist/embed/vibe.js` by each app's `vite.embed.config.ts`; install page `src/pages/Install.tsx`; demo `public/embed-demo.html`). It runs on other people's sites: keep it in its shadow root, never read the host's field values, and store data only through the `Backend` interface in `packages/core/src/embed/store.ts`.
 - Fourth part: the hosted product's website (`#/landingpage`, `src/pages/saas/Landing.tsx`) and user panel (`#/app/*`, `src/pages/saas/`, data in `src/saas/`). Its own look (`src/saas/saas.css`, scoped under `.lp`/`.up`); research tools are not mounted there. No server yet: say so wherever it matters (account, invites, domains, inbox), and never claim a product runs in the script unless its status is 'script'.
 - Frontend only (React + TypeScript + Vite). No backend: catalogue in `src/data/shop.ts`, simulated AI in `src/lib/ai.ts`, cart/orders in localStorage via `src/store/store.tsx`.
-- Before pushing: `npx tsc -b && npm run build` must pass.
 - **Git: always push finished work to `main`** (the owner asked for this explicitly). Push the working branch too if one is in use.
 - The dock is what visitors see: Comment, All comments, Version, Compare, Design tokens, Inspect, Sessions, Heatmap (README "The dock"). Narration, theme, Prompts and console buttons are hidden on purpose; reach those pages by URL. Shop features ship per version in `src/lib/version.ts`; mark a feature's element with `featureMark()` so "what changed" can outline it. Comments carry the version they were made on.
-- Eye tracking (webcam) belongs to usability tests: gaze samples carry the test run and task; fixations come from I-DT in `src/tools/gaze/analysis.ts`. Video never leaves the browser and is never stored; only gaze points are kept.
+- Eye tracking (webcam) belongs to usability tests: gaze samples carry the test run and task; fixations come from I-DT in `packages/core/src/gaze-analysis.ts`. Video never leaves the browser and is never stored; only gaze points are kept.
 - Start things from the dock on the shop's pages (heatmap tests, session recording, compare submit/review); result pages (`#/console/heatmap`, `/sessions`, `/compare`) only show and manage results — keep recording controls off them. Compare reviews have a status (pending/done), annotations and a decision; the dock badge counts pending ones.
 - Research tools: read the README section "Research tools" before changing them. Never record typed text or field values; production default for click recording stays OFF until the owner decides on consent.
