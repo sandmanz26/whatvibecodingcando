@@ -107,6 +107,24 @@ The dock is the set of tools shown to visitors. From left to right:
   - **Sample data.** With no eye data for that task, screen and width it shows sample gaze: raw webcam-like samples run through the same algorithm, clearly labelled.
   - **Tests.** The algorithms are checked against known fixations (positions within 15 px; durations within a sample or two in 7 of 8 random noise runs).
 
+### Starting from the shop, reviewing on their own pages
+Tests and reviews are started from the dock on the shop's own pages. Results live on their own pages: the Heatmap, Sessions and Compare result pages are what a hosted product would show.
+
+- **Heatmap test** (dock, flame):
+  - **Starting.** Choose a task (or **Change task** / **New task**, editing in place), optionally a name and webcam eye tracking, then **Start the task here**. The task runs on the page you're on, with the same runner participants get, minus the intro. The dock steps aside meanwhile.
+  - **When it ends.** **Run saved** offers **Run again** and **See this run**.
+- **Heatmap results** (`#/console/heatmap`):
+  - **The list.** It starts as a list of every run, grouped by task: who, when, result, time, clicks and the pages in order, with an eye icon when gaze was recorded.
+  - **Managing runs.** Search and filter by result, rename a run, delete one, several (checkboxes) or all runs of a task (their gaze goes too), and export CSV.
+  - **Opening runs.** **View** opens one run alone; **All runs as a heatmap** opens the task's combined map (`#/console/heatmap/view`). Everyday browsing has its own entry.
+- **Sessions** (dock, pointer): switch recording on or off and end the current session from where you are. `#/console/sessions` shows the results, now with a per-session delete.
+- **Compare** (dock): the badge counts comparisons waiting for a review.
+  - **Submitting.** **New**, write what the reviewer should decide, then **Pick on the page** for A and B. Hovering outlines elements and a click picks (never presses). **Wider** and **Narrower** adjust the pick, and **Navigate** lets you reach another page first. Then **Send for review**.
+  - **Reviewing.** The review opens over the page: both components cropped from the live screens and the style table. **Annotate** pins numbered notes anywhere on A or B. Then a decision (Keep A, Keep B, both are fine, both need changes) with an optional summary.
+  - **After the review.** The submitter sees the decision and the notes, and after changing things can **Ask for another review**. That starts a new round, keeps the earlier decision in the history, and puts it back in the count.
+  - **Console.** `#/console/compare` lists every comparison with its status and opens the same review.
+  - **Names.** Annotations and decisions are signed with the comments name.
+
 The research console's tools are in a grouped sidebar (Behaviour, Tests, Design, Findings, Use it yourself); on a phone it opens from the top bar.
 
 Hidden for now: narration (the microphone and ▶ Explain), the theme switch, and the Prompts and console buttons. Those pages are reached by URL (`#/console/narration`, `#/console/prompts`, `#/console/…`).

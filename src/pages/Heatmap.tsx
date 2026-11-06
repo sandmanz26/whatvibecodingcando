@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { RefreshCw, ExternalLink, Info, Check, X, Target, Eye, MousePointerClick, Play, Pause, Circle, Pencil, Plus } from 'lucide-react'
+import { RefreshCw, ExternalLink, Info, Check, X, Target, Eye, MousePointerClick, Play, Pause, ArrowLeft } from 'lucide-react'
 import { Switch } from '../components/ui'
 import { DEVICES, type Device } from '../tools/insights/ScreenViewer'
 import { layoutOf, loadEvents, type ClickEvent } from '../tools/insights/store'
@@ -8,9 +8,7 @@ import { endSession, flushNow } from '../tools/insights/tracker'
 import { LEGEND, drawHeat, rng, sampleTaps, type HeatPoint } from '../tools/insights/heat'
 import { setFlag, useFlag } from '../tools/shared'
 import { nameOf } from '../tools/compare/store'
-import { loadSessions, loadTests, saveTests, summarize, type TestTask, type UsabilityTest } from '../tools/tests/store'
-import { RunHere } from './heatmap/RunHere'
-import { TaskEdit } from './heatmap/TaskEdit'
+import { loadSessions, loadTests, summarize, type UsabilityTest } from '../tools/tests/store'
 import { loadGaze, loadGazeSessions, timeOf } from '../tools/gaze/store'
 import { aoiStats, fixationsOf, idtFor, saccadesOf, type Aoi, type Fixation } from '../tools/gaze/analysis'
 import { sampleGaze } from '../tools/gaze/sample'
@@ -48,7 +46,7 @@ const short = (s: string, n = 70) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 export default function Heatmap() {
   const [params, setParams] = useSearchParams()
   const recording = useFlag('insights')
-  const [tests, setTests] = useState(loadTests)
+  const tests = useMemo(() => loadTests(), [])
   const [ver, setVer] = useState(0)
   const sessions = useMemo(() => (ver >= 0 ? loadSessions() : []), [ver])
   const [clicks, setClicks] = useState<ClickEvent[]>([])
@@ -70,8 +68,8 @@ export default function Heatmap() {
   const [radius, setRadius] = useState(30)
   const [opacity, setOpacity] = useState(0.8)
   const [hover, setHover] = useState<string | null>(null)
-  const [recordingRun, setRecordingRun] = useState(false)
-  const [editing, setEditing] = useState<'edit' | 'new' | null>(null)
+  // One run only (opened from the results list), or every run of the task.
+  const runId = params.get('run')
   const [pidx, setPidx] = useState(0)
   const [playT, setPlayT] = useState<number | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -89,7 +87,7 @@ export default function Heatmap() {
       if (!test || !task) return []
       // "First" is the first click on each page of an attempt: on the start page that is the task's
       // first click; on a later page, where they went first once they got there.
-      return sessions.filter((s) => s.testId === test.id).flatMap((s) => s.attempts.filter((a) => a.taskId === task.id).flatMap((a) => {
+      return sessions.filter((s) => s.testId === test.id && (!runId || s.id === runId)).flatMap((s) => s.attempts.filter((a) => a.taskId === task.id).flatMap((a) => {
         const seenPage = new Set<string>()
         return a.taps.map((t) => {
           const first = !seenPage.has(t.page)
@@ -108,13 +106,13 @@ export default function Heatmap() {
   }, [source, test, task, sessions, clicks])
 
   const gaze = useMemo(() => (ver >= 0 ? loadGaze() : []), [ver])
-  const testRuns = useMemo(() => new Set(sessions.filter((x) => x.testId === test?.id).map((x) => x.id)), [sessions, test?.id])
+  const testRuns = useMemo(() => new Set(sessions.filter((x) => x.testId === test?.id && (!runId || x.id === runId)).map((x) => x.id)), [sessions, test?.id, runId])
   const gazeHereAll = useMemo(() => gaze.filter((p) => (source === 'test' ? p.task === task?.id && !!p.test && testRuns.has(p.test) : !p.test)), [gaze, source, task?.id, testRuns])
   // Every page this task (or browsing) touched, in the order people went: the start page, then the
   // pages they visited (with or without a click there), then any other page with clicks or gaze.
   const pages = useMemo(() => {
     const visited = source === 'test' && test && task
-      ? sessions.filter((x) => x.testId === test.id).flatMap((x) => x.attempts.filter((a) => a.taskId === task.id).flatMap((a) => a.pages))
+      ? sessions.filter((x) => x.testId === test.id && (!runId || x.id === runId)).flatMap((x) => x.attempts.filter((a) => a.taskId === task.id).flatMap((a) => a.pages))
       : []
     const base = source === 'test' ? [task?.startPage ?? '/'] : SCREENS
     return [...new Set([...base, ...visited, ...taps.map((t) => t.page), ...gazeHereAll.map((g) => g.page)])]
@@ -138,7 +136,7 @@ export default function Heatmap() {
   const testOutcome = useMemo(() => {
     const m = new Map<string, { ok: boolean; firstRight: boolean | null; acc?: number }>()
     if (source !== 'test' || !test || !task) return m
-    for (const s of sessions.filter((x) => x.testId === test.id)) {
+    for (const s of sessions.filter((x) => x.testId === test.id && (!runId || x.id === runId))) {
       const a = s.attempts.find((x) => x.taskId === task.id)
       if (a) m.set(s.id, { ok: a.outcome === 'success', firstRight: a.firstTapCorrect, acc: s.gaze?.accuracy })
     }
@@ -307,7 +305,7 @@ export default function Heatmap() {
           <p>Where participants clicked while doing a usability task, added up and drawn as heat over the screen: blue where a few clicked, red where most did. Start with <b>first clicks</b>: people whose first click is on the right path usually finish the task. For one person’s path step by step, see <Link to="/console/sessions">Sessions</Link>.</p>
         </div>
         <div className="actions">
-          <button className="btn primary" onClick={() => setRecordingRun(true)} disabled={source === 'test' && !task}><Circle size={12} fill="currentColor" /> {source === 'test' ? 'Record a run here' : 'Record browsing here'}</button>
+          <Link className="btn" to="/console/heatmap"><ArrowLeft size={14} /> All results</Link>
           <button className="btn" onClick={() => void refresh()}><RefreshCw size={14} /> Refresh</button>
         </div>
       </div>
@@ -315,15 +313,15 @@ export default function Heatmap() {
       <section className="card hm-controls">
         <div className="row wrap" style={{ gap: 8 }}>
           <div className="seg" role="group" aria-label="Source">
-            <button aria-pressed={source === 'test'} onClick={() => set({ source: null, page: null, device: null })}>Usability test</button>
-            <button aria-pressed={source === 'browsing'} onClick={() => set({ source: 'browsing', page: null, device: null })}>Everyday browsing</button>
+            <button aria-pressed={source === 'test'} onClick={() => set({ source: null, page: null, device: null, run: null })}>Usability test</button>
+            <button aria-pressed={source === 'browsing'} onClick={() => set({ source: 'browsing', page: null, device: null, run: null })}>Everyday browsing</button>
           </div>
           {source === 'test' && test && (
             <>
-              <select className="select hm-select" value={test.id} onChange={(e) => set({ ut: e.target.value, utask: null, page: null, device: null })} aria-label="Test">
+              <select className="select hm-select" value={test.id} onChange={(e) => set({ ut: e.target.value, utask: null, page: null, device: null, run: null })} aria-label="Test">
                 {tests.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
-              <select className="select hm-select wide" value={task?.id} onChange={(e) => set({ utask: e.target.value, page: null, device: null })} aria-label="Task">
+              <select className="select hm-select wide" value={task?.id} onChange={(e) => set({ utask: e.target.value, page: null, device: null, run: null })} aria-label="Task">
                 {test.tasks.map((t, i) => <option key={t.id} value={t.id}>Task {i + 1}: {short(t.prompt)}</option>)}
               </select>
             </>
@@ -376,11 +374,9 @@ export default function Heatmap() {
               <div><dt>First click right</dt><dd className="num">{pct(stats.firstCorrect, stats.firstTotal)}</dd></div>
             </dl>
           )}
-          <span className="row" style={{ gap: 6 }}>
-            <button className="btn sm" onClick={() => setEditing('edit')}><Pencil size={13} /> Change task</button>
-            <button className="btn sm" onClick={() => setEditing('new')}><Plus size={13} /> New task</button>
-            <Link className="btn sm ghost" to={`/console/tests/${test!.id}`}>Results</Link>
-          </span>
+          {runId ? (() => { const s = sessions.find((x) => x.id === runId); return (
+            <span className="hm-run-pill">One run: <b>{s?.participant ?? 'removed'}</b>{s ? ` · ${new Date(s.startedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''} <button className="link-btn" onClick={() => set({ run: null, page: null, device: null })}>Show all runs</button></span>
+          ) })() : null}
         </section>
       )}
 
@@ -404,13 +400,13 @@ export default function Heatmap() {
       })()}
       {layer === 'eyes' && (
         <p className="hm-sample"><Info size={14} /> <span>{eyeSample
-          ? <>No one has done this {source === 'test' ? 'task' : 'screen'} with eye tracking on at {device} width yet, so this shows <b>sample gaze</b>: 8 made-up people’s raw webcam-like samples (30 a second, with noise), run through the same fixation algorithm as real data. It shows how the view reads; it is not a result. Press <b>{source === 'test' ? 'Record a run here' : 'Record browsing here'}</b> and tick “also record where I look”.</>
+          ? <>No one has done this {source === 'test' ? 'task' : 'screen'} with eye tracking on at {device} width yet, so this shows <b>sample gaze</b>: 8 made-up people’s raw webcam-like samples (30 a second, with noise), run through the same fixation algorithm as real data. It shows how the view reads; it is not a result. Start a task from the dock (Heatmap) with “also record where I look” ticked.</>
           : <>Eyes: {eyePeople.length} {eyePeople.length === 1 ? 'person' : 'people'} with eye tracking, median accuracy ±{accuracy ?? '?'} px. Webcam tracking is good for areas, not single words: read fixations as “around here”.</>}</span></p>
       )}
       {layer === 'clicks' && sample && (
         <p className="hm-sample"><Info size={14} /> <span>{source === 'test'
-          ? <>No participant has done this task on this screen at {device} width yet, so this shows <b>sample data</b>: {SAMPLE_PEOPLE} made-up participants clicking this screen’s real buttons and links, more often on the way to the goal. It shows how the map reads; it is not a result. Press <b>Record a run here</b> to do the task yourself on this page, or share the test link from <Link to={`/console/tests/${test?.id}`}>the test</Link>.</>
-          : <>No recorded taps on this screen at {device} width yet, so this shows <b>sample data</b>, not real visitors. Press <b>Record browsing here</b> to click around the shop on this page{recording ? ', or use the shop in another tab and Refresh' : ''}.</>}</span></p>
+          ? <>No participant has done this task on this screen at {device} width yet, so this shows <b>sample data</b>: {SAMPLE_PEOPLE} made-up participants clicking this screen’s real buttons and links, more often on the way to the goal. It shows how the map reads; it is not a result. Run it from the dock on any shop page (Heatmap → Start the task here), or share the test link from <Link to={`/console/tests/${test?.id}`}>the test</Link>.</>
+          : <>No recorded taps on this screen at {device} width yet, so this shows <b>sample data</b>, not real visitors. {recording ? 'Use the shop, then Refresh.' : 'Turn on recording from the dock (Sessions) and use the shop.'}</>}</span></p>
       )}
 
       <div className="hm-grid">
@@ -504,18 +500,6 @@ export default function Heatmap() {
         </aside>
         )}
       </div>
-      {recordingRun && (
-        <RunHere test={source === 'test' ? test : undefined} task={source === 'test' ? task : undefined} startPage={source === 'test' ? task?.startPage ?? '/' : page}
-          onClose={(saved) => { setRecordingRun(false); if (saved) { void refresh(); set({ page: saved.page, device: null }) } }} />
-      )}
-      {editing && test && (
-        <TaskEdit task={editing === 'edit' ? task : undefined} results={editing === 'edit' && stats ? stats.attempts : 0} onCancel={() => setEditing(null)}
-          onSave={(t: TestTask) => {
-            const next = tests.map((x) => (x.id === test.id ? { ...x, tasks: editing === 'edit' ? x.tasks.map((k) => (k.id === t.id ? t : k)) : [...x.tasks, t], updatedAt: new Date().toISOString() } : x))
-            saveTests(next); setTests(next); setEditing(null)
-            set({ utask: t.id, page: null, device: null })
-          }} />
-      )}
     </main>
   )
 }

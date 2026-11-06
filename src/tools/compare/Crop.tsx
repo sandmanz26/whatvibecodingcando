@@ -17,7 +17,7 @@ const firstVisible = (doc: Document, sel: string) => {
  * can't be clicked. A component that only appears after an action (an open menu, a search) is
  * reported as not found instead of showing the wrong part of the screen.
  */
-export function Crop({ slot, maxHeight = 320 }: { slot: Slot; maxHeight?: number }) {
+export function Crop({ slot, maxHeight = 320, overlay }: { slot: Slot; maxHeight?: number; /** drawn over the component once it is found (annotations) */ overlay?: React.ReactNode }) {
   const wrap = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [avail, setAvail] = useState(400)
@@ -66,6 +66,8 @@ export function Crop({ slot, maxHeight = 320 }: { slot: Slot; maxHeight?: number
   return (
     <div className="cmp-crop" ref={wrap}>
       <div className="cmp-crop-box" style={found ? { width: found.w * scale, height: found.h * scale } : { width: '100%', height: 120 }}>
+        {/* The frame is clipped to the component; annotations above it are not, so a note near an edge stays whole. */}
+        <div className="cmp-crop-clip">
         <iframe
           ref={frame}
           key={src}
@@ -75,6 +77,8 @@ export function Crop({ slot, maxHeight = 320 }: { slot: Slot; maxHeight?: number
           aria-hidden
           style={{ width: d.w, height: d.h, transform: `scale(${scale})`, left: found ? -found.x * scale : 0, top: found ? -found.y * scale : 0, visibility: found ? 'visible' : 'hidden' }}
         />
+        </div>
+        {found && overlay}
         {st.kind === 'loading' && <span className="cmp-crop-msg muted">Loading the component…</span>}
         {st.kind === 'missing' && <span className="cmp-crop-msg muted">Not on this screen when it opens. It may need an action first, such as an open menu, or the screen changed since it was picked.</span>}
       </div>

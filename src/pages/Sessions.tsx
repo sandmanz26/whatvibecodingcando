@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Ban, CircleSlash, Download, Flame, MousePointerClick, RefreshCw, Trash2, X, FileText } from 'lucide-react'
 import { Empty, Modal, Switch } from '../components/ui'
 import { DEVICES, ScreenViewer, type Device } from '../tools/insights/ScreenViewer'
-import { clearEvents, layoutOf, loadEvents, type ClickEvent, type Loaded } from '../tools/insights/store'
+import { clearEvents, layoutOf, loadEvents, removeSessionLocal, type ClickEvent, type Loaded } from '../tools/insights/store'
 import { endSession, flushNow } from '../tools/insights/tracker'
 import { buildSessions, clock, ENDED, loadNotes, saveNote, sessionCsv, TAGS, type Session, type Step } from '../tools/insights/sessions'
 import { setFlag, useFlag } from '../tools/shared'
@@ -133,6 +133,7 @@ export default function Sessions({ view = 'sessions' }: { view?: 'sessions' | 'h
   const [sid, setSid] = useState<string | null>(null)
   const [step, setStep] = useState<number | null>(null)
   const [confirm, setConfirm] = useState(false)
+  const [dropOne, setDropOne] = useState<Session | null>(null)
   const [heat, setHeat] = useState<{ page: string | null; device: Device; mode: 'dots' | 'elements' }>({ page: null, device: 'desktop', mode: 'dots' })
   const [notesVer, setNotesVer] = useState(0)
 
@@ -214,6 +215,7 @@ export default function Sessions({ view = 'sessions' }: { view?: 'sessions' | 'h
                   <div className="row">
                     <button className="btn sm primary" onClick={() => { const i = open.steps.findIndex((s) => s.kind === 'tap'); if (i >= 0) setStep(i) }} disabled={!open.taps}><MousePointerClick size={13} /> Replay taps</button>
                     <button className="btn sm" onClick={() => exportCsv(open)}><Download size={13} /> CSV</button>
+                    <button className="btn sm ghost danger icon" onClick={() => setDropOne(open)} disabled={!!data?.configured} aria-label={`Delete session ${open.n}`} title={data?.configured ? 'Sessions on the server are deleted all at once' : 'Delete this session'}><Trash2 size={13} /></button>
                   </div>
                 </div>
                 <div className="journey" aria-label="Screens in order">
@@ -270,6 +272,10 @@ export default function Sessions({ view = 'sessions' }: { view?: 'sessions' | 'h
         <StepDrawer steps={open.steps} index={step} onMove={setStep} onClose={() => setStep(null)} title={`Session ${open.n}`} />
       )}
 
+      {dropOne && (
+        <Modal title={`Delete session ${dropOne.n}?`} description={`Its ${dropOne.taps} taps and ${dropOne.pages.length} screens are removed from this browser. This can’t be undone.`} onClose={() => setDropOne(null)}
+          footer={<><button className="btn" onClick={() => setDropOne(null)}>Keep it</button><button className="btn primary" onClick={() => { removeSessionLocal(dropOne.sid); setDropOne(null); setSid(null); void refresh() }}>Delete session</button></>} />
+      )}
       {confirm && data && (
         <Modal title="Delete every session?" description={`Removes ${sessions.length} sessions (${data.events.length} events) from ${data.scope}. This can’t be undone.`} onClose={() => setConfirm(false)}
           footer={<>

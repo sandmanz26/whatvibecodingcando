@@ -25,13 +25,42 @@ export interface Slot {
   pickedAt: string
 }
 export interface CNote { id: string; author: string; text: string; about: About; at: string }
-export interface Review { id: string; title: string; a: Slot; b: Slot; notes: CNote[]; createdAt: string; updatedAt: string; /** made by the app as an example */ sample?: boolean }
+/** A reviewer's pin on one of the two components: where (as % of the component's box) and what. */
+export interface Annotation { id: string; side: Side; x: number; y: number; text: string; author: string; at: string; round: number }
+export type Choice = 'A' | 'B' | 'both' | 'neither'
+export const CHOICE_LABEL: Record<Choice, string> = { A: 'Keep A', B: 'Keep B', both: 'Both are fine', neither: 'Both need changes' }
+export interface Decision { by: string; at: string; choice: Choice; summary: string; round: number }
+export interface Review {
+  id: string; title: string; a: Slot; b: Slot; notes: CNote[]; createdAt: string; updatedAt: string
+  /** made by the app as an example */
+  sample?: boolean
+  /** what the person submitting wants decided */
+  question?: string
+  submittedBy?: string
+  /** 'pending' waits for a reviewer; 'done' has a decision. Older reviews without one count as pending. */
+  status?: 'pending' | 'done'
+  annotations?: Annotation[]
+  decision?: Decision
+  /** earlier decisions, when the submitter asked for another review */
+  history?: Decision[]
+  /** 1 for the first review, +1 each time another review is asked for */
+  round?: number
+}
+export const statusOf = (r: Review) => (r.status === 'done' && r.decision ? 'done' : 'pending')
+export const pendingCount = (list = loadReviews()) => list.filter((r) => statusOf(r) === 'pending').length
+export const COMPARE_CHANGED = `${APP}:compare`
+/** Opens the compare panel from anywhere: the list, a new comparison, or one review. */
+export const COMPARE_OPEN = `${APP}:compare-open`
+export type CompareOpen = { view: 'list' } | { view: 'new' } | { view: 'review'; id: string }
+const NAME_KEY = `${APP}.reviewPins.name`
+/** The name reviews and annotations are signed with: the same one comments use. */
+export const reviewerName = () => readJSON<string>(NAME_KEY, '').trim() || 'Rani'
 
 const KEY = `${APP}.compare`
 export const MAX_NOTE = 2000
 
 export const loadReviews = () => readJSON<Review[]>(KEY, [])
-export const saveReviews = (list: Review[]) => writeJSON(KEY, list)
+export const saveReviews = (list: Review[]) => { writeJSON(KEY, list); window.dispatchEvent(new Event(COMPARE_CHANGED)) }
 export const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
 
 /** Screens to start from. The search screen uses a fixed demo query, never one somebody typed. */

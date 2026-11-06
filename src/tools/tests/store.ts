@@ -75,6 +75,12 @@ export interface TestSession {
 
 const TESTS_KEY = `${APP}.tests`
 export const RUN_KEY = `${APP}.tests.run`
+/** Start one task right where you are (from the dock), skipping the participant intro. */
+export const UT_START = `${APP}:ut-start`
+export interface UtStart { testId: string; taskId: string; eyes: boolean; name?: string }
+/** Someone (the dock) wants to know whether a run is going on. */
+export const UT_STATE = `${APP}:ut-state`
+export const utRunning = () => document.documentElement.dataset.utRunning === 'on'
 
 /** The task a participant is doing right now in this tab, if any (read by eye tracking to tag its samples). */
 export function runningTask(): { session: string; testId: string; taskId: string; startedAt: number } | null {

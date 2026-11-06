@@ -93,6 +93,11 @@ export async function loadEvents(): Promise<Loaded> {
   return { configured: false, scope: LOCAL_SCOPE, events: readJSON<InsightEvent[]>(LOCAL_KEY, []) }
 }
 
+/** Removes one session's events from this browser (the server contract has no per-session delete). */
+export function removeSessionLocal(sid: string) {
+  writeJSON(LOCAL_KEY, readJSON<InsightEvent[]>(LOCAL_KEY, []).filter((e) => e.sid !== sid))
+}
+
 export async function clearEvents(configured: boolean) {
   if (configured && TOOLS_API) {
     await fetch(`${TOOLS_API}/clicks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clear: true }) })

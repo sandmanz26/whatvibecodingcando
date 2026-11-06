@@ -237,7 +237,7 @@ function Results({ id }: { id: string }) {
                                 </div>
                               </div>
                               <p className="muted" style={{ fontSize: 12 }}>Green outlines mark taps that hit the target; red, taps that missed. Numbers show how many taps landed on each element.</p>
-                              <Link className="btn sm" to={`/console/heatmap?ut=${test.id}&utask=${x.task.id}&page=${encodeURIComponent(page)}&device=${dev}`}><Flame size={13} /> Open heatmap</Link>
+                              <Link className="btn sm" to={`/console/heatmap/view?ut=${test.id}&utask=${x.task.id}&page=${encodeURIComponent(page)}&device=${dev}`}><Flame size={13} /> Open heatmap</Link>
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <ScreenViewer key={`${x.task.id}-${page}`} page={page} device={dev} mode="elements" task={`${test.id}:${x.task.id}`} maxHeight={560} />

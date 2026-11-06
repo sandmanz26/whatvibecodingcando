@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { GripVertical, MessageSquarePlus, MessagesSquare, Columns2, Palette, ScanSearch, MousePointerClick, Flame, GitBranch } from 'lucide-react'
+import { GripVertical, MessageSquarePlus, MessagesSquare, Palette, ScanSearch, GitBranch } from 'lucide-react'
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
 import { getFlag, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
 import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
@@ -10,6 +10,8 @@ import { INSPECT_EVENT, INSPECT_STATE } from '../tools/inspect/Inspector'
 import { LATEST, VERSIONS, setShowingChanges, setVersion, useCommentCounts, useShowingChanges, useVersion, versionOf } from '../lib/version'
 import { TokenSwitcher } from '../tools/design/TokenSwitcher'
 import { useStore } from '../store/store'
+import { DockPopover, HeatmapMenu, SessionsMenu } from './DockMenus'
+import { CompareButton } from '../tools/compare/CompareDock'
 
 const POS_KEY = 'market.dock'
 
@@ -98,34 +100,13 @@ export function VersionSwitch() {
         <button className="dock-icon dock-count" onClick={() => comment('list')} aria-label={`All comments, ${verCount} on v${version}`} title={`All comments on v${version}`}><MessagesSquare size={15} />{verCount > 0 && <span>{verCount}</span>}</button>
         <VersionMenu />
         <span className="dock-sep" aria-hidden />
-        <button className="dock-icon" onClick={() => nav('/console/compare')} aria-label="Compare components" title="Compare two components side by side"><Columns2 size={15} /></button>
+        <CompareButton />
         <TokensMenu />
         <button className={`dock-icon ${inspecting ? 'on' : ''}`} onClick={() => window.dispatchEvent(new Event(INSPECT_EVENT))} aria-label="Inspect styles" aria-pressed={inspecting} title="Inspect: hover anything to see its colours, font and whether they are design tokens (I)"><ScanSearch size={15} /></button>
-        <button className="dock-icon" onClick={() => nav('/console/sessions')} aria-label="Sessions" title="Sessions: what each person tapped, in order"><MousePointerClick size={15} /></button>
-        <button className="dock-icon" onClick={() => nav('/console/heatmap')} aria-label="Heatmap" title="Heatmap: where people tap on each screen"><Flame size={15} /></button>
+        <SessionsMenu />
+        <HeatmapMenu />
       </div>
     </>
-  )
-}
-
-/** A dock button with a panel above it (or below, when the dock sits near the top). Outside click or Esc closes. */
-function DockPopover({ button, label, children, className = '' }: { button: (open: boolean) => React.ReactNode; label: string; className?: string; children: (close: () => void) => React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const [down, setDown] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const out = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('pointerdown', out)
-    window.addEventListener('keydown', key)
-    return () => { window.removeEventListener('pointerdown', out); window.removeEventListener('keydown', key) }
-  }, [open])
-  return (
-    <div className={`dock-ver ${down ? 'down' : ''} ${className}`} ref={box}>
-      <span onClick={() => { setDown((box.current?.getBoundingClientRect().top ?? 999) < 420); setOpen((o) => !o) }} aria-label={label}>{button(open)}</span>
-      {open && children(() => setOpen(false))}
-    </div>
   )
 }
 

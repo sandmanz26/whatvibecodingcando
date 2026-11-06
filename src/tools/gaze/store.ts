@@ -65,3 +65,10 @@ export const gazeFrame = () => frame
 let clickHook: ((x: number, y: number) => void) | null = null
 export const setGazeClickHook = (h: typeof clickHook) => { clickHook = h }
 export const noteGazeClick = (x: number, y: number) => clickHook?.(x, y)
+
+/** Removes the gaze points that match (e.g. one usability run's task). */
+export function removeGaze(match: (p: GazePoint) => boolean) {
+  const all = loadGaze()
+  const keep = all.filter((p) => !match(p))
+  if (keep.length !== all.length) writeJSON(POINTS_KEY, keep)
+}

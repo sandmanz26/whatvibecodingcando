@@ -4,9 +4,10 @@ import { useStore } from '../store/store'
 import { Empty, Modal } from '../components/ui'
 import { ScreenViewer, DEVICES, type Device, type Picked } from '../tools/insights/ScreenViewer'
 import { Crop } from '../tools/compare/Crop'
+import { AnnotatedCrop, Diff } from '../tools/compare/parts'
 import { buildSamples, markSeeded, wasSeeded } from '../tools/compare/samples'
 import { APP, readJSON, writeJSON } from '../tools/shared'
-import { MAX_NOTE, SCREENS, loadReviews, nameOf, rid, same, sameSpot, saveReviews, screenOf, snapshot, stale, type About, type CNote, type Review, type Side, type Slot } from '../tools/compare/store'
+import { CHOICE_LABEL, COMPARE_CHANGED, COMPARE_OPEN, MAX_NOTE, SCREENS, loadReviews, nameOf, reviewerName, rid, sameSpot, statusOf, saveReviews, screenOf, snapshot, stale, type About, type CNote, type Review, type Side, type Slot } from '../tools/compare/store'
 
 const NAME_KEY = `${APP}.reviewPins.name`
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -125,8 +126,9 @@ function SlotMeta({ slot }: { slot: Slot }) {
   )
 }
 
-function Editor({ initial, onCancel, onSave }: { initial?: Review; onCancel: () => void; onSave: (title: string, a: Slot, b: Slot) => void }) {
+function Editor({ initial, onCancel, onSave }: { initial?: Review; onCancel: () => void; onSave: (title: string, a: Slot, b: Slot, question: string) => void }) {
   const [title, setTitle] = useState(initial?.title ?? '')
+  const [question, setQuestion] = useState(initial?.question ?? '')
   const [a, setA] = useState<Slot | undefined>(initial?.a)
   const [b, setB] = useState<Slot | undefined>(initial?.b)
   const [picking, setPicking] = useState<Side | null>(null)
@@ -147,6 +149,8 @@ function Editor({ initial, onCancel, onSave }: { initial?: Review; onCancel: () 
       <div className="field" style={{ maxWidth: 520, marginBottom: 16 }}>
         <label htmlFor="cmp-title">Title</label>
         <input id="cmp-title" className="input" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder={placeholder} />
+        <label htmlFor="cmp-q" style={{ marginTop: 8 }}>What should the reviewer decide?</label>
+        <input id="cmp-q" className="input" value={question} maxLength={300} onChange={(e) => setQuestion(e.target.value)} placeholder="e.g. Which card should we use everywhere?" />
       </div>
       <div className="cmp-pair">
         <SlotCard side="A" slot={a} onPick={() => setPicking('A')} />
@@ -156,7 +160,7 @@ function Editor({ initial, onCancel, onSave }: { initial?: Review; onCancel: () 
       {initial && (a !== initial.a || b !== initial.b) && initial.notes.length > 0 && <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>Notes stay. Notes about a component you replace are marked as written about the earlier one.</p>}
       <div className="row mt-16" style={{ gap: 8 }}>
         <button className="btn" onClick={cancel}>Cancel</button>
-        <button className="btn primary" disabled={!a || !b || !!dup} onClick={() => a && b && onSave(title.trim() || placeholder, a, b)}>{initial ? 'Save changes' : 'Save review'}</button>
+        <button className="btn primary" disabled={!a || !b || !!dup} onClick={() => a && b && onSave(title.trim() || placeholder, a, b, question.trim())}>{initial ? 'Save changes' : 'Save review'}</button>
         {(!a || !b) && <span className="muted" style={{ fontSize: 12.5 }}>Pick both components to save.</span>}
       </div>
 
@@ -171,37 +175,6 @@ function Editor({ initial, onCancel, onSave }: { initial?: Review; onCancel: () 
 }
 
 /* ---------- a saved review ---------- */
-
-function Diff({ a, b }: { a: Slot; b: Slot }) {
-  const rows = a.styles.map((r) => ({ r, o: b.styles.find((x) => x.key === r.key) }))
-  const differ = rows.filter(({ r, o }) => !o || !same(r.value, o.value)).length
-  const cell = (v?: { value: string; token?: string }) => v && (
-    <span className="cmp-val">
-      {/^rgba?\(/.test(v.value) && <i className="cmp-swatch" style={{ background: v.value }} />}
-      <span className="mono">{v.value}</span>
-      {v.token && <span className="badge outline">{v.token}</span>}
-    </span>
-  )
-  return (
-    <section className="card card-body">
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-        <b>Rendered styles</b>
-        <span className="muted" style={{ fontSize: 12.5 }}>{differ === 0 ? 'Same in every property checked' : `${differ} of ${rows.length} properties differ`} · as picked</span>
-      </div>
-      <div className="cmp-table-wrap">
-        <table className="cmp-table">
-          <thead><tr><th>Property</th><th>A</th><th>B</th></tr></thead>
-          <tbody>
-            {rows.map(({ r, o }) => {
-              const d = !o || !same(r.value, o.value)
-              return <tr key={r.key} className={d ? 'diff' : ''}><th scope="row">{r.label}{d && <span className="cmp-dot" aria-label="differs" />}</th><td>{cell(r)}</td><td>{cell(o)}</td></tr>
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
 
 function Notes({ review, onChange }: { review: Review; onChange: (notes: CNote[]) => void }) {
   const { me } = useStore()
@@ -274,6 +247,13 @@ export default function Compare() {
   const commit = (next: Review[]) => { setList(next); saveReviews(next) }
   const sorted = useMemo(() => [...list].sort((x, y) => y.createdAt.localeCompare(x.createdAt)), [list])
   const r = list.find((x) => x.id === sel) ?? sorted[0]
+  const anns = useMemo(() => [...(r?.annotations ?? [])].sort((a, b) => a.at.localeCompare(b.at)), [r])
+  // Reviews made in the dock's panel show up here too.
+  useEffect(() => {
+    const sync = () => setList(loadReviews())
+    window.addEventListener(COMPARE_CHANGED, sync)
+    return () => window.removeEventListener(COMPARE_CHANGED, sync)
+  }, [])
   useEffect(() => { window.scrollTo(0, 0) }, [editing])
 
   // Example reviews the first time the page opens empty, so it shows what it does. Deleting them is
@@ -297,14 +277,14 @@ export default function Compare() {
     const initial = editing === 'new' ? undefined : list.find((x) => x.id === editing)
     return (
       <Editor key={editing} initial={initial} onCancel={() => setEditing(null)}
-        onSave={(title, a, b) => {
+        onSave={(title, a, b, question) => {
           const now = new Date().toISOString()
           if (initial) {
-            commit(list.map((x) => (x.id === initial.id ? { ...x, title, a, b, updatedAt: now } : x)))
+            commit(list.map((x) => (x.id === initial.id ? { ...x, title, a, b, question, updatedAt: now } : x)))
             toast('Review saved')
           } else {
             const id = rid()
-            commit([...list, { id, title, a, b, notes: [], createdAt: now, updatedAt: now }])
+            commit([...list, { id, title, a, b, question, notes: [], annotations: [], createdAt: now, updatedAt: now, submittedBy: reviewerName(), status: 'pending', round: 1 }])
             setSel(id)
             toast('Review saved. Add your notes.')
           }
@@ -334,14 +314,18 @@ export default function Compare() {
             {sorted.map((x) => (
               <button key={x.id} className={`ses-row ${x.id === r.id ? 'on' : ''}`} onClick={() => setSel(x.id)}>
                 <b>{x.title}</b>
-                <span className="muted">{x.sample && <span className="badge outline" style={{ height: 18, marginRight: 6 }}>Sample</span>}{x.notes.length} note{x.notes.length === 1 ? '' : 's'} · {when(x.updatedAt)}</span>
+                <span className="muted"><span className={`cmpr-status ${statusOf(x)}`} style={{ marginRight: 6 }}>{statusOf(x) === 'pending' ? 'To review' : CHOICE_LABEL[x.decision!.choice]}</span>{x.sample && <span className="badge outline" style={{ height: 18, marginRight: 6 }}>Sample</span>}{x.notes.length} note{x.notes.length === 1 ? '' : 's'} · {when(x.updatedAt)}</span>
               </button>
             ))}
           </nav>
           <section className="stack gap-16" style={{ minWidth: 0 }}>
             <div className="row wrap" style={{ justifyContent: 'space-between', gap: 8 }}>
-              <h2 style={{ fontSize: 18 }}>{r.title}</h2>
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ fontSize: 18 }}>{r.title}</h2>
+                {r.question && <p className="muted" style={{ margin: '2px 0 0', fontSize: 13.5 }}>“{r.question}” · by {r.submittedBy ?? 'someone'}</p>}
+              </div>
               <div className="row" style={{ gap: 6 }}>
+                <button className="btn sm primary" onClick={() => window.dispatchEvent(new CustomEvent(COMPARE_OPEN, { detail: { view: 'review', id: r.id } }))}>{statusOf(r) === 'pending' ? 'Review it' : 'Open review'}</button>
                 <button className="btn sm" onClick={() => setEditing(r.id)} title="Rename, or replace a component"><Pencil size={13} /> Edit</button>
                 <button className="btn sm danger" onClick={() => setConfirmDelete(true)} aria-label="Delete review" title="Delete review"><Trash2 size={13} /></button>
               </div>
@@ -352,12 +336,15 @@ export default function Compare() {
                 return (
                   <section key={s} className="card card-body cmp-slot">
                     <b className="cmp-side">{s}</b>
-                    <Crop key={`${r.id}-${slot.pickedAt}`} slot={slot} />
+                    <AnnotatedCrop key={`${r.id}-${slot.pickedAt}`} slot={slot} side={s} annotations={anns} numberOf={(a) => anns.indexOf(a) + 1} annotate={false} onAdd={() => {}} onRemove={() => {}} me="" highlight={null} onHighlight={() => {}} />
                     <SlotMeta slot={slot} />
                   </section>
                 )
               })}
             </div>
+            {r.decision && statusOf(r) === 'done' && (
+              <section className="card card-body"><b>Decision: {CHOICE_LABEL[r.decision.choice]}</b><span className="muted" style={{ fontSize: 12.5 }}>by {r.decision.by}{(r.round ?? 1) > 1 ? ` · round ${r.round}` : ''}</span>{r.decision.summary && <p style={{ margin: '6px 0 0' }}>{r.decision.summary}</p>}</section>
+            )}
             <Diff a={r.a} b={r.b} />
             <Notes review={r} onChange={(notes) => commit(list.map((x) => (x.id === r.id ? { ...x, notes, updatedAt: new Date().toISOString() } : x)))} />
           </section>

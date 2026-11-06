@@ -29,12 +29,14 @@ import Signup from './pages/saas/Signup'
 import { PanelLayout, Overview, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { Inspector } from './tools/inspect/Inspector'
+import { CompareDock } from './tools/compare/CompareDock'
 import { DesignLayer } from './tools/design/DesignLayer'
 import { FiveSecRunner } from './tools/fivesec/Runner'
 import { FakeDoors } from './tools/doors/FakeDoors'
 import { GazeRunner } from './tools/gaze/GazeRunner'
 import Sessions from './pages/Sessions'
 import Heatmap from './pages/Heatmap'
+import HeatmapRuns from './pages/HeatmapRuns'
 import UsabilityTests from './pages/UsabilityTests'
 import TestEditor from './pages/TestEditor'
 
@@ -68,7 +70,8 @@ export default function App() {
           <Route path="console" element={<ResearchLayout />}>
             <Route path="insights" element={<Navigate to="/console/sessions" replace />} />
             <Route path="sessions" element={<Sessions view="sessions" />} />
-            <Route path="heatmap" element={<Heatmap />} />
+            <Route path="heatmap" element={<HeatmapRuns />} />
+            <Route path="heatmap/view" element={<Heatmap />} />
             <Route path="tests" element={<UsabilityTests />} />
             <Route path="tests/:id" element={<UsabilityTests />} />
             <Route path="tests/:id/edit" element={<TestEditor />} />
@@ -109,6 +112,7 @@ function ResearchTools() {
       <GazeRunner />
       <NarrationRecorder />
       <Inspector />
+      <CompareDock />
       <VersionSwitch />
     </>
   )

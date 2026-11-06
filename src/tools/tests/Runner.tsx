@@ -5,7 +5,7 @@ import { CheckCircle2, Clock, Flag, TimerOff, ListChecks } from 'lucide-react'
 import { TOOL_DOM, isEmbedded } from '../shared'
 import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP } from '../gaze/store'
 import { describeTarget } from '../insights/tracker'
-import { RUN_KEY, loadSessions, loadTests, pageMatches, uid, upsertSession, type Attempt, type Outcome, type TaskTap, type TestSession, type UsabilityTest } from './store'
+import { RUN_KEY, UT_START, UT_STATE, type UtStart, loadSessions, loadTests, pageMatches, uid, upsertSession, type Attempt, type Outcome, type TaskTap, type TestSession, type UsabilityTest } from './store'
 
 
 interface Run {
@@ -15,6 +15,8 @@ interface Run {
   phase: 'intro' | 'eyes' | 'ready' | 'doing' | 'result' | 'finished'
   /** eye tracking is on for this run */
   eyes?: boolean
+  /** started from the dock for one task: no intro, and it ends after that task */
+  single?: boolean
   startedAt: number
   taps: TaskTap[]
   pages: string[]
@@ -68,7 +70,26 @@ export function UsabilityRunner() {
   useEffect(() => {
     if (run) document.documentElement.dataset.utRunning = 'on'
     else delete document.documentElement.dataset.utRunning
+    window.dispatchEvent(new Event(UT_STATE))
   }, [run])
+
+  // From the dock: one task, here and now. A run already going on isn't interrupted.
+  useEffect(() => {
+    const start = (e: Event) => {
+      const d = (e as CustomEvent<UtStart>).detail
+      if (runRef.current || !d) return
+      const t = loadTests().find((x) => x.id === d.testId)
+      const index = t?.tasks.findIndex((k) => k.id === d.taskId) ?? -1
+      if (!t || index < 0) return
+      const sessionId = uid()
+      upsertSession({ id: sessionId, testId: t.id, participant: d.name?.trim().slice(0, 40) || 'You (from the dock)', startedAt: new Date().toISOString(), vw: window.innerWidth, attempts: [] })
+      setTest(t)
+      setRun({ sessionId, testId: t.id, index, phase: d.eyes ? 'eyes' : 'ready', startedAt: 0, taps: [], pages: [], single: true })
+      if (d.eyes) window.dispatchEvent(new Event(GAZE_START))
+    }
+    window.addEventListener(UT_START, start)
+    return () => window.removeEventListener(UT_START, start)
+  }, [setRun])
 
   const task = test && run ? test.tasks[run.index] : undefined
 
@@ -187,12 +208,13 @@ export function UsabilityRunner() {
     setNow(Date.now())
   }
   const next = () => {
-    if (run.index + 1 < test.tasks.length) setRun({ ...run, index: run.index + 1, phase: 'ready', taps: [], pages: [] })
+    if (run.single) setRun({ ...run, phase: 'finished' })
+    else if (run.index + 1 < test.tasks.length) setRun({ ...run, index: run.index + 1, phase: 'ready', taps: [], pages: [] })
     else setRun({ ...run, phase: 'finished' })
   }
   const close = () => { if (run.eyes || run.phase === 'eyes') window.dispatchEvent(new Event(GAZE_STOP)); setRun(null) }
 
-  const step = <span className="ut-step">Task {run.index + 1} of {test.tasks.length}</span>
+  const step = <span className="ut-step">{run.single ? `Heatmap test · task ${run.index + 1}` : `Task ${run.index + 1} of ${test.tasks.length}`}</span>
   const remaining = task.limitSec * 1000 - (now - run.startedAt)
 
   const card = (body: React.ReactNode) => (
@@ -250,16 +272,25 @@ export function UsabilityRunner() {
         {run.last.outcome === 'timeout' && <div className="ut-outcome"><TimerOff size={22} /><div><b>Time’s up</b><span>That’s useful to know — it means the design made this hard.</span></div></div>}
         {run.last.outcome === 'gave_up' && <div className="ut-outcome"><Flag size={22} /><div><b>Skipped</b><span>Thanks — skipping tells us something too.</span></div></div>}
         <div className="ut-actions">
-          <button className="btn primary" onClick={next}>{run.index + 1 < test.tasks.length ? 'Next task' : 'Finish'}</button>
+          <button className="btn primary" onClick={next}>{!run.single && run.index + 1 < test.tasks.length ? 'Next task' : 'Finish'}</button>
         </div>
       </>)}
 
-      {run.phase === 'finished' && card(<>
+      {run.phase === 'finished' && (run.single ? card(<>
+        <span className="ut-step"><CheckCircle2 size={13} /> Saved</span>
+        <h2>Run saved</h2>
+        <p>It’s in the heatmap results with every other run of this task.</p>
+        <div className="ut-actions">
+          <button className="btn ghost" onClick={close}>Close</button>
+          <button className="btn" onClick={() => { const id = run.sessionId, ti = task.id; setRun(null); nav(`/console/heatmap/view?ut=${test.id}&utask=${ti}&run=${id}`) }}>See this run</button>
+          <button className="btn primary" onClick={() => { const d: UtStart = { testId: test.id, taskId: task.id, eyes: !!run.eyes }; setRun(null); window.setTimeout(() => window.dispatchEvent(new CustomEvent(UT_START, { detail: d })), 0) }}>Run again</button>
+        </div>
+      </>) : card(<>
         <span className="ut-step"><CheckCircle2 size={13} /> All done</span>
         <h2>Thank you!</h2>
         <p>Your answers are saved. You can close this and keep using the app.</p>
         <div className="ut-actions"><button className="btn primary" onClick={close}>Close</button></div>
-      </>)}
+      </>))}
     </div>,
     document.body,
   )

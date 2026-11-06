@@ -5,16 +5,17 @@
  */
 import { DEVICES, type Device } from '../insights/ScreenViewer'
 import { APP } from '../shared'
-import { rid, snapshot, type About, type Review, type Slot } from './store'
+import { rid, snapshot, type About, type Choice, type Review, type Slot } from './store'
 
 const SEEDED = `${APP}.compare.seeded`
 export const wasSeeded = () => { try { return localStorage.getItem(SEEDED) === '1' } catch { return true } }
 export const markSeeded = () => { try { localStorage.setItem(SEEDED, '1') } catch { /* ignore */ } }
 
 interface Spec { page: string; device: Device; sel: string }
-const SAMPLES: { title: string; a: Spec; b: Spec; notes: { about: About; text: string }[] }[] = [
+const SAMPLES: { title: string; question: string; a: Spec; b: Spec; notes: { about: About; text: string }[]; reviewed?: { choice: Choice; summary: string; pins: { side: 'A' | 'B'; x: number; y: number; text: string }[] } }[] = [
   {
     title: 'Product card · Home (desktop) vs Search (mobile)',
+    question: 'Is this the same card on both screens, or should one change?',
     a: { page: '/', device: 'desktop', sel: '.p-grid.six .pcard' },
     b: { page: '/search?q=running%20shoes', device: 'mobile', sel: '.pcard' },
     notes: [
@@ -24,13 +25,16 @@ const SAMPLES: { title: string; a: Spec; b: Spec; notes: { about: About; text: s
   },
   {
     title: 'Primary buttons · header Search vs Buy now',
+    question: 'Should page-level actions be bigger than the header’s?',
+    reviewed: { choice: 'both', summary: 'Intended: Buy now is the page’s main action, so the larger size is right. Keep both.', pins: [{ side: 'A', x: 50, y: 50, text: 'Default size works in the header.' }, { side: 'B', x: 50, y: 50, text: 'Large size is right for the main action.' }] },
     a: { page: '/', device: 'desktop', sel: '.sh-search .btn.primary' },
     b: { page: '/product/p1', device: 'desktop', sel: '.buy .btn.primary' },
     notes: [{ about: 'both', text: 'Sample review: two primary actions. “Buy now” uses the large button size and the header Search button the default size. Decide whether that difference is intended.' }],
   },
   {
     title: 'Chips · search ideas vs product options',
-    a: { page: '/', device: 'desktop', sel: '.hero .chip' },
+    question: 'Should a chosen option look different from a search idea?',
+    a: { page: '/', device: 'desktop', sel: '.hero .chip, .hero2-ideas button' },
     b: { page: '/product/p1', device: 'desktop', sel: '.opt .chip' },
     notes: [{ about: 'both', text: 'Sample review: these look alike but do different jobs. One starts a search, the other selects a size. Should a chosen option look different from an idea?' }],
   },
@@ -67,7 +71,13 @@ export async function buildSamples(author: string): Promise<Review[]> {
     const a = await capture(s.a)
     const b = a && await capture(s.b)
     if (!a || !b) continue
-    out.push({ id: rid(), title: s.title, a, b, sample: true, createdAt: '', updatedAt: '', notes: s.notes.map((n) => ({ id: rid(), author, text: n.text, about: n.about, at: '' })) })
+    out.push({
+      id: rid(), title: s.title, question: s.question, a, b, sample: true, createdAt: '', updatedAt: '', submittedBy: author, round: 1,
+      notes: s.notes.map((n) => ({ id: rid(), author, text: n.text, about: n.about, at: '' })),
+      status: s.reviewed ? 'done' : 'pending',
+      annotations: (s.reviewed?.pins ?? []).map((p) => ({ id: rid(), ...p, author: 'Sample reviewer', at: '', round: 1 })),
+      ...(s.reviewed ? { decision: { by: 'Sample reviewer', at: '', choice: s.reviewed.choice, summary: s.reviewed.summary, round: 1 } } : {}),
+    })
   }
   // Times are set once every component is captured: notes are never older than their components,
   // and the first sample gets the latest time so it heads the newest-first list.
@@ -76,6 +86,8 @@ export async function buildSamples(author: string): Promise<Review[]> {
     const at = new Date(end - i).toISOString()
     r.createdAt = at; r.updatedAt = at
     r.notes.forEach((n) => { n.at = new Date(end).toISOString() })
+    r.annotations?.forEach((a) => { a.at = new Date(end).toISOString() })
+    if (r.decision) r.decision.at = new Date(end).toISOString()
   })
   return out
 }
