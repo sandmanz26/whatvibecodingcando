@@ -1,9 +1,9 @@
 # Vibe coding monorepo — notes for Claude
 
-- **Layout:** `apps/content` (the content site, deployed from the root's `dist/`), `apps/saas` (Vibe Collab, the SaaS, a copy of the content app that opens on the website), `packages/core` (`@vibe/core`: embed widget + `Backend` interface, heatmap renderer, eye-movement analysis — shared by both). Paths below are relative to an app (`src/...` means `apps/<app>/src/...`); the embed script and the gaze analysis live in `packages/core/src`.
+- **Layout:** `apps/content` (the content site, served at `/content/`), `apps/saas` (Vibe Collab, the SaaS, a copy of the content app that opens on the website, served at `/saas/`; its browser storage is prefixed `saas:` by `src/storage-scope.ts`, which must stay main.tsx's first import). One Vercel deployment builds both into `dist/content` and `dist/saas` (root `vercel.json`), `packages/core` (`@vibe/core`: embed widget + `Backend` interface, heatmap renderer, eye-movement analysis — shared by both). Paths below are relative to an app (`src/...` means `apps/<app>/src/...`); the embed script and the gaze analysis live in `packages/core/src`.
 - The apps are separate copies. When the owner asks for a change, make it in the app they mean; if it is a tool both apps have, ask or apply it to both. Code that must stay identical goes in `packages/core`.
 - Everything already built (embed, landing, panel, research tools) is part of the SaaS too; the owner wants it there.
-- Before pushing: `npm run typecheck && npm run build:all` at the root must pass.
+- Before pushing: `npm run typecheck && npm run build` at the root must pass.
 
 ## Each app
 

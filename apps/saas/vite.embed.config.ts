@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react()],
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
-    outDir: 'dist/embed',
+    outDir: '../../dist/saas/embed',
     emptyOutDir: false,
     copyPublicDir: false,
     lib: { entry: fileURLToPath(new URL('../../packages/core/src/embed/main.tsx', import.meta.url)), formats: ['iife'], name: 'VibeCollab', fileName: () => 'vibe.js' },

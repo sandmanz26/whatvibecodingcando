@@ -10,8 +10,7 @@ export default defineConfig({
   plugins: [react()],
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
-    // Into the repository's dist/, next to the content app (see vite.config.ts).
-    outDir: '../../dist/embed',
+    outDir: '../../dist/content/embed',
     emptyOutDir: false,
     copyPublicDir: false,
     lib: { entry: fileURLToPath(new URL('../../packages/core/src/embed/main.tsx', import.meta.url)), formats: ['iife'], name: 'VibeCollab', fileName: () => 'vibe.js' },

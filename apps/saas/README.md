@@ -4,7 +4,7 @@ The hosted product: website (`#/landingpage`, the default page), sign-up, user p
 
 Shared code lives in `packages/core` (the script's widget and storage interface, the heatmap renderer, the eye-movement analysis), so fixes there reach both apps. Everything else is this app's own copy.
 
-Run: `npm run dev:saas` · build: `npm run build:saas` (output `apps/saas/dist`).
+Run: `npm run dev:saas` · build: `npm run build:saas` (output `dist/saas`, served at `/saas/` on the shared Vercel deployment).
 
 The rest of this file is the content app's documentation as it was when the SaaS app was copied from it; it describes the same features.
 

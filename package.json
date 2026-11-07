@@ -10,11 +10,10 @@
   "scripts": {
     "dev": "npm run dev -w apps/content",
     "dev:saas": "npm run dev -w apps/saas",
-    "build": "npm run build -w apps/content",
+    "build": "npm run build -w apps/content && npm run build -w apps/saas",
     "build:saas": "npm run build -w apps/saas",
-    "build:all": "npm run build -w apps/content && npm run build -w apps/saas",
     "typecheck": "npm run typecheck -w packages/core && npm run typecheck -w apps/content && npm run typecheck -w apps/saas",
-    "preview": "npm run preview -w apps/content",
-    "preview:saas": "npm run preview -w apps/saas"
+    "preview": "vite preview --outDir dist --port 4173",
+    "build:content": "npm run build -w apps/content"
   }
 }
