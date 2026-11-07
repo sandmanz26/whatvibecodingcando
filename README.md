@@ -15,3 +15,13 @@ The two apps are copies that grow apart on purpose: change a tool in one, then d
 - **Claude Code plugin:** the `ux-research-kit` plugin stays at the root (`.claude-plugin/`, `plugins/`).
 
 Each app's own documentation is in its README (`apps/content/README.md`, `apps/saas/README.md`).
+
+## Vercel
+
+- **Content site** (the existing Vercel project): Root Directory = the repository root. `vercel.json` at the root pins the setup:
+  - install: `npm install`, which also installs the workspaces;
+  - build: `npm run build`;
+  - output: `dist`.
+- **SaaS** (a second Vercel project on the same repository): Root Directory = `apps/saas`. `apps/saas/vercel.json` installs and builds from the repository root (`npm run build:saas`) and serves `apps/saas/dist`. Keep "Include files outside the root directory" on, because the build needs `packages/core`.
+
+Both apps use hash routes (`#/...`), so no rewrites are needed.
