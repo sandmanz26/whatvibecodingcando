@@ -11,7 +11,8 @@
  */
 import { APP } from '../shared'
 
-const DB = `${APP}-voice`
+// The SaaS keeps its own voice-note database: the content site's ("market-voice") may be on the same domain.
+const DB = `saas-${APP}-voice`
 const STORE = 'clips'
 
 function db(): Promise<IDBDatabase> {

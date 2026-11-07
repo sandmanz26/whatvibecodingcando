@@ -6,7 +6,7 @@ import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
 import { copyText, demoUrl, snippet } from '../../saas/snippet'
 import { freeId, newProject, originOf, slug, useSaas, validEmail, type Project, type SaasState } from '../../saas/account'
-import { LocalBackend, STATUS_LABEL, statusOf, type Status, type Thread } from '@vibe/core/embed/store'
+import { LocalBackend, STATUS_LABEL, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
 interface Ctx { s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }

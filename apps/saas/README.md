@@ -2,7 +2,7 @@
 
 The hosted product: website (`#/landingpage`, the default page), sign-up, user panel (`#/app`), install page and the installable script, plus every research tool built for the content site (dock, research console, heatmaps and eye tracking, sessions, compare reviews, design tokens, inspect, versions). It starts as a copy of `apps/content`; from here it grows on its own (backend, accounts and a database come later).
 
-Shared code lives in `packages/core` (the script's widget and storage interface, the heatmap renderer, the eye-movement analysis), so fixes there reach both apps. Everything else is this app's own copy.
+This is a separate system from the content site. It has its own code (including `src/core`: the script's widget and storage interface, the heatmap renderer and the eye-movement analysis), its own dependencies and its own browser data (`saas:` storage prefix, `saas:vibe:` for the script, its own voice database). Changes made here stay here.
 
 Run: `npm run dev:saas` · build: `npm run build:saas` (output `dist/saas`, served at `/saas/` on the shared Vercel deployment).
 

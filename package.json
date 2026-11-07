@@ -1,19 +1,16 @@
 {
-  "name": "vibecoding-monorepo",
+  "name": "vibecoding",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "description": "Two separate systems in one repository: apps/content and apps/saas. Each has its own code, dependencies and lockfile; nothing is shared.",
   "scripts": {
-    "dev": "npm run dev -w apps/content",
-    "dev:saas": "npm run dev -w apps/saas",
-    "build": "npm run build -w apps/content && npm run build -w apps/saas",
-    "build:saas": "npm run build -w apps/saas",
-    "typecheck": "npm run typecheck -w packages/core && npm run typecheck -w apps/content && npm run typecheck -w apps/saas",
-    "preview": "vite preview --outDir dist --port 4173",
-    "build:content": "npm run build -w apps/content"
+    "install:all": "npm ci --prefix apps/content && npm ci --prefix apps/saas",
+    "dev": "npm run dev --prefix apps/content",
+    "dev:saas": "npm run dev --prefix apps/saas",
+    "build": "npm run build --prefix apps/content && npm run build --prefix apps/saas",
+    "build:content": "npm run build --prefix apps/content",
+    "build:saas": "npm run build --prefix apps/saas",
+    "typecheck": "npm run typecheck --prefix apps/content && npm run typecheck --prefix apps/saas",
+    "preview": "cd apps/content && npx vite preview --outDir ../../dist --port 4173"
   }
 }

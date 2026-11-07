@@ -7,8 +7,8 @@
  * navigation), then down the left and across in shorter sweeps (an F-shape); in a task, the eyes
  * keep coming back to whatever looks like the way forward. Every page shows it labelled as sample.
  */
-import { rng } from '@vibe/core/heat'
-import type { Rect, Sample } from '@vibe/core/gaze-analysis'
+import { rng } from '../../core/heat'
+import type { Rect, Sample } from '../../core/gaze-analysis'
 
 export interface SamplePerson { id: string; start: number; samples: Sample[] }
 

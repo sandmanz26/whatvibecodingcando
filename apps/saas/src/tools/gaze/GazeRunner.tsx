@@ -5,7 +5,7 @@ import { Eye, EyeOff, Square, Video } from 'lucide-react'
 import { APP, currentPath, isConsole, isEmbedded } from '../shared'
 import { CALIBRATION, VALIDATION, features, fit, isBlink, loadLandmarker, predict, startCamera, stopCamera, type Features, type Model } from './engine'
 import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP, appendGaze, gazeFrame, saveGazeSession, setGazeClickHook, type GazePoint } from './store'
-import { OneEuro } from '@vibe/core/gaze-analysis'
+import { OneEuro } from '../../core/gaze-analysis'
 import { runningTask } from '../tests/store'
 import { TOOL_DOM } from '../shared'
 

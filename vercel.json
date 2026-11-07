@@ -1,12 +1,24 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "npm install",
+  "installCommand": "npm run install:all",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "redirects": [
-    { "source": "/", "destination": "/content/", "permanent": false },
-    { "source": "/content", "destination": "/content/", "permanent": false },
-    { "source": "/saas", "destination": "/saas/", "permanent": false }
+    {
+      "source": "/",
+      "destination": "/content/",
+      "permanent": false
+    },
+    {
+      "source": "/content",
+      "destination": "/content/",
+      "permanent": false
+    },
+    {
+      "source": "/saas",
+      "destination": "/saas/",
+      "permanent": false
+    }
   ]
 }
