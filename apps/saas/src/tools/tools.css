@@ -95,7 +95,7 @@ nav.seg a { height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12.5px
 nav.seg a.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm), 0 0 0 1px var(--line); }
 
 /* ---------- usability test runner ---------- */
-html[data-ut-running] .rp-root { display: none; }
+html[data-ut-running] .rp-root, html[data-session-recording] .rp-root { display: none; }
 .ut-scrim { position: fixed; inset: 0; z-index: 2147483002; background: rgba(11, 11, 11, 0.4); animation: fade 0.15s ease-out; }
 .ut-card {
   position: fixed; z-index: 2147483003; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -619,3 +619,38 @@ tr:hover .hm-rename, .hm-rename:focus { opacity: 1; }
 .cmp-ann-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cmp-ann-text em { color: var(--ink-3); font-style: normal; }
 @media (max-width: 900px) { .cmpr-cols { grid-template-columns: minmax(0, 1fr); } .cmpr-decide { position: static; } .cmpr-head { flex-wrap: wrap; } }
+
+/* Dock: latest results, Start buttons, and the recording bar (only Stop while a session records). */
+.dk-recent { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.dk-recent-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #d6d6d0; }
+.dk-recent-head button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: #eb8f65; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; padding: 2px 0; }
+.dk-recent ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.dk-recent li button { width: 100%; display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: center; text-align: left; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: #f4f4f0; font: inherit; cursor: pointer; }
+.dk-recent li button:hover, .dk-recent li button:focus-visible { background: rgba(255,255,255,.08); }
+.dk-recent-title { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-recent-meta { grid-column: 1; font-size: 11.5px; color: #a9a9a3; }
+.dk-recent .dk-tag { grid-column: 2; grid-row: 1 / span 2; }
+.dk-recent-empty { margin: 0; padding: 4px 2px; font-size: 12px; color: #a9a9a3; }
+.dk-tag { font-style: normal; font-size: 11px; font-weight: 650; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.1); color: #e7e7e1; white-space: nowrap; }
+.dk-tag.good { background: rgba(84, 190, 120, .2); color: #8fe0a8; }
+.dk-tag.bad { background: rgba(255, 90, 79, .18); color: #ff9c94; }
+.dk-starts { display: flex; flex-direction: column; gap: 6px; }
+.hm-pop-tasks button { display: block; width: 100%; text-align: left; padding: 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; font: inherit; font-size: 12.5px; color: #d6d6d0; cursor: pointer; line-height: 1.4; }
+.hm-pop-tasks button:hover { background: rgba(255,255,255,.06); }
+.hm-pop-tasks button.on { background: rgba(255,255,255,.12); border-color: rgba(235, 104, 52, .7); color: #fff; }
+.dock-rec b.num { margin-left: 6px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.dock-stop { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: #ff5a4f; color: #fff; font: inherit; font-size: 12.5px; font-weight: 650; cursor: pointer; }
+.dock-stop:hover { background: #ff7268; }
+.ut-bar .ut-stop { display: inline-flex; align-items: center; gap: 6px; background: #d93a2f; border-color: #d93a2f; color: #fff; }
+.ut-bar .ut-stop:hover { background: #c22f25; }
+
+/* Token switcher: sample looks as swatch cards */
+.tk-label { font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: #a9a9a3; padding: 0 2px; margin-bottom: -4px; }
+.tk-samples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.tk-samples button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.03); color: #e7e7e1; font: inherit; text-align: left; cursor: pointer; min-width: 0; }
+.tk-samples button:hover { background: rgba(255,255,255,.08); }
+.tk-samples button[aria-pressed='true'] { border-color: #fff; background: rgba(255,255,255,.12); }
+.tk-swatch { display: flex; height: 18px; width: 100%; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+.tk-swatch i { flex: 1; }
+.tk-sample-name { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 650; }
+.tk-samples small { font-size: 11px; color: #a9a9a3; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }

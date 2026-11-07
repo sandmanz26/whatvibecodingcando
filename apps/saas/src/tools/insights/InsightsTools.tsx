@@ -2,8 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
-import { isConsole, useFlag } from '../shared'
-import { installTracker, trackView } from './tracker'
+import { getFlag, isConsole, useFlag } from '../shared'
+import { endSession, installTracker, trackView } from './tracker'
 import { layoutOf, loadEvents, type ClickEvent } from './store'
 import { taskTapsAsClicks } from '../tests/store'
 import { fiveSecAsClicks } from '../fivesec/store'
@@ -16,7 +16,12 @@ export interface HeatmapStats { type: 'market:heatmap'; taps: number; missing: n
 export function InsightsTracker() {
   const on = useFlag('insights')
   const { pathname } = useLocation()
-  useEffect(() => (on ? installTracker() : undefined), [on])
+  useEffect(() => {
+    if (!on) return
+    const off = installTracker()
+    // Recording switched off (here or in another tab): close the session before uninstalling.
+    return () => { if (!getFlag('insights')) endSession('stopped'); off() }
+  }, [on])
   useEffect(() => { if (on) trackView(pathname) }, [on, pathname])
   return null
 }

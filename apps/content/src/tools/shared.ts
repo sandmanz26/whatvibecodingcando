@@ -13,10 +13,11 @@ export const APP = 'market'
 
 export type ToolFlag = 'insights' | 'reviewPins'
 
-// Insights: on in dev, off in production builds until the product owner decides on consent.
+// Insights (session recording): off until someone presses Start in the dock's Sessions menu,
+// in dev and production alike, until the product owner decides on consent.
 // Comments (review pins): on — anyone can comment on any screen.
 const DEFAULTS: Record<ToolFlag, boolean> = {
-  insights: import.meta.env.DEV,
+  insights: false,
   reviewPins: true,
 }
 

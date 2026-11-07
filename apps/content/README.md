@@ -111,13 +111,20 @@ The dock is the set of tools shown to visitors. From left to right:
 Tests and reviews are started from the dock on the shop's own pages. Results live on their own pages: the Heatmap, Sessions and Compare result pages are what a hosted product would show.
 
 - **Heatmap test** (dock, flame):
-  - **Starting.** Choose a task (or **Change task** / **New task**, editing in place), optionally a name and webcam eye tracking, then **Start the task here**. The task runs on the page you're on, with the same runner participants get, minus the intro. The dock steps aside meanwhile.
+  - **The menu.** It lists the latest 3 runs (who, task, time, result). Each opens that run, and **See all** opens the results page, both in a new tab.
+  - **Starting.** Choose a task (or **Change task** / **New task**, editing in place), then **Start** or **Start with eye tracking**. There are no checkboxes and no name field: runs from the dock are named Run 1, Run 2, and so on. The task runs on the page you're on, with the same runner participants get, minus the intro.
+  - **While it runs.** The dock is hidden and the task bar's only action is **Stop**, so nothing else can mix into the run. A stopped run is saved as "Stopped".
   - **When it ends.** **Run saved** offers **Run again** and **See this run**.
 - **Heatmap results** (`#/console/heatmap`):
   - **The list.** It starts as a list of every run, grouped by task: who, when, result, time, clicks and the pages in order, with an eye icon when gaze was recorded.
   - **Managing runs.** Search and filter by result, rename a run, delete one, several (checkboxes) or all runs of a task (their gaze goes too), and export CSV.
   - **Opening runs.** **View** opens one run alone; **All runs as a heatmap** opens the task's combined map (`#/console/heatmap/view`). Everyday browsing has its own entry.
-- **Sessions** (dock, pointer): switch recording on or off and end the current session from where you are. `#/console/sessions` shows the results, now with a per-session delete.
+- **Sessions** (dock, pointer):
+  - **The menu.** It lists the latest 3 sessions (pages, taps, length, problems). Each opens that session (`#/console/sessions?sid=…`), and **See all** opens the list, both in a new tab.
+  - **Starting.** **Start recording here** starts a session at once, on the page you're on.
+  - **While it records.** The dock becomes a recording bar (● Recording session · time · **Stop**). The other tools, their shortcuts (C, I) and comment pins wait until it stops, so they can't mix into the session. Inspect switches off when recording starts.
+  - **Stop.** It ends the session and switches recording off.
+  - **Results.** `#/console/sessions` shows the results, with a per-session delete.
 - **Compare** (dock): the badge counts comparisons waiting for a review.
   - **Submitting.** **New**, write what the reviewer should decide, then **Pick on the page** for A and B. Hovering outlines elements and a click picks (never presses). **Wider** and **Narrower** adjust the pick, and **Navigate** lets you reach another page first. Then **Send for review**.
   - **Reviewing.** The review opens over the page: both components cropped from the live screens and the style table. **Annotate** pins numbered notes anywhere on A or B. Then a decision (Keep A, Keep B, both are fine, both need changes) with an optional summary.
@@ -131,12 +138,14 @@ Hidden for now: narration (the microphone and ▶ Explain), the theme switch, an
 
 Two of them sit *around* the product (not features of it). Each has its own flag and neither changes how the app behaves. Click recording pauses on the research console (`/console/*`); comments work on every screen. Each marks its own DOM (`data-insights-ignore`, `data-review-pins`) so neither records nor reacts to the other.
 
-Flags are stored in localStorage (`market.flags.insights`, `market.flags.reviewPins`). Recording is toggled on **Sessions** (`#/console/insights`). Comments are on by default.
+Flags are stored in localStorage (`market.flags.insights`, `market.flags.reviewPins`). Recording is off by default, in dev and production, until the owner decides on consent. It is started and stopped from the dock's **Sessions** menu. Comments are on by default.
 
 ### Click insights
 - **Recorded:** screen views (with the previous screen), and taps. A tap stores its position, the control's visible name (its aria-label or own text, max 100 chars), its kind, its section, a selector to find it again, where on the element it landed, its aria state, time since the screen opened, scroll depth, rage (3+ taps within 1 s and 40 px), dead (not a control), and its effect within 0.7 s (navigated / changed / nothing), and the screen's filters and tabs (e.g. `scope=shared`; never the search box or any free text). Rows and cards the app made clickable count as controls, so a tap on a table row is recorded as that row.
 - **Never recorded:** anything typed, field values, names, emails, or page content. For a field we keep only its placeholder, name or type. The session id is random, per tab (sessionStorage), and not linked to a user.
-- **Sessions:** a session starts counting when the main page (`#/`) opens; taps before that aren't kept. It ends when the tab closes (a reload carries on), the participant presses **End session** in the dock, it sits idle for 30 minutes, or recording is switched off. Recording carries on into the next session until it is stopped.
+- **Sessions:** a session starts when **Start recording here** is pressed, on that page.
+  - **When it ends.** When **Stop** is pressed, when the tab closes (a reload carries on), or after 30 idle minutes.
+  - **After an idle end.** Recording stays on, and the next session starts when the main page (`#/`) opens.
 - **Defaults:** on in development; **off in production builds until the product owner decides on consent** (banner / privacy policy).
 - **Where to review:** `#/console/insights` (**Sessions**). Pick a session to read it **in time order**: the screens it went through, then every tap — time, element, where it sits, and what happened (opened a page, changed the screen, nothing; rage and dead taps are flagged). **Replay taps** opens each tap on the real screen, at the participant's exact window size and with the same filters, with the tap drawn where it landed on the element and the element ringed; ← → step through. Researchers can tag a session (Confused, Got lost…) and write notes, and export it as CSV. The **Heatmap** tab shows all taps on one screen at one width. Add `?heatmap` (dots) or `?heatmap=elements` to any screen URL to see it outside the console. Only taps from the same page *and* layout bucket are drawn (mobile < 640 px, tablet < 1024 px, desktop).
 
@@ -158,10 +167,26 @@ Flags are stored in localStorage (`market.flags.insights`, `market.flags.reviewP
 `#/console/gaze`, participant link `#/?gaze`. Uses [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) (Apache-2.0) running in the browser: iris position inside each eye, eye openness and head direction go into a ridge regression fitted by a 9-dot calibration, then checked on 4 more dots and reported as average error in px (recording is refused when it is too far off). **The camera starts only after the participant agrees; video frames never leave the browser and are never stored** — only the estimated gaze point on the page (about 15 per second). Webcam tracking is coarse (typically 100–200 px), so the heatmap (`?heatmap=gaze`) draws soft areas. The WebAssembly runtime is bundled; the 4 MB face model loads from Google's model storage the first time.
 
 ### Design tokens and UI-library looks
-`#/console/design`. Edit the app's design tokens as JSON (W3C design-token style: a token is an object with `$value`, its name is the CSS variable it sets; top-level `light` and `dark` say where it applies). The JSON starts from the app's own stylesheets. Pick a UI library look (Material 3, Ant Design, shadcn/ui, Bootstrap 5) to load its tokens and restyle the marketplace's components the way that library draws them; these imitate the look and don't load the library's code. Quick controls edit the main tokens; a live screen viewer previews any screen without saving; **Apply in this browser** puts the variant on the whole app (for example for a usability test) and the dock shows its name until it is turned off. Download/upload JSON; partial files are laid over the app's own tokens.
+`#/console/design`. Edit the app's design tokens as JSON (W3C design-token style: a token is an object with `$value`, its name is the CSS variable it sets; top-level `light` and `dark` say where it applies). The JSON starts from the app's own stylesheets. The dock's **Design tokens** popover switches looks live.
+
+**Sample looks** (`src/tools/design/looks.ts`) are seven plain token sets, built to look clearly different from each other. Each changes only tokens: colour, contrast, corners, shadows, type and placeholders.
+
+| Look | Character |
+|---|---|
+| Midnight Neon | Dark, electric teal and magenta |
+| Paper Press | Editorial cream, serif, sharp corners |
+| Candy Pop | Pastel pink, pill buttons, playful |
+| Terminal | Green monospace on black, no corners |
+| Forest Calm | Natural greens with amber, soft corners |
+| Brutal Mono | Black, white and yellow, hard shadows |
+| Luxe Noir | Black and gold, serif, quiet |
+
+They also appear in **Compare sets**.
+
+Pick a UI library look (Material 3, Ant Design, shadcn/ui, Bootstrap 5) to load its tokens and restyle the marketplace's components the way that library draws them; these imitate the look and don't load the library's code. Quick controls edit the main tokens; a live screen viewer previews any screen without saving; **Apply in this browser** puts the variant on the whole app (for example for a usability test) and the dock shows its name until it is turned off. Download/upload JSON; partial files are laid over the app's own tokens.
 
 **Upload & compare** (`#/console/design/compare`, from the Design tokens page).
-- **Upload.** Upload or drop token files: W3C design tokens, Tokens Studio JSON, or CSS custom properties. Two sample files are included.
+- **Upload.** Upload or drop token files: W3C design tokens, Tokens Studio JSON, or CSS custom properties. Two sample files are included: `aurora.tokens.json` (W3C with aliases, violet and teal, pill buttons, dark mode) and `retro-arcade.css` (cream, teal and orange, slab serif, hard offset shadows).
   - Aliases (`{color.brand.500}`) and `var(--x)` references inside a file are resolved.
   - A `dark` set, group or selector becomes the dark-mode value.
   - Composite tokens (typography and similar), unresolved aliases and unsafe values are skipped and counted.

@@ -1,64 +1,85 @@
-/** Example token files, so the upload can be tried without one of your own. */
+/**
+ * Example token files, so the upload can be tried without one of your own. Each is a different
+ * format and a clearly different look from the app's own and from the others.
+ */
 export const SAMPLES: { fileName: string; text: string }[] = [
   {
-    fileName: 'ocean.tokens.json',
+    fileName: 'aurora.tokens.json',
     text: JSON.stringify({
-      $description: 'W3C design tokens with a brand palette, aliases and a dark mode',
+      $description: 'W3C design tokens: a violet and teal brand palette, aliases, pill buttons and a dark mode',
       palette: {
         $type: 'color',
-        blue: { 50: { $value: '#eef6ff' }, 500: { $value: '#1d6fd8' }, 600: { $value: '#165bb3' }, 900: { $value: '#0b2a55' } },
-        slate: { 0: { $value: '#ffffff' }, 50: { $value: '#f5f8fb' }, 100: { $value: '#e7edf3' }, 300: { $value: '#b9c6d3' }, 600: { $value: '#4d5d6e' }, 800: { $value: '#1f2b37' }, 950: { $value: '#0c131a' } },
+        violet: { 50: { $value: '#f5f0ff' }, 100: { $value: '#e9ddff' }, 500: { $value: '#7c3aed' }, 600: { $value: '#6d28d9' }, 300: { $value: '#c4a5ff' } },
+        teal: { 400: { $value: '#2dd4bf' }, 600: { $value: '#0d9488' } },
+        night: { 0: { $value: '#ffffff' }, 50: { $value: '#faf8ff' }, 200: { $value: '#ddd6f3' }, 500: { $value: '#6b6390' }, 800: { $value: '#231c3d' }, 900: { $value: '#18122b' }, 950: { $value: '#0f0a1f' } },
       },
       light: {
         color: {
           $type: 'color',
-          page: { $value: '{palette.slate.50}' },
-          surface: { $value: '{palette.slate.0}' },
-          ink: { $value: '{palette.slate.950}' },
-          'ink-2': { $value: '{palette.slate.600}' },
-          line: { $value: '{palette.slate.100}' },
-          primary: { $value: '{palette.blue.500}' },
-          'primary-ink': { $value: '{palette.slate.0}' },
-          accent: { $value: '{palette.blue.600}' },
+          page: { $value: '{palette.violet.50}' },
+          surface: { $value: '{palette.night.0}' },
+          'surface-2': { $value: '{palette.night.50}' },
+          ink: { $value: '{palette.night.950}' },
+          'ink-2': { $value: '{palette.night.500}' },
+          line: { $value: '{palette.night.200}' },
+          primary: { $value: '{palette.violet.600}' },
+          'primary-ink': { $value: '{palette.night.0}' },
+          accent: { $value: '{palette.teal.600}' },
+          ph: { $value: '{palette.violet.100}' },
         },
-        radius: { $type: 'dimension', r: { $value: '12px' }, 'r-sm': { $value: '999px' }, 'r-lg': { $value: '18px' } },
+        radius: { $type: 'dimension', r: { $value: '16px' }, 'r-sm': { $value: '999px' }, 'r-lg': { $value: '24px' } },
+        shadow: { 'shadow': { $value: '0 10px 30px rgba(109, 40, 217, 0.18)' } },
+        font: { font: { $value: "'Inter Variable', system-ui, sans-serif" } },
       },
       dark: {
         color: {
           $type: 'color',
-          page: { $value: '{palette.slate.950}' },
-          surface: { $value: '{palette.slate.800}' },
-          ink: { $value: '{palette.slate.50}' },
-          'ink-2': { $value: '{palette.slate.300}' },
-          primary: { $value: '{palette.blue.500}' },
-          'primary-ink': { $value: '{palette.slate.0}' },
+          page: { $value: '{palette.night.950}' },
+          surface: { $value: '{palette.night.900}' },
+          'surface-2': { $value: '{palette.night.800}' },
+          ink: { $value: '{palette.violet.50}' },
+          'ink-2': { $value: '{palette.violet.300}' },
+          line: { $value: '{palette.night.800}' },
+          primary: { $value: '{palette.teal.400}' },
+          'primary-ink': { $value: '{palette.night.950}' },
+          accent: { $value: '{palette.violet.300}' },
+          ph: { $value: '{palette.night.800}' },
         },
       },
     }, null, 2),
   },
   {
-    fileName: 'sunset.css',
+    fileName: 'retro-arcade.css',
     text: `/* CSS custom properties: :root is light, a selector mentioning dark is dark mode */
 :root {
-  --brand: #e8590c;
-  --page: #fff8f3;
-  --surface: #ffffff;
-  --ink: #2b1a10;
-  --ink-2: #7a5a48;
-  --ink-3: #b8a092;
-  --line: #f1dccd;
+  --brand: #1b998b;
+  --page: #fdf6e3;
+  --surface: #fffdf5;
+  --surface-2: #f6ecd2;
+  --ink: #26213a;
+  --ink-2: #5b5470;
+  --ink-3: #8a8299;
+  --line: #26213a;
   --primary: var(--brand);
-  --primary-ink: #ffffff;
-  --r: 4px;
-  --r-sm: 4px;
-  --r-lg: 6px;
-  --font: Georgia, 'Times New Roman', serif;
+  --primary-ink: #fffdf5;
+  --accent: #ff6b35;
+  --ph: #ffd166;
+  --ph-line: #26213a;
+  --r: 6px;
+  --r-sm: 6px;
+  --r-lg: 10px;
+  --shadow-sm: 2px 2px 0 #26213a;
+  --shadow: 4px 4px 0 #ff6b35;
+  --font: Rockwell, 'Roboto Slab', 'Courier New', serif;
 }
 [data-theme='dark'] {
-  --page: #1d130d;
-  --surface: #2a1c14;
-  --ink: #fbe9dd;
-  --ink-2: #d2b29f;
+  --page: #1a1726;
+  --surface: #26213a;
+  --surface-2: #2f2948;
+  --ink: #fdf6e3;
+  --ink-2: #d6cdb4;
+  --line: #fdf6e3;
+  --shadow: 4px 4px 0 #1b998b;
 }`,
   },
 ]

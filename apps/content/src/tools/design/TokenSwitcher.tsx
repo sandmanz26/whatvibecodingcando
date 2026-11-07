@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Check, Download, Upload, RotateCcw, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { baseline, flatten, loadDesign, merge, saveDesign, DESIGN_EVENT, type DesignDoc } from './tokens'
 import { PRESETS } from './presets'
+import { LOOKS } from './looks'
 import { autoMap, docOf, loadSets, parseFile, saveSets, type TokenSet } from './tokenfile'
 
 /**
@@ -55,6 +56,7 @@ export function TokenSwitcher({ onClose }: { onClose: () => void }) {
 
   const current = applied?.doc ?? base
   const light = flatten(merge(base, current).light)
+  const samples = LOOKS.map((l) => ({ ...l, on: applied?.from === `look:${l.id}`, apply: () => saveDesign({ doc: merge(base, l.doc), preset: 'wireframe', from: `look:${l.id}` }) }))
   const looks = [
     ...PRESETS.map((p) => ({ id: `preset:${p.id}`, name: p.id === 'wireframe' ? 'App’s own' : p.name, apply: () => saveDesign(p.id === 'wireframe' ? null : { doc: merge(base, p.tokens), preset: p.id }), on: p.id === 'wireframe' ? !applied : applied?.preset === p.id && applied.from === undefined })),
     ...sets.map((s) => ({ id: `set:${s.id}`, name: s.name, apply: () => saveDesign({ doc: merge(base, docOf(s)), preset: 'wireframe', from: s.id }), on: applied?.from === s.id })),
@@ -91,6 +93,17 @@ export function TokenSwitcher({ onClose }: { onClose: () => void }) {
   return (
     <div className="dock-pop tk-pop" role="dialog" aria-label="Design tokens">
       <div className="dock-verhead"><b>Design tokens · live</b><span>Changes show on this page straight away and stay on while you browse.</span></div>
+      <div className="tk-label">Sample looks</div>
+      <div className="tk-samples" role="group" aria-label="Sample looks">
+        {samples.map((l) => (
+          <button key={l.id} aria-pressed={l.on} onClick={() => { setOwn(false); setError(''); l.apply() }} title={l.note}>
+            <span className="tk-swatch" aria-hidden>{l.swatch.map((c) => <i key={c} style={{ background: c }} />)}</span>
+            <span className="tk-sample-name">{l.on && <Check size={11} />}{l.name}</span>
+            <small>{l.note}</small>
+          </button>
+        ))}
+      </div>
+      <div className="tk-label">UI libraries{sets.length ? ' and your sets' : ''}</div>
       <div className="tk-looks" role="group" aria-label="Looks">
         {looks.map((l) => <button key={l.id} aria-pressed={l.on} onClick={() => { setOwn(false); setError(''); l.apply() }}>{l.on && <Check size={12} />}{l.name}</button>)}
       </div>

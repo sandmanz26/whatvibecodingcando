@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { X, Check, TriangleAlert, Pin } from 'lucide-react'
 import { DEFAULT_SCALE, readTokens } from '../dscheck/scan'
 import { COMMENT_EVENT } from '../pins/ReviewPins'
-import { isEmbedded } from '../shared'
+import { getFlag, isEmbedded } from '../shared'
+import { SESSION_EVENT, sessionState } from '../insights/tracker'
 
 /**
  * Inspect: hover anything in the app to see the colours, font and spacing it really renders
@@ -115,13 +116,17 @@ export function Inspector() {
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+      if (document.documentElement.dataset.sessionRecording === 'on') return
       if ((e.key === 'i' || e.key === 'I') && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); toggle() }
     }
     const offForComment = () => set(false)
+    // A session started recording: inspecting would block its clicks, so it stops.
+    const offForSession = () => { if (onRef.current && getFlag('insights') && sessionState() === 'active') set(false) }
+    window.addEventListener(SESSION_EVENT, offForSession)
     window.addEventListener(INSPECT_EVENT, toggle)
     window.addEventListener('keydown', key)
     window.addEventListener(COMMENT_EVENT, offForComment)
-    return () => { window.removeEventListener(INSPECT_EVENT, toggle); window.removeEventListener('keydown', key); window.removeEventListener(COMMENT_EVENT, offForComment) }
+    return () => { window.removeEventListener(INSPECT_EVENT, toggle); window.removeEventListener('keydown', key); window.removeEventListener(COMMENT_EVENT, offForComment); window.removeEventListener(SESSION_EVENT, offForSession) }
   }, [set])
 
   useEffect(() => {

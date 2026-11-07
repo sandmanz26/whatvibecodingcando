@@ -21,6 +21,9 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 const SID_KEY = 'market.insights.sid'
 const SEEN_KEY = 'market.insights.seen'
 const CLOSING_KEY = 'market.insights.closing'
+const SID_AT_KEY = 'market.insights.sidAt'
+/** Start pressed before the tracker was installed: the session starts on install, on this page. */
+const START_KEY = 'market.insights.start'
 const IDLE_MS = 30 * 60 * 1000
 export const SESSION_EVENT = 'market:session'
 
@@ -32,6 +35,12 @@ const ss = {
 
 /** 'active' while a session is counting; 'waiting' until the participant reaches the main page. */
 export const sessionState = (): 'active' | 'waiting' => (ss.get(SID_KEY) ? 'active' : 'waiting')
+/** When the current session started (ms), for the recording bar's clock. */
+export const sessionStartedAt = (): number | null => {
+  if (!ss.get(SID_KEY)) return null
+  const at = Number(ss.get(SID_AT_KEY))
+  return Number.isFinite(at) && at > 0 ? at : null
+}
 
 /** Should taps and views be recorded right now? */
 // Also paused while someone is choosing an element to comment on: those clicks aren't use of the app.
@@ -176,6 +185,7 @@ let installed: (() => void) | null = null
 let viewHook: ((path: string) => void) | null = null
 let flushHook: (() => void) | null = null
 let endHook: ((reason: EndReason) => void) | null = null
+let startHook: (() => void) | null = null
 
 /** Record a screen view. Called by the router integration on every route change. */
 export const trackView = (path: string) => viewHook?.(path)
@@ -186,6 +196,15 @@ export const flushNow = () => flushHook?.()
  * participant is back on the main page. 'stopped' is for when recording is switched off.
  */
 export const endSession = (reason: EndReason = 'ended') => endHook?.(reason)
+/**
+ * Start a session now, on the page you're on (the dock's Start), instead of waiting for the main
+ * page. Call it right after switching recording on: if the tracker isn't installed yet, the session
+ * starts when it is.
+ */
+export const startSessionNow = () => {
+  if (startHook) startHook()
+  else ss.set(START_KEY, '1')
+}
 
 /** Installs once; returns an uninstall function. */
 export function installTracker(): () => void {
@@ -214,18 +233,26 @@ export function installTracker(): () => void {
     queue.push({ type: 'end', ...base(sid), ...(at ? { t: new Date(at).toISOString() } : {}), reason })
     sid = null
     ss.del(SID_KEY)
+    ss.del(SID_AT_KEY)
     notify()
   }
 
-  /** The session this event belongs to — or none yet: counting starts on the main page. */
+  const open = () => {
+    sid = Math.random().toString(36).slice(2, 12)
+    ss.set(SID_KEY, sid)
+    ss.set(SID_AT_KEY, String(Date.now()))
+    ss.set(SEEN_KEY, String(Date.now()))
+    notify()
+  }
+
+  /**
+   * The session this event belongs to — or none yet. Start in the dock opens one at once; after
+   * one ends on its own (idle), the next starts when the participant is back on the main page.
+   */
   const gate = (path: string): string | null => {
     const seen = Number(ss.get(SEEN_KEY) ?? 0)
     if (sid && seen && Date.now() - seen > IDLE_MS) end('idle', seen)
-    if (!sid && isMainPage(path)) {
-      sid = Math.random().toString(36).slice(2, 12)
-      ss.set(SID_KEY, sid)
-      notify()
-    }
+    if (!sid && isMainPage(path)) open()
     if (sid) ss.set(SEEN_KEY, String(Date.now()))
     return sid
   }
@@ -266,6 +293,15 @@ export function installTracker(): () => void {
     queue.push({ type: 'view', ...base(id), page: path, ...(from ? { from } : {}) })
   }
   flushHook = flush
+  startHook = () => {
+    ss.del(START_KEY)
+    if (sid) return
+    open()
+    // Record the screen it starts on.
+    lastPath = undefined
+    viewHook?.(currentPath())
+  }
+  if (ss.get(START_KEY)) startHook()
   endHook = (reason) => { watching.splice(0).forEach((finish) => finish()); end(reason); flush() }
 
   const onClick = (e: MouseEvent) => {
@@ -362,6 +398,7 @@ export function installTracker(): () => void {
     viewHook = null
     flushHook = null
     endHook = null
+    startHook = null
   }
   return installed
 }

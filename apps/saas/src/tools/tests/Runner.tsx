@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { CheckCircle2, Clock, Flag, TimerOff, ListChecks } from 'lucide-react'
+import { CheckCircle2, Clock, Flag, TimerOff, ListChecks, Square } from 'lucide-react'
 import { TOOL_DOM, isEmbedded } from '../shared'
 import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP } from '../gaze/store'
 import { describeTarget } from '../insights/tracker'
@@ -82,7 +82,9 @@ export function UsabilityRunner() {
       const index = t?.tasks.findIndex((k) => k.id === d.taskId) ?? -1
       if (!t || index < 0) return
       const sessionId = uid()
-      upsertSession({ id: sessionId, testId: t.id, participant: d.name?.trim().slice(0, 40) || 'You (from the dock)', startedAt: new Date().toISOString(), vw: window.innerWidth, attempts: [] })
+      // Runs started from the dock are numbered: Run 1, Run 2… (after the highest so far, so deleting one never repeats a name).
+      const runNo = 1 + Math.max(0, ...loadSessions().map((x) => Number(/^Run (\d+)$/.exec(x.participant)?.[1] ?? 0)))
+      upsertSession({ id: sessionId, testId: t.id, participant: d.name?.trim().slice(0, 40) || `Run ${runNo}`, startedAt: new Date().toISOString(), vw: window.innerWidth, attempts: [] })
       setTest(t)
       setRun({ sessionId, testId: t.id, index, phase: d.eyes ? 'eyes' : 'ready', startedAt: 0, taps: [], pages: [], single: true })
       if (d.eyes) window.dispatchEvent(new Event(GAZE_START))
@@ -262,7 +264,9 @@ export function UsabilityRunner() {
             <span className={`ut-bar-prompt ${expanded ? 'open' : ''}`}>{task.prompt}</span>
           </div>
           <span className={`ut-timer ${remaining < 10000 ? 'low' : ''}`} aria-live="off"><Clock size={13} />{clock(remaining)}</span>
-          <button className="btn sm ghost" onClick={() => finish('gave_up')}><Flag size={13} /> Give up</button>
+          {run.single
+            ? <button className="btn sm ut-stop" onClick={() => finish('gave_up')} title="Stop the task; the run is saved as stopped"><Square size={12} /> Stop</button>
+            : <button className="btn sm ghost" onClick={() => finish('gave_up')}><Flag size={13} /> Give up</button>}
         </div>
       )}
 
@@ -270,7 +274,9 @@ export function UsabilityRunner() {
         {step}
         {run.last.outcome === 'success' && <div className="ut-outcome good"><CheckCircle2 size={22} /><div><b>Task complete</b><span>in {secs(run.last.ms)} · {run.taps.length} tap{run.taps.length === 1 ? '' : 's'}</span></div></div>}
         {run.last.outcome === 'timeout' && <div className="ut-outcome"><TimerOff size={22} /><div><b>Time’s up</b><span>That’s useful to know — it means the design made this hard.</span></div></div>}
-        {run.last.outcome === 'gave_up' && <div className="ut-outcome"><Flag size={22} /><div><b>Skipped</b><span>Thanks — skipping tells us something too.</span></div></div>}
+        {run.last.outcome === 'gave_up' && (run.single
+          ? <div className="ut-outcome"><Square size={22} /><div><b>Stopped</b><span>Saved as stopped after {secs(run.last.ms)} · {run.taps.length} tap{run.taps.length === 1 ? '' : 's'}.</span></div></div>
+          : <div className="ut-outcome"><Flag size={22} /><div><b>Skipped</b><span>Thanks — skipping tells us something too.</span></div></div>)}
         <div className="ut-actions">
           <button className="btn primary" onClick={next}>{!run.single && run.index + 1 < test.tasks.length ? 'Next task' : 'Finish'}</button>
         </div>

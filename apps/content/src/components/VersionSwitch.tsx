@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { GripVertical, MessageSquarePlus, MessagesSquare, Palette, ScanSearch, GitBranch } from 'lucide-react'
+import { GripVertical, MessageSquarePlus, MessagesSquare, Palette, ScanSearch, GitBranch, Square } from 'lucide-react'
 import { COMMENT_EVENT } from '../tools/pins/ReviewPins'
 import { getFlag, isEmbedded, readJSON, setFlag, useFlag, writeJSON } from '../tools/shared'
-import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
+import { SESSION_EVENT, endSession, sessionStartedAt, sessionState } from '../tools/insights/tracker'
+import { clock } from '../tools/insights/sessions'
 import { DESIGN_EVENT, loadDesign } from '../tools/design/tokens'
 import { presetOf } from '../tools/design/presets'
+import { lookOf } from '../tools/design/looks'
 import { INSPECT_EVENT, INSPECT_STATE } from '../tools/inspect/Inspector'
 import { LATEST, VERSIONS, setShowingChanges, setVersion, useCommentCounts, useShowingChanges, useVersion, versionOf } from '../lib/version'
 import { TokenSwitcher } from '../tools/design/TokenSwitcher'
@@ -26,6 +28,7 @@ export function VersionSwitch() {
   const ref = useRef<HTMLDivElement>(null)
   const recording = useFlag('insights')
   const [session, setSession] = useState(sessionState)
+  const [now, setNow] = useState(Date.now())
   const [design, setDesign] = useState(loadDesign)
   const version = useVersion()
   const verCount = useCommentCounts()[version]?.total ?? 0
@@ -47,6 +50,16 @@ export function VersionSwitch() {
     sync()
     return () => window.removeEventListener(SESSION_EVENT, sync)
   }, [])
+  // While a session records, the dock is only the recording bar: other tools would mix their own
+  // clicks into the session, so they (and their shortcuts, C and I) wait until it stops.
+  useEffect(() => {
+    const root = document.documentElement
+    if (recording) root.dataset.sessionRecording = 'on'
+    else delete root.dataset.sessionRecording
+    if (!recording) return
+    const t = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => { window.clearInterval(t); delete root.dataset.sessionRecording }
+  }, [recording])
   const [pos, setPos] = useState<{ x: number; y: number }>(() => readJSON(POS_KEY, { x: 16, y: window.innerHeight - (window.innerWidth <= 860 ? 140 : 72) }))
 
   const clamp = useCallback((p: { x: number; y: number }) => {
@@ -92,10 +105,19 @@ export function VersionSwitch() {
     <>
       <div ref={ref} className="dock" style={{ left: pos.x, top: pos.y }} role="toolbar" aria-label="Research tools" data-insights-ignore>
         <button className="dock-grip" onPointerDown={startDrag} onKeyDown={keyMove} aria-label="Move the dock (drag, or use arrow keys)" title="Drag to move"><GripVertical size={15} /></button>
-        {recording && (session === 'active'
-          ? <button className="dock-rec on" onClick={() => endSession('ended')} title="Recording this session. End it here; the next one starts on the main page."><i /> End session</button>
-          : <span className="dock-rec" title="Recording is on. A session starts counting when the main page opens."><i /> Starts on home</span>)}
-        {design && <button className="dock-rec" onClick={() => nav('/console/design')} title="A simulated design is on in this browser">{presetOf(design.preset).name}</button>}
+        {recording ? (() => {
+          const at = sessionStartedAt()
+          const stop = () => { endSession('stopped'); setFlag('insights', false) }
+          return (
+            <>
+              <span className={`dock-rec ${session === 'active' ? 'on' : ''}`} role="status">
+                <i /> {session === 'active' ? <>Recording session{at ? <b className="num">{clock(Math.max(0, now - at))}</b> : null}</> : 'Recording · starts on the home page'}
+              </span>
+              <button className="dock-stop" onClick={stop} title="Stop recording and save this session"><Square size={12} /> Stop</button>
+            </>
+          )
+        })() : <>
+        {design && <button className="dock-rec" onClick={() => nav('/console/design')} title="A simulated design is on in this browser">{(design.from?.startsWith('look:') && lookOf(design.from.slice(5))?.name) || presetOf(design.preset).name}</button>}
         <button className="dock-comment" onClick={() => comment('start')} title="Comment anywhere on the screen — or press C"><MessageSquarePlus size={15} /> Comment</button>
         <button className="dock-icon dock-count" onClick={() => comment('list')} aria-label={`All comments, ${verCount} on v${version}`} title={`All comments on v${version}`}><MessagesSquare size={15} />{verCount > 0 && <span>{verCount}</span>}</button>
         <VersionMenu />
@@ -105,6 +127,7 @@ export function VersionSwitch() {
         <button className={`dock-icon ${inspecting ? 'on' : ''}`} onClick={() => window.dispatchEvent(new Event(INSPECT_EVENT))} aria-label="Inspect styles" aria-pressed={inspecting} title="Inspect: hover anything to see its colours, font and whether they are design tokens (I)"><ScanSearch size={15} /></button>
         <SessionsMenu />
         <HeatmapMenu />
+        </>}
       </div>
     </>
   )

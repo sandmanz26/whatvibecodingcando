@@ -15,6 +15,7 @@
 import { APP, readJSON } from '../shared'
 import { baseline, flatten, merge, type DesignDoc, type Scope } from './tokens'
 import { PRESETS, presetOf } from './presets'
+import { LOOKS } from './looks'
 
 export type Kind = 'color' | 'radius' | 'size' | 'font' | 'shadow' | 'other'
 export interface FileToken { path: string; short: string; kind: Kind; light?: string; dark?: string }
@@ -238,12 +239,13 @@ export function docOf(set: TokenSet): DesignDoc {
   return { light: { set: light }, ...(Object.keys(dark).length ? { dark: { set: dark } } : {}) }
 }
 
-/** Everything that can be compared: the app's own look, the UI-library looks, and uploaded sets. */
+/** Everything that can be compared: the app's own look, the UI-library looks, the sample looks, and uploaded sets. */
 export interface Choice { id: string; name: string; kind: 'builtin' | 'upload'; preset: string; doc: DesignDoc }
 export function choices(sets: TokenSet[]): Choice[] {
   const base = baseline()
   return [
     ...PRESETS.map((p) => ({ id: `preset:${p.id}`, name: p.id === 'wireframe' ? 'App’s own (wireframe)' : p.name, kind: 'builtin' as const, preset: p.id, doc: merge(base, p.tokens) })),
+    ...LOOKS.map((l) => ({ id: `look:${l.id}`, name: `${l.name} (sample)`, kind: 'builtin' as const, preset: 'wireframe', doc: merge(base, l.doc) })),
     ...sets.map((s) => ({ id: `set:${s.id}`, name: s.name, kind: 'upload' as const, preset: 'wireframe', doc: merge(base, docOf(s)) })),
   ]
 }

@@ -217,6 +217,7 @@ function Comments({ onHide }: { onHide: () => void }) {
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== 'c' || e.metaKey || e.ctrlKey || e.altKey) return
+      if (document.documentElement.dataset.sessionRecording === 'on') return
       const t = e.target as HTMLElement
       if (t.closest('input, textarea, select, [contenteditable="true"]')) return
       e.preventDefault()

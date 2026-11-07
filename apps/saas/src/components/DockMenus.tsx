@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
-import { Flame, MousePointerClick, Play, Pencil, Plus, ArrowRight, Square, Eye } from 'lucide-react'
-import { loadTests, saveTests, UT_START, UT_STATE, utRunning, type UtStart, type TestTask } from '../tools/tests/store'
+import { Flame, MousePointerClick, Play, Pencil, Plus, ExternalLink, Eye } from 'lucide-react'
+import { loadSessions, loadTests, saveTests, UT_START, UT_STATE, utRunning, type Outcome, type UtStart, type TestTask } from '../tools/tests/store'
 import { TaskEdit } from '../pages/heatmap/TaskEdit'
-import { SESSION_EVENT, endSession, sessionState } from '../tools/insights/tracker'
-import { setFlag, useFlag, readJSON, writeJSON } from '../tools/shared'
+import { flushNow, startSessionNow } from '../tools/insights/tracker'
+import { loadEvents, layoutOf } from '../tools/insights/store'
+import { buildSessions, clock } from '../tools/insights/sessions'
+import { setFlag, readJSON, writeJSON } from '../tools/shared'
 import { useStore } from '../store/store'
 
 /** A dock button with a panel above it (or below, when the dock sits near the top). Outside click or Esc closes. */
@@ -34,12 +35,77 @@ export function DockPopover({ button, label, children, className = '', open: ope
   )
 }
 
+/** Result pages open in a new tab, so whatever is going on in this one stays as it is. */
+export function openResults(route: string) {
+  flushNow()
+  window.open(`${window.location.pathname}${window.location.search}#${route}`, '_blank', 'noopener')
+}
+
+const ago = (iso: string) => {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m} min ago`
+  const h = Math.round(m / 60)
+  if (h < 24) return `${h} h ago`
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+interface Recent { key: string; title: string; meta: string; tag?: { text: string; tone: 'good' | 'bad' | 'live' | 'plain' }; route: string }
+
+/** The latest three results, each opening on the results page in a new tab, and "See all". */
+function RecentList({ items, empty, all, label }: { items: Recent[] | null; empty: string; all: string; label: string }) {
+  return (
+    <div className="dk-recent">
+      <div className="dk-recent-head"><b>{label}</b><button onClick={() => openResults(all)} title="Opens in a new tab">See all <ExternalLink size={11} /></button></div>
+      {items === null ? <p className="dk-recent-empty">Loading…</p> : !items.length ? <p className="dk-recent-empty">{empty}</p> : (
+        <ul>
+          {items.map((r) => (
+            <li key={r.key}>
+              <button onClick={() => openResults(r.route)} title="Open in a new tab">
+                <span className="dk-recent-title">{r.title}</span>
+                <span className="dk-recent-meta">{r.meta}</span>
+                {r.tag && <em className={`dk-tag ${r.tag.tone}`}>{r.tag.text}</em>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 const PICK_KEY = 'market.dock.heatmap'
-interface Pick { testId: string; taskId: string; eyes: boolean; name: string }
+interface Pick { testId: string; taskId: string }
+const OUTCOME: Record<Outcome, { text: string; tone: 'good' | 'bad' | 'plain' }> = {
+  success: { text: 'Done', tone: 'good' },
+  timeout: { text: 'Time up', tone: 'bad' },
+  gave_up: { text: 'Stopped', tone: 'plain' },
+}
+
+/** The latest three heatmap runs (a participant's attempt at one task), newest first. */
+function recentRuns(): Recent[] {
+  const tests = loadTests()
+  return loadSessions().flatMap((s) => {
+    const t = tests.find((x) => x.id === s.testId)
+    if (!t) return []
+    return s.attempts.map((a) => {
+      const i = t.tasks.findIndex((k) => k.id === a.taskId)
+      const page = encodeURIComponent(a.pages[0] ?? '/')
+      return {
+        at: s.startedAt,
+        key: `${s.id}|${a.taskId}`,
+        title: s.participant,
+        meta: `Task ${i + 1} · ${(a.ms / 1000).toFixed(0)} s · ${ago(s.startedAt)}`,
+        tag: OUTCOME[a.outcome],
+        route: `/console/heatmap/view?ut=${t.id}&utask=${a.taskId}&run=${s.id}&page=${page}&device=${layoutOf(s.vw)}`,
+      }
+    })
+  }).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 3)
+}
 
 /**
- * Start a heatmap test right on the page you're on: choose a task, optionally your name and eye
- * tracking, and go. The task runs here; the results open on their own page.
+ * Heatmap test from the page you're on: the latest runs, then pick a task and Start (with or
+ * without eye tracking). Once a task runs, the dock gives way to the task bar, whose only action is Stop.
  */
 export function HeatmapMenu() {
   const { toast } = useStore()
@@ -47,28 +113,29 @@ export function HeatmapMenu() {
   const [open, setOpen] = useState(false)
   const [running, setRunning] = useState(utRunning)
   const [editing, setEditing] = useState<'edit' | 'new' | null>(null)
+  const [recent, setRecent] = useState<Recent[]>([])
   const saved = readJSON<Pick | null>(PICK_KEY, null)
-  const [pick, setPickState] = useState<Pick>(() => ({ testId: saved?.testId ?? tests[0]?.id ?? '', taskId: saved?.taskId ?? tests[0]?.tasks[0]?.id ?? '', eyes: saved?.eyes ?? false, name: saved?.name ?? '' }))
-  const setPick = (p: Pick) => { setPickState(p); writeJSON(PICK_KEY, p) }
+  const [pick, setPickState] = useState<Pick>(() => ({ testId: saved?.testId ?? tests[0]?.id ?? '', taskId: saved?.taskId ?? tests[0]?.tasks[0]?.id ?? '' }))
+  const setPick = (p: Pick) => { setPickState(p); writeJSON(PICK_KEY, { testId: p.testId, taskId: p.taskId }) }
   useEffect(() => {
     const sync = () => setRunning(utRunning())
     window.addEventListener(UT_STATE, sync)
     return () => window.removeEventListener(UT_STATE, sync)
   }, [])
-  useEffect(() => { if (open) setTests(loadTests()) }, [open])
+  useEffect(() => { if (open) { setTests(loadTests()); setRecent(recentRuns()) } }, [open])
   const test = tests.find((t) => t.id === pick.testId) ?? tests[0]
   const task = test?.tasks.find((t) => t.id === pick.taskId) ?? test?.tasks[0]
 
-  const start = () => {
-    if (!test || !task) return
+  const start = (eyes: boolean) => {
+    if (!test || !task || utRunning()) return
     setOpen(false)
-    window.dispatchEvent(new CustomEvent<UtStart>(UT_START, { detail: { testId: test.id, taskId: task.id, eyes: pick.eyes, name: pick.name } }))
+    window.dispatchEvent(new CustomEvent<UtStart>(UT_START, { detail: { testId: test.id, taskId: task.id, eyes } }))
   }
   const saveTask = (t: TestTask) => {
     if (!test) return
     const next = tests.map((x) => (x.id === test.id ? { ...x, tasks: editing === 'edit' ? x.tasks.map((k) => (k.id === t.id ? t : k)) : [...x.tasks, t], updatedAt: new Date().toISOString() } : x))
     saveTests(next); setTests(next); setEditing(null)
-    setPick({ ...pick, testId: test.id, taskId: t.id })
+    setPick({ testId: test.id, taskId: t.id })
     toast(editing === 'edit' ? 'Task saved' : 'Task added')
   }
 
@@ -79,32 +146,32 @@ export function HeatmapMenu() {
       )}>
         {() => (
           <div className="dock-pop hm-pop" role="dialog" aria-label="Heatmap test">
-            <div className="dock-verhead"><b>Heatmap test</b><span>Do a task right here. Your clicks (and, if you like, where you look) are recorded.</span></div>
-            {running ? <p className="hm-pop-busy">A task is running. Finish it, or give up, first.</p> : !test ? <p className="hm-pop-busy">No usability test yet.</p> : (
+            <div className="dock-verhead"><b>Heatmap test</b><span>Do a task right here. Your clicks (and, if you choose, where you look) are recorded.</span></div>
+            <RecentList label="Latest runs" items={recent} empty="No runs yet. Start one below." all="/console/heatmap" />
+            {running ? <p className="hm-pop-busy">A task is running. Stop it first.</p> : !test ? <p className="hm-pop-busy">No usability test yet.</p> : (
               <>
                 {tests.length > 1 && (
-                  <select className="hm-pop-select" value={test.id} onChange={(e) => { const t = tests.find((x) => x.id === e.target.value); setPick({ ...pick, testId: e.target.value, taskId: t?.tasks[0]?.id ?? '' }) }} aria-label="Test">
+                  <select className="hm-pop-select" value={test.id} onChange={(e) => { const t = tests.find((x) => x.id === e.target.value); setPick({ testId: e.target.value, taskId: t?.tasks[0]?.id ?? '' }) }} aria-label="Test">
                     {tests.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 )}
                 <div className="hm-pop-tasks" role="radiogroup" aria-label="Task">
                   {test.tasks.map((t, i) => (
-                    <label key={t.id} className={t.id === task?.id ? 'on' : ''}>
-                      <input type="radio" name="hm-task" checked={t.id === task?.id} onChange={() => setPick({ ...pick, taskId: t.id })} />
-                      <span><b>Task {i + 1}</b> {t.prompt}</span>
-                    </label>
+                    <button key={t.id} role="radio" aria-checked={t.id === task?.id} className={t.id === task?.id ? 'on' : ''} onClick={() => setPick({ testId: test.id, taskId: t.id })}>
+                      <b>Task {i + 1}</b> {t.prompt}
+                    </button>
                   ))}
                 </div>
                 <div className="hm-pop-row">
                   <button onClick={() => { setOpen(false); setEditing('edit') }} disabled={!task}><Pencil size={12} /> Change task</button>
                   <button onClick={() => { setOpen(false); setEditing('new') }}><Plus size={12} /> New task</button>
                 </div>
-                <input className="hm-pop-input" value={pick.name} onChange={(e) => setPick({ ...pick, name: e.target.value })} maxLength={40} placeholder="Name or code (optional)" aria-label="Name or code" />
-                <label className="hm-pop-check"><input type="checkbox" checked={pick.eyes} onChange={(e) => setPick({ ...pick, eyes: e.target.checked })} /> <Eye size={13} /> Also record where I look (webcam, about a minute to calibrate)</label>
-                <button className="hm-pop-start" onClick={start} disabled={!task}><Play size={13} /> Start the task here</button>
+                <div className="dk-starts">
+                  <button className="hm-pop-start" onClick={() => start(false)} disabled={!task}><Play size={13} /> Start</button>
+                  <button className="hm-pop-start ghost" onClick={() => start(true)} disabled={!task} title="Uses your webcam to estimate where you look; about a minute to calibrate. Video never leaves the browser."><Eye size={13} /> Start with eye tracking</button>
+                </div>
               </>
             )}
-            <div className="tk-foot"><span /><Link to="/console/heatmap" onClick={() => setOpen(false)}>See results <ArrowRight size={12} /></Link></div>
           </div>
         )}
       </DockPopover>
@@ -116,29 +183,44 @@ export function HeatmapMenu() {
   )
 }
 
-/** Record sessions from where you are: switch recording on or off, end the current session. */
+/**
+ * Sessions from the page you're on: the latest three, and Start. Start records a session from
+ * this page at once; the dock then gives way to the recording bar, whose only action is Stop.
+ */
 export function SessionsMenu() {
-  const recording = useFlag('insights')
-  const [state, setState] = useState(sessionState)
+  const [open, setOpen] = useState(false)
+  const [recent, setRecent] = useState<Recent[] | null>(null)
   useEffect(() => {
-    const sync = () => setState(sessionState())
-    window.addEventListener(SESSION_EVENT, sync)
-    sync()
-    return () => window.removeEventListener(SESSION_EVENT, sync)
-  }, [])
+    if (!open) return
+    let live = true
+    setRecent(null)
+    flushNow()
+    void loadEvents().then((d) => {
+      if (!live) return
+      setRecent(buildSessions(d.events).slice(0, 3).map((s) => ({
+        key: s.sid,
+        title: `Session ${s.n}`,
+        meta: `${s.pages.length} page${s.pages.length === 1 ? '' : 's'} · ${s.taps} tap${s.taps === 1 ? '' : 's'} · ${clock(s.ms)} · ${ago(s.start)}`,
+        tag: s.problems ? { text: `${s.problems} problem${s.problems === 1 ? '' : 's'}`, tone: 'bad' } : undefined,
+        route: `/console/sessions?sid=${s.sid}`,
+      })))
+    })
+    return () => { live = false }
+  }, [open])
+  const start = () => {
+    setOpen(false)
+    setFlag('insights', true)
+    startSessionNow()
+  }
   return (
-    <DockPopover label="Sessions" button={(o) => (
-      <button className={`dock-icon ${o ? 'on' : ''} ${recording ? 'rec' : ''}`} aria-label="Sessions" aria-expanded={o} title="Sessions: record what people tap, in order"><MousePointerClick size={15} /></button>
+    <DockPopover label="Sessions" open={open} onOpenChange={setOpen} button={(o) => (
+      <button className={`dock-icon ${o ? 'on' : ''}`} aria-label="Sessions" aria-expanded={o} title="Sessions: record what people tap, in order"><MousePointerClick size={15} /></button>
     )}>
-      {(close) => (
+      {() => (
         <div className="dock-pop" role="dialog" aria-label="Sessions">
-          <div className="dock-verhead"><b>Sessions</b><span>Records each visit as a path: the pages opened and every tap, in order, with timing. Never what anyone types.</span></div>
-          <label className="hm-pop-check big">
-            <input type="checkbox" checked={recording} onChange={() => { if (recording) endSession('stopped'); setFlag('insights', !recording) }} />
-            <span><b>{recording ? 'Recording is on' : 'Recording is off'}</b><br /><small>{recording ? (state === 'active' ? 'A session is being recorded now.' : 'A session starts when the home page opens.') : 'Turn it on, then use the shop as a visitor would.'}</small></span>
-          </label>
-          {recording && state === 'active' && <button className="hm-pop-start ghost" onClick={() => { endSession('ended'); close() }}><Square size={12} /> End this session</button>}
-          <div className="tk-foot"><span /><Link to="/console/sessions" onClick={close}>See sessions <ArrowRight size={12} /></Link></div>
+          <div className="dock-verhead"><b>Sessions</b><span>Records a visit as a path: the pages opened and every tap, in order, with timing. Never what anyone types.</span></div>
+          <RecentList label="Latest sessions" items={recent} empty="No sessions yet. Start one below." all="/console/sessions" />
+          <button className="hm-pop-start" onClick={start}><Play size={13} /> Start recording here</button>
         </div>
       )}
     </DockPopover>

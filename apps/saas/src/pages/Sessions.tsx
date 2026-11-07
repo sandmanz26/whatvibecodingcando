@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Ban, CircleSlash, Download, Flame, MousePointerClick, RefreshCw, Trash2, X, FileText } from 'lucide-react'
 import { Empty, Modal, Switch } from '../components/ui'
 import { DEVICES, ScreenViewer, type Device } from '../tools/insights/ScreenViewer'
@@ -130,7 +131,9 @@ export default function Sessions({ view = 'sessions' }: { view?: 'sessions' | 'h
   const recording = useFlag('insights')
   const [data, setData] = useState<Loaded | null>(null)
   const tab = view
-  const [sid, setSid] = useState<string | null>(null)
+  // ?sid= opens one session (the dock's latest-sessions list links here).
+  const [params] = useSearchParams()
+  const [sid, setSid] = useState<string | null>(() => params.get('sid'))
   const [step, setStep] = useState<number | null>(null)
   const [confirm, setConfirm] = useState(false)
   const [dropOne, setDropOne] = useState<Session | null>(null)
