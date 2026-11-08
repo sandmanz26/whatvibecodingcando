@@ -712,3 +712,16 @@ html[data-ut-running] .dock { display: none; }
   .rs.menu-open .rs-scrim { display: block; position: fixed; inset: 52px 0 0 0; z-index: 30; background: rgba(0,0,0,.25); }
 }
 @media print { .rs { display: block; } }
+
+/* __reset: the hidden "reset everything" page */
+.reset-page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--page); }
+.reset-card { width: min(480px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 28px; display: flex; flex-direction: column; gap: 12px; color: var(--ink); }
+.reset-card h1 { font-size: 22px; margin: 0; }
+.reset-card p, .reset-card ul { margin: 0; line-height: 1.5; font-size: 14.5px; }
+.reset-card ul { padding-left: 20px; color: var(--ink-2); }
+.reset-icon { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--ink); }
+.reset-icon.ok { background: #e3f4e8; color: #1f7a3a; }
+.reset-muted { color: var(--ink-3); font-size: 13.5px !important; }
+.reset-warn { display: flex; gap: 8px; align-items: flex-start; color: #9a3412; font-size: 13.5px !important; }
+.reset-warn svg { flex: none; margin-top: 3px; }
+.reset-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }

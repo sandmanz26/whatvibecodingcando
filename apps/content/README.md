@@ -17,6 +17,16 @@ npm run dev       # http://localhost:5173
 npm run build     # static build in dist/ (hash routing, works on any static host)
 ```
 
+## Reset everything (`__reset`)
+
+Open `/content/__reset` or `/content/#/__reset`; `/__reset` on the deployment redirects to the first. It is never linked from the site.
+
+- **What it shows.** A page with **Reset everything** and **Cancel**, shown instead of the app, so no tool is running and saving data back while it clears.
+- **What it clears.** All of this site's data in the browser: its localStorage and sessionStorage, and its voice database (`market-voice`). That covers the cart, orders, version, comments, compare reviews, design tokens, sessions, heatmap and test runs, eye-tracking points, voice and the dock's position.
+- **What it leaves.** The SaaS app's data on the same domain (keys starting with `saas:`, its own voice database) is not touched.
+- **Other tabs.** If the site is open in other tabs, they may save their old data again; the page says so, and asks to close them and reset again.
+- **Locally.** `vite preview` has no rewrite for the path form, so use `#/__reset` there.
+
 ## The marketplace
 
 | Screen | What's on it |

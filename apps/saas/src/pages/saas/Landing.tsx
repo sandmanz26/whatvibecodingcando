@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Check, ArrowRight, Plus, ExternalLink, Code2, MousePointer2, Users, ShieldCheck, Sparkles } from 'lucide-react'
 import { BRAND, CATEGORIES, PRODUCTS, type Category } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
-import { loadSaas } from '../../saas/account'
+import { isSignedIn, loadSaas } from '../../saas/account'
 import '../../saas/saas.css'
 
 const PICK_KEY = 'vibe.landing.pick'
@@ -21,14 +21,16 @@ export default function Landing() {
   const nav = useNavigate()
   const [pick, setPick] = useState<string[]>(readPick)
   const [cat, setCat] = useState<Category | 'All'>('All')
-  const signedIn = !!loadSaas().account
+  const saas = loadSaas()
+  const signedIn = isSignedIn(saas)
+  const hasAccount = !!saas.account
   useEffect(() => { try { sessionStorage.setItem(PICK_KEY, JSON.stringify(pick)) } catch { /* ignore */ } }, [pick])
   useEffect(() => { window.scrollTo(0, 0); document.title = `${BRAND} — collaboration and UX research for vibe-coded products` }, [])
 
   const shown = useMemo(() => PRODUCTS.filter((p) => cat === 'All' || p.category === cat), [cat])
   const picked = PRODUCTS.filter((p) => pick.includes(p.id))
   const toggle = (id: string) => setPick((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
-  const start = () => nav(signedIn ? '/app/products' : `/app/signup?products=${picked.map((p) => p.id).join(',')}`)
+  const start = () => nav(signedIn ? '/app/products' : `/app/register?products=${picked.map((p) => p.id).join(',')}`)
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
   return (
@@ -45,7 +47,7 @@ export default function Landing() {
           <span className="lp-grow" />
           {signedIn
             ? <Link to="/app" className="lp-btn dark">Open your panel <ArrowRight size={15} /></Link>
-            : <Link to="/app/signup" className="lp-btn dark">Get started</Link>}
+            : <><Link to="/app/login" className="lp-btn ghost">Log in</Link>{!hasAccount && <Link to="/app/register" className="lp-btn dark">Get started</Link>}</>}
         </div>
       </header>
 
@@ -164,7 +166,7 @@ export default function Landing() {
             <b className="lp-big">Free</b>
             <p>Every product, every project, while we build the shared workspace.</p>
             <ul><li><Check size={14} /> All tools you pick</li><li><Check size={14} /> Unlimited projects</li><li><Check size={14} /> Prompts to build tools into your own code</li></ul>
-            <Link to={signedIn ? '/app' : '/app/signup'} className="lp-btn dark full">{signedIn ? 'Open your panel' : 'Get started'}</Link>
+            <Link to={signedIn ? '/app' : hasAccount ? '/app/login' : '/app/register'} className="lp-btn dark full">{signedIn ? 'Open your panel' : 'Get started'}</Link>
           </div>
           <div className="lp-price muted">
             <h3>After the beta</h3>

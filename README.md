@@ -27,6 +27,7 @@ One Vercel project serves both apps. `vercel.json` at the root sets the install 
 | `/content/` | the content site | `dist/content` |
 | `/saas/` | the SaaS (opens on its website) | `dist/saas` |
 | `/` | redirects to `/content/` (a hash such as `#/console/...` is kept) | — |
+| `/content/__reset` (and `/__reset`) | the content site's hidden "reset everything" page; `/content/__reset` is rewritten to the content app | `dist/content` |
 
 `/content` and `/saas` without the slash redirect to the version with it, so the relative asset paths resolve. Locally, `npm run build && npm run preview` serves the same layout at `http://localhost:4173/content/` and `/saas/`.
 

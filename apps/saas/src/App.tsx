@@ -25,7 +25,8 @@ import Compare from './pages/Compare'
 import TokenCompare from './pages/TokenCompare'
 import Install from './pages/Install'
 import Landing from './pages/saas/Landing'
-import Signup from './pages/saas/Signup'
+import Onboarding from './pages/saas/Onboarding'
+import { Forgot, Login, Register, Reset } from './pages/saas/Auth'
 import { PanelLayout, Overview, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { Inspector } from './tools/inspect/Inspector'
@@ -47,7 +48,12 @@ export default function App() {
         <Routes>
           {/* The hosted product's website and user panel: their own look, no research tools. */}
           <Route path="landingpage" element={<Landing />} />
-          <Route path="app/signup" element={<Signup />} />
+          <Route path="app/register" element={<Register />} />
+          <Route path="app/login" element={<Login />} />
+          <Route path="app/forgot" element={<Forgot />} />
+          <Route path="app/reset" element={<Reset />} />
+          <Route path="app/onboarding" element={<Onboarding />} />
+          <Route path="app/signup" element={<SignupRedirect />} />
           <Route path="app" element={<PanelLayout />}>
             <Route index element={<Overview />} />
             <Route path="products" element={<Products />} />
@@ -116,4 +122,10 @@ function ResearchTools() {
       <VersionSwitch />
     </>
   )
+}
+
+/** The old sign-up address: registering is now first, and the picked products carry on to onboarding. */
+function SignupRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/app/register${search}`} replace />
 }

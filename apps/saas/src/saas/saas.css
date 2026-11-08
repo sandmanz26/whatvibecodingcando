@@ -292,3 +292,34 @@
   .up-page { padding: 20px 16px; }
   .up-beta { padding: 8px 16px; }
 }
+
+/* Sign-in pages: register, log in, forgot and reset password */
+.lp-auth-col { width: min(460px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.lp-auth-card { width: 100%; }
+.lp-auth-card h1 { font-size: 26px; }
+.lp-auth-card .lp-muted { margin-top: 6px; line-height: 1.5; }
+.lp-auth-fields { display: flex; flex-direction: column; gap: 14px; }
+.lp-auth-foot { text-align: center; font-size: 14px; color: var(--lp-ink-2); }
+.lp-auth-foot a, .lp-auth-link, .lp-auth-card p a { color: var(--lp-ink); font-weight: 650; }
+.lp-auth-link { font-size: 13px; align-self: flex-end; }
+.lp-pass { position: relative; display: flex; }
+.lp-pass input { flex: 1; padding-right: 44px; min-width: 0; }
+.lp-pass button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 34px; border: 0; background: transparent; color: var(--lp-ink-2); border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
+.lp-pass button:hover { background: rgba(22,19,15,.06); color: var(--lp-ink); }
+.lp-strength { display: flex; align-items: center; gap: 10px; }
+.lp-strength-bar { display: flex; gap: 4px; flex: 1; max-width: 200px; }
+.lp-strength-bar i { flex: 1; height: 5px; border-radius: 3px; background: var(--lp-line-2); }
+.lp-strength-bar i.on.s1 { background: #d9480f; }
+.lp-strength-bar i.on.s2 { background: #f08c00; }
+.lp-strength-bar i.on.s3 { background: #5c940d; }
+.lp-strength-bar i.on.s4 { background: #2b8a3e; }
+.lp-note { display: flex; gap: 8px; align-items: flex-start; }
+.lp-note svg { flex: none; margin-top: 3px; }
+.lp-ok { display: flex; align-items: center; gap: 8px; color: #2b8a3e; font-size: 14px; font-weight: 600; }
+.lp-mail { border: 1.5px dashed var(--lp-line-2); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: #fffdf8; }
+.lp-mail-tag { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--lp-ink-2); }
+.lp-mail-body { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; background: #fff; border: 1px solid var(--lp-line-2); border-radius: 10px; padding: 14px; font-size: 14px; line-height: 1.5; margin: 0; }
+.lp-signup .lp-form .lp-eyebrow { align-self: flex-start; margin-bottom: 0; }
+.lp-code { margin: 0; padding: 14px; border-radius: 10px; background: #16130f; color: #f4efe6; font: 13px/1.55 'JetBrains Mono', ui-monospace, monospace; overflow-x: auto; white-space: pre; }
+.up-logout { margin-top: 6px; align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12.5px; font-weight: 600; color: inherit; opacity: .75; cursor: pointer; }
+.up-logout:hover { opacity: 1; text-decoration: underline; }

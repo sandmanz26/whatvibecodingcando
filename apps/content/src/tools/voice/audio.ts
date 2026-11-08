@@ -11,7 +11,8 @@
  */
 import { APP } from '../shared'
 
-const DB = `${APP}-voice`
+export const VOICE_DB = `${APP}-voice`
+const DB = VOICE_DB
 const STORE = 'clips'
 
 function db(): Promise<IDBDatabase> {

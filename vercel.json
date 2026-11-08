@@ -19,6 +19,22 @@
       "source": "/saas",
       "destination": "/saas/",
       "permanent": false
+    },
+    {
+      "source": "/__reset",
+      "destination": "/content/__reset",
+      "permanent": false
+    },
+    {
+      "source": "/content/__reset/",
+      "destination": "/content/__reset",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/content/__reset",
+      "destination": "/content/index.html"
     }
   ]
 }

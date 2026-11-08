@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, Circle, CheckCircle2, X, TriangleAlert } from 'lucide-react'
+import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, Circle, CheckCircle2, X, TriangleAlert } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
 import { copyText, demoUrl, snippet } from '../../saas/snippet'
-import { freeId, newProject, originOf, slug, useSaas, validEmail, type Project, type SaasState } from '../../saas/account'
+import { canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, validEmail, type Project, type SaasState } from '../../saas/account'
 import { LocalBackend, STATUS_LABEL, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
-interface Ctx { s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
+interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
 const usePanel = () => useOutletContext<Ctx>()
 const ago = (iso: string) => {
   const m = (Date.now() - new Date(iso).getTime()) / 60000
@@ -38,11 +38,6 @@ function useThreads(projectId: string | undefined) {
 
 /* ---------- frame ---------- */
 
-/**
- * Set while the workspace is being deleted on the way out. Navigation runs as a transition, so the
- * panel can see "no account" before the new page shows; it must not send you to sign-up then.
- */
-let leaving = false
 
 export function PanelLayout() {
   const [s, update] = useSaas()
@@ -50,8 +45,19 @@ export function PanelLayout() {
   const nav = useNavigate()
   const [creating, setCreating] = useState(false)
   const { pathname } = useLocation()
-  useEffect(() => () => { leaving = false }, []) // reset once the panel is gone
-  if (!s.account) return leaving ? null : <Navigate to="/app/signup" replace />
+  /**
+   * Where the panel is going on the way out (logging out, deleting the workspace). The guards below
+   * would otherwise see "signed out" or "no account" first and send you elsewhere. Kept per panel,
+   * and dropped when the address changes, so it can never leave the panel stuck.
+   */
+  const [exit, setExit] = useState<string | null>(null)
+  useEffect(() => { setExit(null) }, [pathname])
+  if (exit) return <Navigate to={exit} replace />
+  if (!s.account) return <Navigate to="/app/register" replace />
+  if (!isSignedIn(s)) return <Navigate to={`/app/login?next=${encodeURIComponent(pathname)}`} replace />
+  if (!isOnboarded(s)) return <Navigate to="/app/onboarding" replace />
+  const leave = (to: string, change: () => void) => { setExit(to); change() }
+  const logOut = () => leave('/app/login', () => update((x) => ({ ...x, signedIn: false })))
   const project = s.projects.find((p) => p.id === s.current) ?? s.projects[0] ?? null
   const setProject = (fn: (p: Project) => Project) => {
     if (!project) return false
@@ -83,12 +89,12 @@ export function PanelLayout() {
           {LINKS.map(({ to, end, icon: Icon, label }) => <NavLink key={to} to={to} end={end}><Icon size={16} /> {label}</NavLink>)}
         </nav>
         <span className="lp-grow" />
-        <div className="up-me"><b>{s.account.name}</b><span>{s.account.email}</span></div>
+        <div className="up-me"><b>{s.account.name}</b><span>{s.account.email}</span><button className="up-logout" onClick={logOut}><LogOut size={13} /> Log out</button></div>
         <Link to="/landingpage" className="up-back"><ArrowLeft size={14} /> Website</Link>
       </aside>
       <main className="up-main">
         <div className="up-beta"><TriangleAlert size={14} /> Beta without a server: this workspace is saved in this browser only.</div>
-        {project || pathname === '/app/settings' ? <Outlet context={{ s, update, project, setProject } satisfies Ctx} /> : (
+        {project || pathname === '/app/settings' ? <Outlet context={{ s, update, project, setProject, leave, logOut } satisfies Ctx} /> : (
           <div className="up-empty"><h1>No project yet</h1><p>Create a project for a site or app to get its snippet.</p><button className="lp-btn primary" onClick={() => setCreating(true)}><Plus size={15} /> New project</button></div>
         )}
       </main>
@@ -385,7 +391,7 @@ export function Team() {
 /* ---------- settings ---------- */
 
 export function SettingsPage() {
-  const { s, update, project, setProject } = usePanel()
+  const { s, update, project, setProject, leave, logOut } = usePanel()
   const { toast } = useStore()
   const nav = useNavigate()
   const [name, setName] = useState(s.account!.name)
@@ -405,7 +411,7 @@ export function SettingsPage() {
 
   return (
     <div className="up-page">
-      <div className="up-head"><div><h1>Settings</h1></div></div>
+      <div className="up-head"><div><h1>Settings</h1></div><button className="lp-btn sm" onClick={logOut}><LogOut size={14} /> Log out</button></div>
       <section className="up-card">
         <h2>You</h2>
         <div className="up-grid2">
@@ -415,6 +421,7 @@ export function SettingsPage() {
         <div className="up-row"><button className="lp-btn primary sm" disabled={!accountDirty || !accountOk} onClick={() => { if (update((x) => ({ ...x, account: { ...x.account!, name: name.trim(), email: email.trim() } }))) toast('Saved') }}>Save</button>
           {accountDirty && <button className="lp-btn sm ghost" onClick={() => { setName(s.account!.name); setEmail(s.account!.email) }}>Cancel</button>}</div>
       </section>
+      <PasswordCard />
       {project && (
         <section className="up-card">
           <h2>Project</h2>
@@ -450,15 +457,56 @@ export function SettingsPage() {
                 update((x) => { const projects = x.projects.filter((p) => p.id !== project.id); return { ...x, projects, current: projects[0]?.id ?? null, invites: x.invites.filter((i) => i.projectId !== project.id) } })
                 toast('Project deleted'); setConfirm(null); nav('/app')
               } else {
-                leaving = true
-                try { localStorage.removeItem('vibe.saas') } catch { /* ignore */ }
-                window.dispatchEvent(new Event('vibe:saas'))
-                nav('/landingpage')
+                leave('/landingpage', () => {
+                  try { localStorage.removeItem('vibe.saas') } catch { /* ignore */ }
+                  window.dispatchEvent(new Event('vibe:saas'))
+                })
               }
             }}>Delete</button></>}>
           <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Confirmation" autoFocus />
         </Modal>
       )}
     </div>
+  )
+}
+
+/** Change the password: the current one first, then the new one twice. */
+function PasswordCard() {
+  const { s, update } = usePanel()
+  const { toast } = useStore()
+  const [cur, setCur] = useState('')
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const has = !!s.account?.password
+  const problem = passwordProblem(pw, s.account?.email)
+  const save = async () => {
+    setError('')
+    if (problem) { setError(problem); return }
+    if (pw !== pw2) { setError('The new passwords don’t match.'); return }
+    if (!canHash()) { setError('This page isn’t on a secure address, so a password can’t be set here.'); return }
+    setBusy(true)
+    try {
+      if (has && !(await checkPassword(cur, s.account!.password!))) { setError('The current password is incorrect.'); return }
+      const password = await hashPassword(pw)
+      if (update((x) => ({ ...x, account: { ...x.account!, password }, reset: undefined }))) { toast(has ? 'Password changed' : 'Password set'); setCur(''); setPw(''); setPw2('') }
+      else setError('Not saved: this browser’s storage is full or blocked.')
+    } finally { setBusy(false) }
+  }
+  return (
+    <section className="up-card">
+      <h2>Password</h2>
+      {!has && <p className="up-muted">This workspace was made before passwords. Set one so you can log in after logging out.</p>}
+      <form className="up-grid2" onSubmit={(e) => { e.preventDefault(); void save() }}>
+        {has && <label className="lp-field">Current password<input type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" maxLength={200} /></label>}
+        <label className="lp-field">New password<input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" maxLength={200} /></label>
+        <label className="lp-field">Confirm new password<input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" maxLength={200} /></label>
+        <div className="up-row" style={{ gridColumn: '1 / -1' }}>
+          <button className="lp-btn primary sm" type="submit" disabled={busy || !pw || (has && !cur)}>{busy ? 'Saving…' : has ? 'Change password' : 'Set password'}</button>
+          {error && <span className="lp-error">{error}</span>}
+        </div>
+      </form>
+    </section>
   )
 }

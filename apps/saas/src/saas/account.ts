@@ -23,8 +23,23 @@ export interface Project {
   createdAt: string
 }
 export interface Invite { email: string; role: 'admin' | 'member'; projectId: string; at: string }
-export interface Account { name: string; email: string; createdAt: string }
-export interface SaasState { account: Account | null; projects: Project[]; current: string | null; invites: Invite[] }
+/** A password as stored: PBKDF2-SHA-256 of the password with a random salt; never the password itself. */
+export interface PasswordHash { salt: string; hash: string; iter: number }
+export interface Account { name: string; email: string; createdAt: string; password?: PasswordHash }
+export interface SaasState {
+  account: Account | null
+  projects: Project[]
+  current: string | null
+  invites: Invite[]
+  /** false after logging out; absent on workspaces from before login existed (they were signed in) */
+  signedIn?: boolean
+  /** false between registering and finishing onboarding; absent on older workspaces (already set up) */
+  onboarded?: boolean
+  /** a password-reset link not used yet: single use, short-lived */
+  reset?: { token: string; expires: number }
+  /** failed logins in a row, and until when logging in is paused */
+  lock?: { fails: number; until: number }
+}
 
 const KEY = 'vibe.saas'
 const EVENT = 'vibe:saas'
@@ -80,3 +95,65 @@ export function newProject(name: string, siteUrl: string, products: string[], ta
     domains: origin ? [new URL(origin).hostname] : [], createdAt: new Date().toISOString(),
   }
 }
+
+/* ---------- signing in (no server yet: all of this happens in this browser) ---------- */
+
+export const isSignedIn = (s: SaasState) => !!s.account && s.signedIn !== false
+export const isOnboarded = (s: SaasState) => s.onboarded !== false
+export const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+export const PASSWORD_MIN = 8
+const COMMON = ['password', 'password1', '12345678', '123456789', 'qwerty123', 'iloveyou', 'admin123', 'letmein1', '11111111', 'abcd1234']
+/** What's wrong with a new password, or '' when it is acceptable. */
+export function passwordProblem(pw: string, email = ''): string {
+  if (pw.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters.`
+  if (pw.length > 200) return 'That’s too long.'
+  if (COMMON.includes(pw.toLowerCase())) return 'That password is too common. Pick another.'
+  if (email && sameEmail(pw, email)) return 'Don’t use your email as the password.'
+  return ''
+}
+/** 0–4, for the strength meter: length and the kinds of characters used. */
+export function passwordScore(pw: string): number {
+  if (!pw) return 0
+  const kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/].filter((r) => r.test(pw)).length
+  let n = pw.length >= PASSWORD_MIN ? 1 : 0
+  if (pw.length >= 12) n++
+  if (kinds >= 3) n++
+  if (pw.length >= 16 || (kinds === 4 && pw.length >= 12)) n++
+  return passwordProblem(pw) ? Math.min(n, 1) : Math.max(1, n)
+}
+
+const b64 = (u: Uint8Array) => btoa(String.fromCharCode(...u))
+const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0))
+const ITER = 120_000
+async function derive(pw: string, salt: Uint8Array, iter: number) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: salt as BufferSource, iterations: iter }, key, 256)
+  return b64(new Uint8Array(bits))
+}
+/** Hashes a new password. Needs a secure page (https or localhost), where crypto.subtle exists. */
+export async function hashPassword(pw: string): Promise<PasswordHash> {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  return { salt: b64(salt), hash: await derive(pw, salt, ITER), iter: ITER }
+}
+export async function checkPassword(pw: string, h: PasswordHash): Promise<boolean> {
+  const got = await derive(pw, unb64(h.salt), h.iter)
+  // Compared in full, not stopping at the first difference.
+  let diff = got.length ^ h.hash.length
+  for (let i = 0; i < Math.max(got.length, h.hash.length); i++) diff |= (got.charCodeAt(i) || 0) ^ (h.hash.charCodeAt(i) || 0)
+  return diff === 0
+}
+export const canHash = () => typeof crypto !== 'undefined' && !!crypto.subtle
+
+/** After 5 wrong passwords in a row, logging in pauses: 30 s, doubling each further miss, up to 15 min. */
+export const LOCK_AFTER = 5
+export function lockAfterFail(lock: SaasState['lock']): NonNullable<SaasState['lock']> {
+  const fails = (lock?.fails ?? 0) + 1
+  const pause = fails >= LOCK_AFTER ? Math.min(15 * 60_000, 30_000 * 2 ** (fails - LOCK_AFTER)) : 0
+  return { fails, until: pause ? Date.now() + pause : 0 }
+}
+
+export const RESET_MINUTES = 30
+export const newResetToken = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('')
+/** Whether a reset link's token is the current one and still valid. */
+export const resetValid = (s: SaasState, token: string | null) => !!token && !!s.reset && s.reset.token === token && s.reset.expires > Date.now() && !!s.account

@@ -1,6 +1,6 @@
 # Vibe Collab (SaaS app)
 
-The hosted product: website (`#/landingpage`, the default page), sign-up, user panel (`#/app`), install page and the installable script, plus every research tool built for the content site (dock, research console, heatmaps and eye tracking, sessions, compare reviews, design tokens, inspect, versions). It starts as a copy of `apps/content`; from here it grows on its own (backend, accounts and a database come later).
+The hosted product: website (`#/landingpage`, the default page), register, login, forgot/reset password, onboarding, user panel (`#/app`), install page and the installable script, plus every research tool built for the content site (dock, research console, heatmaps and eye tracking, sessions, compare reviews, design tokens, inspect, versions). It starts as a copy of `apps/content`; from here it grows on its own (backend, accounts and a database come later).
 
 This is a separate system from the content site. It has its own code (including `src/core`: the script's widget and storage interface, the heatmap renderer and the eye-movement analysis), its own dependencies and its own browser data (`saas:` storage prefix, `saas:vibe:` for the script, its own voice database). Changes made here stay here.
 
@@ -346,17 +346,34 @@ The first step towards a hosted product: one script tag adds comments to any sit
   - Visitors pick the tools they want from a catalogue of 12 products, filtered by category, with a running "Your stack" summary.
   - Each product says honestly where it works today: **On your site today** (in the script) or **Early access** (built and usable in the demo console).
   - It also has how it works, a live demo of the script in an iframe, beta pricing and FAQ.
-  - The picks carry into sign-up.
-- **`#/app/signup`** has three steps: tools, project, you.
-  - Nothing is saved until the last step, Back keeps what was entered, and each step validates.
-  - There is no password, because there is no server: the page says the account lives in this browser.
+  - The picks carry into registering, then into onboarding.
+- **Signing in** (`src/pages/saas/Auth.tsx`, helpers in `src/saas/account.ts`). There is no server yet, so the account lives in this browser, one workspace per browser. Each page says so.
+  - **`#/app/register`:** name, work email, password and confirmation.
+    - Password: at least 8 characters, not a common one, not the email. A strength meter and show/hide are shown.
+    - Storage: only a salted PBKDF2-SHA-256 hash is kept, never the password.
+    - If the browser already has a workspace, the page offers Log in instead.
+    - `#/app/signup` redirects here, keeping `?products=`.
+  - **`#/app/onboarding`:** after registering, three steps (tools, first project, install snippet with Copy).
+    - Nothing is saved until **Finish** or **Skip for now**.
+    - The panel sends you back here until onboarding is done.
+  - **`#/app/login`:** email (any case) and password.
+    - A wrong email and a wrong password get the same message.
+    - After 5 misses in a row, logging in pauses for 30 s, doubling per further miss up to 15 min. The pause survives a reload.
+    - `?next=` returns you to the panel page you came from (only `/app` paths are accepted).
+  - **`#/app/forgot`:** always answers "Check your email". No email is sent, so a **Demo inbox** shows the email that would arrive, with its reset link, or says that nothing would arrive.
+  - **`#/app/reset?token=`:** sets a new password and logs you in. Reset links:
+    - work once and expire after 30 minutes;
+    - stop working when a newer link is asked for;
+    - clear the login pause.
+  - **Log out** is in the panel's sidebar and in Settings. **Settings → Password** changes the password (current one first).
+  - **Workspaces from before login:** they stay signed in and set up. They can set a password in Settings, or through Forgot password.
 - **`#/app`** is the user panel:
   - **Overview:** a setup checklist and comment counts.
   - **Products:** turn tools on or off per project; early-access ones count as requested.
   - **Install:** the project's snippet with `data-products`, widget options, and where to paste it (HTML, Vite, Next.js, CMS, or a prompt for Claude). It warns when the snippet changed since it was last copied.
   - **Comments:** an inbox with filters, search, complete, reopen, delete and "open on site".
   - **Team:** invites, kept as pending because no emails are sent yet.
-  - **Settings:** account, project, allowed domains, and deleting a project or the workspace by typing to confirm.
+  - **Settings:** account, password, log out, project, allowed domains, and deleting a project or the workspace by typing to confirm.
   - Several projects are supported; a project id is fixed once created because the snippet and comments use it.
 - **Inbox without a backend.** The inbox reads comments through the script's `Backend` interface, so it shows those saved on this domain. Open `embed-demo.html?project=<id>` (the panel links to it) to see comments arrive in the panel.
 - **Code and storage.** Data is in `vibe.saas` (localStorage) and the code in `src/saas/` and `src/pages/saas/`. The research dock and tools are not mounted on these pages.
