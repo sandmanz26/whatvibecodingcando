@@ -319,7 +319,7 @@ Rules for those endpoints:
 - Each card has **Copy prompt**, **Show prompt**, and **Try it here** (opens the tool in this demo). **Download all (.md)** saves every prompt in one file.
 - The prompts live in `src/tools/prompts/catalog.ts`. When a tool's behaviour changes, update its prompt too.
 
-## Installable script: collaboration on any website (SaaS, version 0.1)
+## Installable script: collaboration on any website (SaaS, version 0.2)
 
 The first step towards a hosted product: one script tag adds comments to any site, whatever it is built with.
 
@@ -345,6 +345,39 @@ The first step towards a hosted product: one script tag adds comments to any sit
   - **Focus traps.** A host dialog that traps the keyboard (Radix, MUI, Headless UI) can't be overridden from outside. The widget says so instead of leaving a field that ignores typing.
   - **Comment text** is rendered as text only (no `innerHTML`).
 - **Storage.** Code is in `src/embed/`. For now there is `LocalBackend` (localStorage per project), so teammates don't see each other's comments yet. The widget only talks to a `Backend` interface (`list`, `upsert` one thread, `remove` one, `subscribe` to changes elsewhere). A shared database needs only a new implementation of that interface, plus decisions on accounts, project keys and allowed domains.
+
+### Widget settings (0.2)
+
+The snippet carries only the project, so it never has to change:
+
+```html
+<script src=".../embed/vibe.js" data-project="toko-budi" defer></script>
+```
+
+Everything else is the project's **published configuration**, built in the panel (**Widget**) and read by the script when it starts. The format is in `src/core/embed/config.ts`; the panel side is in `src/saas/widget.ts`.
+
+- **Data only.** Every field is checked, unknown fields are dropped, and an invalid configuration is refused whole (the widget then stays off).
+- **Off switch.** Publishing it off hides the widget everywhere without touching the site.
+- **Where (environments).** Host names or patterns (`*.example.com`, `shop-git-*.vercel.app`). Wildcards over shared hosts (`*.vercel.app`) or top-level domains are refused. The hosted demo site always works.
+- **Who sees it.**
+  - **Reviewers only** (the default) needs a review link: `#vibe_t=<one-time token>`, valid 2 minutes. The script trades it for an 8-hour reviewer session and removes it from the address at once. This works on page load and when the hash changes on an open page.
+  - **Everyone** is for open betas.
+- **Modules.** Comments today, and only while the product is on in Products.
+- **Launcher.** Floating, or **your own buttons**:
+  - `data-vibe="comment"` / `data-vibe="comments"` on any element;
+  - `window.VibeCollab.open('comment' | 'list')` from code (calls made before the script loads can be queued in `window.VibeCollab.q`).
+- **Look.** Accent colour, light or dark panels.
+- **Draft, preview, publish, rollback.**
+  - Edits are a draft. The builder's preview opens the demo site as a reviewer in preview mode, which shows the draft live as you edit, with a "Preview · draft" badge and Exit.
+  - **Publish** makes a numbered release that sites follow without a reload. **Roll back** republishes an earlier release as a new version.
+- **Older installs.** Projects that never published keep the 0.1 snippet options (`data-color`, `data-position`, `data-shortcut`, `data-products`).
+- **Deleted projects** are marked gone, so their snippet shows nothing (it does not fall back to the 0.1 behaviour).
+- **The script on the page.**
+  - `data-disabled` loads nothing.
+  - A crash inside the widget removes only the widget.
+  - It says in the console why it isn't shown (off, environment, audience).
+  - It reports itself for the panel's **Installation check**.
+- **No server yet.** The configuration endpoint, review tokens and the installation check use this browser's storage (`saas:vibe:config:*`, `saas:vibe:handoff:*`, `saas:vibe:seen:*`). That works where the panel and the site share an origin, which is the hosted demo site. On a customer's own domain, review links and previews need the server; the panel says so.
 
 ## Website and user panel for the hosted product
 
@@ -376,10 +409,14 @@ The first step towards a hosted product: one script tag adds comments to any sit
 - **`#/app`** is the user panel:
   - **Overview:** a setup checklist and comment counts.
   - **Products:** turn tools on or off per project; early-access ones count as requested.
-  - **Install:** the project's snippet with `data-products`, widget options, and where to paste it (HTML, Vite, Next.js, CMS, or a prompt for Claude). It warns when the snippet changed since it was last copied.
+  - **Install:**
+    - the project's snippet (script and project only) and where to paste it (HTML, Vite, Next.js, CMS, or a prompt for Claude);
+    - an **Installation check** (last seen, shown or why not);
+    - developer notes: CSP, own buttons and API, `data-disabled`, environments.
+  - **Widget:** the widget builder (see "Widget settings").
   - **Comments:** an inbox with filters, search, complete, reopen, delete and "open on site".
   - **Team:** invites, kept as pending because no emails are sent yet.
-  - **Settings:** account, password, log out, project, allowed domains, and deleting a project or the workspace by typing to confirm.
+  - **Settings:** account, password, log out, project, and deleting a project or the workspace by typing to confirm (their published settings go too, so the snippet shows nothing). Where the widget runs is set per environment in Widget.
   - Several projects are supported; a project id is fixed once created because the snippet and comments use it.
 - **Inbox without a backend.** The inbox reads comments through the script's `Backend` interface, so it shows those saved on this domain. Open `embed-demo.html?project=<id>` (the panel links to it) to see comments arrive in the panel.
 - **Code and storage.** Data is in `vibe.saas` (localStorage) and the code in `src/saas/` and `src/pages/saas/`. The research dock and tools are not mounted on these pages.

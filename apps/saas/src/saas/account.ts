@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { SnippetOptions } from './snippet'
+import type { Release, WidgetConfig } from '../core/embed/config'
 
 export interface Project {
   /** the data-project value: fixed once created, because comments are stored under it */
@@ -20,6 +21,10 @@ export interface Project {
   domains: string[]
   /** the snippet as last copied, to tell when it has changed since */
   copiedSnippet?: string
+  /** the widget settings being edited (absent: derived from `widget`, products and domains) */
+  config?: WidgetConfig
+  /** published widget settings, oldest first; the last one is what sites get */
+  releases?: Release[]
   createdAt: string
 }
 export interface Invite { email: string; role: 'admin' | 'member'; projectId: string; at: string }

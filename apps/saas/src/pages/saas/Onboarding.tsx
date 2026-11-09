@@ -3,7 +3,8 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Check, ArrowLeft, ArrowRight, MousePointer2, Copy, ExternalLink, LogOut } from 'lucide-react'
 import { BRAND, PRODUCTS, parseProducts, productOf } from '../../saas/products'
 import { freeId, isOnboarded, isSignedIn, newProject, originOf, slug, useSaas } from '../../saas/account'
-import { copyText, demoUrl, snippet } from '../../saas/snippet'
+import { copyText, demoUrl, installSnippet } from '../../saas/snippet'
+import { publish } from '../../saas/widget'
 import '../../saas/saas.css'
 
 const STEPS = ['Tools', 'Project', 'Install']
@@ -30,7 +31,7 @@ export default function Onboarding() {
 
   const taken = state.projects.map((p) => p.id)
   const draft = useMemo(() => newProject(project || 'my-project', site, products, taken), [project, site, products, taken.join()]) // eslint-disable-line react-hooks/exhaustive-deps
-  const code = snippet({ project: draft.id, ...draft.widget, products: draft.products.filter((id) => productOf(id)?.status === 'script') })
+  const code = installSnippet(draft.id)
 
   if (!state.account) return <Navigate to="/app/register" replace />
   if (!isSignedIn(state)) return <Navigate to="/app/login?next=/app/onboarding" replace />
@@ -41,7 +42,9 @@ export default function Onboarding() {
   const toggle = (id: string) => setProducts((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
   const finish = () => {
     setFinished(true)
-    const p = { ...draft, ...(copied === code ? { copiedSnippet: code } : {}) }
+    // The first widget settings are published with the project, so the snippet works as soon as it is pasted:
+    // reviewers only, on the site's address (when one was given) and the demo site.
+    const p = publish({ ...draft, ...(copied === code ? { copiedSnippet: code } : {}) }, state.account?.name ?? 'You')
     const ok = update((x) => ({ ...x, projects: [...x.projects, p], current: p.id, onboarded: true }))
     if (!ok) { setFinished(false); setError('This browser’s storage is full or blocked, so the workspace couldn’t be saved.') }
   }
@@ -114,6 +117,7 @@ export default function Onboarding() {
                 <button type="button" className="lp-btn" onClick={() => void copy()}>{copied === code ? <><Check size={15} /> Copied</> : <><Copy size={15} /> Copy snippet</>}</button>
                 <a className="lp-btn ghost" href={demoUrl(draft.id)} target="_blank" rel="noopener">Try it on the demo site <ExternalLink size={14} /></a>
               </div>
+              <p className="lp-hint">It starts for <b>reviewers only</b>{originOf(site) ? <> on <code>{new URL(originOf(site)!).host}</code></> : ''}: visitors don’t see it. Invite reviewers, add staging or preview sites, and change the look in Widget.</p>
               {products.some((id) => productOf(id)?.status !== 'script') && <p className="lp-hint">Only Comments runs in the script today; the other tools you picked are marked early access.</p>}
             </>
           )}

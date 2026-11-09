@@ -27,6 +27,7 @@ import Install from './pages/Install'
 import Landing from './pages/saas/Landing'
 import Onboarding from './pages/saas/Onboarding'
 import { Forgot, Login, Register, Reset } from './pages/saas/Auth'
+import { WidgetBuilder } from './pages/saas/WidgetBuilder'
 import { PanelLayout, Overview, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { Inspector } from './tools/inspect/Inspector'
@@ -58,6 +59,7 @@ export default function App() {
             <Route index element={<Overview />} />
             <Route path="products" element={<Products />} />
             <Route path="install" element={<PanelInstall />} />
+            <Route path="widget" element={<WidgetBuilder />} />
             <Route path="comments" element={<Comments />} />
             <Route path="team" element={<Team />} />
             <Route path="settings" element={<SettingsPage />} />

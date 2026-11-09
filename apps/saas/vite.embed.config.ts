@@ -23,6 +23,8 @@ function asciiOnly(): Plugin {
  * Builds the installable script (dist/embed/vibe.js, from this app's own src/core/embed): one self-contained file with no CSS
  * file beside it, so a site needs a single <script> tag. Runs after the app's own build.
  */
+// The bundle's own global is not "VibeCollab": that name is the public API the script sets up
+// (window.VibeCollab.open), and the bundle's return value would overwrite it.
 export default defineConfig({
   plugins: [react(), asciiOnly()],
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
@@ -30,6 +32,6 @@ export default defineConfig({
     outDir: '../../dist/saas/embed',
     emptyOutDir: false,
     copyPublicDir: false,
-    lib: { entry: fileURLToPath(new URL('./src/core/embed/main.tsx', import.meta.url)), formats: ['iife'], name: 'VibeCollab', fileName: () => 'vibe.js' },
+    lib: { entry: fileURLToPath(new URL('./src/core/embed/main.tsx', import.meta.url)), formats: ['iife'], name: '__vibeCollabBundle', fileName: () => 'vibe.js' },
   },
 })

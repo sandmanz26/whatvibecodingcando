@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, Circle, CheckCircle2, X, TriangleAlert } from 'lucide-react'
+import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, Circle, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
-import { copyText, demoUrl, snippet } from '../../saas/snippet'
+import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
+import { liveOf, openAsReviewer, serveProject, unserveProject } from '../../saas/widget'
+import { lastSeen } from '../../core/embed/config'
 import { canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, validEmail, type Project, type SaasState } from '../../saas/account'
 import { LocalBackend, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
-interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
-const usePanel = () => useOutletContext<Ctx>()
+export interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
+export const usePanel = () => useOutletContext<Ctx>()
 const ago = (iso: string) => {
   const m = (Date.now() - new Date(iso).getTime()) / 60000
   if (m < 1) return 'just now'
@@ -18,8 +20,12 @@ const ago = (iso: string) => {
   if (m < 1440) return `${Math.floor(m / 60)} h ago`
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
-/** The snippet for a project, with the products the script can run. */
-const snippetOf = (p: Project) => snippet({ project: p.id, ...p.widget, products: p.products.filter((id) => productOf(id)?.status === 'script') })
+/** The snippet for a project: the script and the project id. The widget's settings live in the panel. */
+const snippetOf = (p: Project) => installSnippet(p.id)
+/** Opens the demo site as a reviewer of the project (the widget shows to reviewers only by default). */
+export const openDemo = (projectId: string, toast: (t: string, k?: 'error') => void) => { if (!openAsReviewer(projectId, demoUrl(projectId))) toast('Couldn’t open the review link: this browser’s storage is blocked.', 'error') }
+/** "x min ago" for the panel. */
+export { ago }
 
 /** A project's comments. On this domain only, until shared projects exist: see the inbox note. */
 function useThreads(projectId: string | undefined) {
@@ -52,6 +58,8 @@ export function PanelLayout() {
    */
   const [exit, setExit] = useState<string | null>(null)
   useEffect(() => { setExit(null) }, [pathname])
+  // The script reads each project's published settings (and draft, for previews) from the configuration stand-in.
+  useEffect(() => { for (const p of s.projects) serveProject(p) }, [s.projects])
   if (exit) return <Navigate to={exit} replace />
   if (!s.account) return <Navigate to="/app/register" replace />
   if (!isSignedIn(s)) return <Navigate to={`/app/login?next=${encodeURIComponent(pathname)}`} replace />
@@ -69,6 +77,7 @@ export function PanelLayout() {
     { to: '/app', end: true, icon: LayoutDashboard, label: 'Overview' },
     { to: '/app/products', icon: Boxes, label: 'Products' },
     { to: '/app/install', icon: Code2, label: 'Install' },
+    { to: '/app/widget', icon: SlidersHorizontal, label: 'Widget' },
     { to: '/app/comments', icon: MessagesSquare, label: 'Comments' },
     { to: '/app/team', icon: Users, label: 'Team' },
     { to: '/app/settings', icon: Settings, label: 'Settings' },
@@ -130,13 +139,17 @@ function NewProject({ taken, onClose, onCreate }: { taken: string[]; onClose: ()
 
 export function Overview() {
   const { s, project } = usePanel()
+  const { toast } = useStore()
   const [params, setParams] = useSearchParams()
   const { threads } = useThreads(project?.id)
   if (!project) return null
   const invited = s.invites.some((i) => i.projectId === project.id)
+  const seen = lastSeen(project.id)
   const steps = [
     { done: project.products.length > 0, label: 'Pick your tools', to: '/app/products' },
+    { done: !!liveOf(project), label: 'Publish your widget settings', to: '/app/widget' },
     { done: !!project.copiedSnippet, label: 'Copy your snippet into your site', to: '/app/install' },
+    { done: !!seen, label: 'See the script running', to: '/app/install', hint: 'Shown once the script has loaded on the demo site in this browser' },
     { done: threads.length > 0, label: 'Leave the first comment', to: '/app/install', hint: 'On your site, or on the demo site with this project' },
     { done: invited, label: 'Invite a teammate', to: '/app/team' },
   ]
@@ -168,7 +181,7 @@ export function Overview() {
           <div className="up-stats">
             {(['open', 'ongoing', 'completed'] as const).map((st) => <Link key={st} to={`/app/comments?status=${st}`} className={`up-stat st-${st}`}><b>{count(st)}</b><span>{STATUS_LABEL[st]}</span></Link>)}
           </div>
-          {threads.length === 0 ? <p className="up-muted">No comments yet. <a href={demoUrl(project.id)} target="_blank" rel="noopener">Try it on the demo site</a> with this project.</p> : (
+          {threads.length === 0 ? <p className="up-muted">No comments yet. <button className="up-linkbtn" onClick={() => openDemo(project.id, toast)}>Try it on the demo site</button> with this project.</p> : (
             <ul className="up-recent">
               {[...threads].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4).map((t) => (
                 <li key={t.id}><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span><span className="up-clip">{t.text}</span><span className="up-muted">{ago(t.createdAt)}</span></li>
@@ -200,11 +213,12 @@ export function Products() {
     if (setProject((x) => ({ ...x, products: on ? x.products.filter((y) => y !== id) : [...x.products, id] })))
       toast(on ? `${p.name} turned off` : p.status === 'script' ? `${p.name} turned on` : `${p.name}: early access requested`)
   }
-  const scriptChanged = !!project.copiedSnippet && project.copiedSnippet !== snippetOf(project)
+  const live = liveOf(project)
+  const pending = !!live && live.config.modules.comments !== project.products.includes('comments')
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Products</h1><p>Turn tools on or off for “{project.name}”. Early-access tools are built and usable in the demo; they switch on in your script as they move into it.</p></div></div>
-      {scriptChanged && <p className="up-warn"><TriangleAlert size={14} /> Your snippet changed since you copied it. <Link to="/app/install">Copy it again</Link> so your site follows.</p>}
+      {pending && <p className="up-warn"><TriangleAlert size={14} /> Your site follows this change once you <Link to="/app/widget">publish the widget</Link>. The snippet stays the same.</p>}
       <div className="up-products">
         {PRODUCTS.map((p) => {
           const on = project.products.includes(p.id)
@@ -215,7 +229,7 @@ export function Products() {
               <div className="lp-grow">
                 <h3>{p.name} <span className={`lp-status ${p.status}`}>{p.status === 'script' ? 'In the script' : 'Early access'}</span></h3>
                 <p>{p.tagline}</p>
-                <a href={p.demo.startsWith('#') ? p.demo : demoUrl(project.id)} target="_blank" rel="noopener" className="up-link">Try it <ExternalLink size={11} /></a>
+                {p.demo.startsWith('#') ? <a href={p.demo} target="_blank" rel="noopener" className="up-link">Try it <ExternalLink size={11} /></a> : <button className="up-link up-linkbtn" onClick={() => openDemo(project.id, toast)}>Try it <ExternalLink size={11} /></button>}
               </div>
               <span className="up-toggle">
                 <Switch checked={on} onChange={() => toggle(p.id)} label={`${p.name} for ${project.name}`} />
@@ -243,23 +257,29 @@ export function Install() {
   const { project, setProject } = usePanel()
   const { toast } = useStore()
   const [guide, setGuide] = useState('html')
+  const [seen, setSeen] = useState(() => (project ? lastSeen(project.id) : null))
+  useEffect(() => {
+    if (!project) return
+    const t = window.setInterval(() => setSeen(lastSeen(project.id)), 3000)
+    return () => window.clearInterval(t)
+  }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!project) return null
   const code = snippetOf(project)
-  const stale = project.copiedSnippet && project.copiedSnippet !== code
+  const stale = !!project.copiedSnippet && !sameInstall(project.copiedSnippet, project.id)
   const g = GUIDES.find((x) => x.id === guide)!
   const copy = async (text: string, what: string, mark: boolean) => {
     if (!(await copyText(text))) { toast('Copy failed. Select the text and copy it by hand.', 'error'); return }
     if (mark) setProject((p) => ({ ...p, copiedSnippet: code }))
     toast(`${what} copied`)
   }
-  const w = project.widget
-  const comments = project.products.includes('comments')
+  const live = liveOf(project)
+  const scriptHost = new URL(code.match(/src="([^"]+)"/)?.[1] ?? window.location.href).host
   return (
     <div className="up-page">
-      <div className="up-head"><div><h1>Install</h1><p>One snippet per project. Paste it once; it works on every page of the site.</p></div>
-        <a className="lp-btn" href={demoUrl(project.id)} target="_blank" rel="noopener">Try on the demo site <ExternalLink size={13} /></a></div>
-      {!comments && <p className="up-warn"><TriangleAlert size={14} /> Comments is off for this project, so the script shows nothing. <Link to="/app/products">Turn it on</Link>.</p>}
-      {stale && <p className="up-warn"><TriangleAlert size={14} /> Your snippet changed since you last copied it. Copy it again and replace the old one on your site.</p>}
+      <div className="up-head"><div><h1>Install</h1><p>One snippet per project. Paste it once; it works on every page and never has to change. What the widget shows, to whom and where is set in <Link to="/app/widget">Widget</Link>.</p></div>
+        <button className="lp-btn" onClick={() => openDemo(project.id, toast)}>Try on the demo site <ExternalLink size={13} /></button></div>
+      {stale && <p className="up-warn"><TriangleAlert size={14} /> The snippet on your site is from an older version or another project. It keeps working; copy this one when you next touch your site.</p>}
+      {!live && <p className="up-warn"><TriangleAlert size={14} /> No widget settings published yet: your site uses the old snippet options. <Link to="/app/widget">Publish them</Link> to control it from here.</p>}
       <div className="up-cols">
         <section className="up-card">
           <h2>Your snippet</h2>
@@ -267,17 +287,14 @@ export function Install() {
           <button className="lp-btn primary" onClick={() => void copy(code, 'Snippet', true)}><Copy size={14} /> Copy snippet</button>
         </section>
         <section className="up-card">
-          <h2>Widget</h2>
-          <div className="up-form">
-            <label>Buttons
-              <span className="seg" role="group" aria-label="Buttons position">
-                <button aria-pressed={w.position === 'right'} onClick={() => setProject((p) => ({ ...p, widget: { ...p.widget, position: 'right' } }))}>Bottom right</button>
-                <button aria-pressed={w.position === 'left'} onClick={() => setProject((p) => ({ ...p, widget: { ...p.widget, position: 'left' } }))}>Bottom left</button>
-              </span>
-            </label>
-            <label>Accent <input type="color" value={w.color} onChange={(e) => setProject((p) => ({ ...p, widget: { ...p.widget, color: e.target.value } }))} className="up-color" /></label>
-            <label>C key starts a comment <Switch checked={w.shortcut} onChange={() => setProject((p) => ({ ...p, widget: { ...p.widget, shortcut: !p.widget.shortcut } }))} label="C key starts a comment" /></label>
-          </div>
+          <h2><Radar size={16} /> Installation check</h2>
+          {seen ? (
+            <>
+              <p className={`up-check ${seen.shown ? 'ok' : 'warn'}`}>{seen.shown ? <CheckCircle2 size={14} /> : <TriangleAlert size={14} />} Script {seen.version} loaded on <code>{seen.host}{seen.page}</code> {ago(seen.at)}.</p>
+              <p className="up-muted">{seen.shown ? 'The widget was shown.' : `The widget stayed hidden: ${seen.why}`}</p>
+            </>
+          ) : <p className="up-muted">Not seen yet. Open your site, or the demo site, after installing.</p>}
+          <p className="up-note">Beta without a server: this check only sees the demo site opened in this browser. Once the server is live, every site with your snippet reports here.</p>
         </section>
       </div>
       <section className="up-card">
@@ -285,6 +302,19 @@ export function Install() {
         <div className="up-tabs" role="tablist">{GUIDES.map((x) => <button key={x.id} role="tab" aria-selected={guide === x.id} onClick={() => setGuide(x.id)}>{x.label}</button>)}</div>
         <p>{g.where}</p>
         {g.code && <><pre className="up-code">{g.code(code)}</pre><button className="lp-btn sm" onClick={() => void copy(g.code!(code), g.id === 'claude' ? 'Prompt' : 'Code', g.id !== 'claude')}><Copy size={13} /> Copy</button></>}
+      </section>
+      <section className="up-card">
+        <h2>For developers</h2>
+        <dl className="up-dl">
+          <dt>Content-Security-Policy</dt>
+          <dd>If your site sends one, allow the script: <code>script-src {scriptHost}</code>. When the server is live, also <code>connect-src</code> for its API.</dd>
+          <dt>Your own button</dt>
+          <dd><code>{'<button data-vibe="comment">Give feedback</button>'}</code> starts a comment; <code>data-vibe="comments"</code> opens the list. From code: <code>window.VibeCollab.open('comment')</code>.</dd>
+          <dt>Tests and local builds</dt>
+          <dd>Add <code>data-disabled</code> to the script tag where it shouldn’t load (end-to-end tests, for example).</dd>
+          <dt>Staging and previews</dt>
+          <dd>Keep one snippet everywhere. Turn the widget on or off per environment in <Link to="/app/widget">Widget → Where</Link>.</dd>
+        </dl>
       </section>
     </div>
   )
@@ -314,7 +344,7 @@ export function Comments() {
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Comments</h1><p>Everything your team left on “{project.name}”.</p></div></div>
-      <p className="up-note">Until shared projects arrive, this inbox shows the comments saved in this browser on this domain, for example from the <a href={demoUrl(project.id)} target="_blank" rel="noopener">demo site</a> opened with this project. Comments made on your own site stay in that site’s browser storage for now.</p>
+      <p className="up-note">Until shared projects arrive, this inbox shows the comments saved in this browser on this domain, for example from the <button className="up-linkbtn" onClick={() => openDemo(project.id, toast)}>demo site</button> opened with this project. Comments made on your own site stay in that site’s browser storage for now.</p>
       <div className="up-row wrap">
         <div className="up-tabs" role="group" aria-label="Status">
           {(['all', 'open', 'ongoing', 'completed'] as const).map((v) => <button key={v} aria-pressed={status === v} onClick={() => setStatus(v)}>{v === 'all' ? 'All' : STATUS_LABEL[v]} <span>{count(v)}</span></button>)}
@@ -334,7 +364,10 @@ export function Comments() {
                   {t.resolved
                     ? <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: undefined }, 'Reopened')}><RotateCcw size={13} /> Reopen</button>
                     : <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: { by: 'panel', at: new Date().toISOString() } }, 'Set as completed')}><Check size={13} /> Set as completed</button>}
-                  {url ? <a className="lp-btn sm ghost" href={url} target="_blank" rel="noopener">Open on site <ExternalLink size={12} /></a> : <span className="up-muted" title="Add the site address in Settings">No site address</span>}
+                  {url ? (t.page.startsWith('/embed-demo.html')
+                    ? <button className="lp-btn sm ghost" onClick={() => { if (!openAsReviewer(project.id, url)) toast('Couldn’t open the review link.', 'error') }} title="Opens the page as a reviewer">Open on site <ExternalLink size={12} /></button>
+                    // Review links on your own site need the server; until then this opens the page as it is.
+                    : <a className="lp-btn sm ghost" href={url} target="_blank" rel="noopener" title="Opens the page. Signing in as a reviewer there needs the server.">Open on site <ExternalLink size={12} /></a>) : <span className="up-muted" title="Add the site address in Settings">No site address</span>}
                   <span className="lp-grow" />
                   <button className="lp-btn sm ghost danger" onClick={() => setDeleting(t)} aria-label="Delete comment"><Trash2 size={13} /></button>
                 </div>
@@ -399,7 +432,6 @@ export function SettingsPage() {
   const [email, setEmail] = useState(s.account!.email)
   const [pname, setPname] = useState(project?.name ?? '')
   const [site, setSite] = useState(project?.siteUrl ?? '')
-  const [domain, setDomain] = useState('')
   const [confirm, setConfirm] = useState<'project' | 'account' | null>(null)
   const [typed, setTyped] = useState('')
   useEffect(() => { setPname(project?.name ?? ''); setSite(project?.siteUrl ?? '') }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -407,8 +439,6 @@ export function SettingsPage() {
   const accountOk = !!name.trim() && validEmail(email)
   const siteOk = !site.trim() || !!originOf(site)
   const projectDirty = !!project && (pname.trim() !== project.name || (originOf(site) ?? '') !== project.siteUrl)
-  const host = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-  const hostOk = /^(\*\.)?([a-z0-9-]+\.)+[a-z]{2,}$|^localhost(:\d+)?$/.test(host)
 
   return (
     <div className="up-page">
@@ -433,16 +463,8 @@ export function SettingsPage() {
           <p className="up-muted">Project id <code>{project.id}</code> can’t change: your snippet and the comments already made are tied to it.</p>
           <div className="up-row"><button className="lp-btn primary sm" disabled={!projectDirty || !pname.trim() || !siteOk} onClick={() => { if (setProject((p) => ({ ...p, name: pname.trim(), siteUrl: originOf(site) ?? '' }))) toast('Saved') }}>Save</button>
             {projectDirty && <button className="lp-btn sm ghost" onClick={() => { setPname(project.name); setSite(project.siteUrl) }}>Cancel</button>}</div>
-          <h3 className="up-sub">Allowed domains</h3>
-          <p className="up-muted">Where this project’s snippet may run. Enforced once shared projects arrive; until then it is a list for your team.</p>
-          <ul className="up-domains">{project.domains.map((d) => <li key={d}><code>{d}</code><button className="lp-btn sm ghost" onClick={() => setProject((p) => ({ ...p, domains: p.domains.filter((x) => x !== d) }))} aria-label={`Remove ${d}`}><X size={13} /></button></li>)}
-            {!project.domains.length && <li className="up-muted">None yet.</li>}</ul>
-          <form className="up-row" onSubmit={(e) => { e.preventDefault(); if (!hostOk || project.domains.includes(host)) return; setProject((p) => ({ ...p, domains: [...p.domains, host] })); setDomain('') }}>
-            <input className="up-search" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="app.example.com or *.example.com" aria-label="Domain" />
-            <button className="lp-btn sm" type="submit" disabled={!hostOk || project.domains.includes(host)}>Add</button>
-            {domain && !hostOk && <span className="lp-error">Enter a domain like app.example.com.</span>}
-            {hostOk && project.domains.includes(host) && <span className="up-muted">Already in the list.</span>}
-          </form>
+          <h3 className="up-sub">Where it runs</h3>
+          <p className="up-muted">The sites the widget may show on (production, staging, previews) are its environments: <Link to="/app/widget">Widget → Where</Link>.</p>
         </section>
       )}
       <section className="up-card danger">
@@ -455,10 +477,13 @@ export function SettingsPage() {
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Keep it</button>
             <button className="btn primary" disabled={typed !== (confirm === 'project' ? project?.id : 'DELETE')} onClick={() => {
               if (confirm === 'project' && project) {
+                unserveProject(project.id)
                 update((x) => { const projects = x.projects.filter((p) => p.id !== project.id); return { ...x, projects, current: projects[0]?.id ?? null, invites: x.invites.filter((i) => i.projectId !== project.id) } })
                 toast('Project deleted'); setConfirm(null); nav('/app')
               } else {
                 leave('/landingpage', () => {
+                  // Its sites stop showing the widget too: the published settings go with it.
+                  for (const p of s.projects) unserveProject(p.id)
                   try { localStorage.removeItem('vibe.saas') } catch { /* ignore */ }
                   window.dispatchEvent(new Event('vibe:saas'))
                 })

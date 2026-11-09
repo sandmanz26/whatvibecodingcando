@@ -35,3 +35,13 @@ export async function copyText(text: string) {
   ta.remove()
   return ok
 }
+
+/**
+ * The snippet to install: the script and the project, nothing else. Everything the widget does is
+ * set in the panel (Widget) and read by the script when it starts, so this never has to change.
+ */
+export const installSnippet = (project: string) => `<script src="${scriptUrl()}"\n  data-project="${validProjectId(project) ? project : 'my-app'}"\n  defer></script>`
+/** Same install: the same script address and project, whatever else the old snippet carried. */
+export function sameInstall(copied: string | undefined, project: string) {
+  return !!copied && copied.includes(`src="${scriptUrl()}"`) && copied.includes(`data-project="${project}"`)
+}

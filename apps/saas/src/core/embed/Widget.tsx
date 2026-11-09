@@ -2,7 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff } from 'lucide-react'
 import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
 
-export interface Config { project: string; position: 'left' | 'right'; shortcut: boolean }
+export interface Config {
+  project: string
+  position: 'left' | 'right'
+  shortcut: boolean
+  /** floating: the buttons in a corner; hidden: none, the site opens it (data-vibe buttons, the API, C) */
+  launcher: 'floating' | 'hidden'
+  label: string
+  accent: string
+  mode: 'light' | 'dark'
+  /** showing the draft configuration (from the panel's preview), with a way out */
+  preview?: { exit: () => void }
+}
+/** Asked of the widget from outside: by a data-vibe button on the site or window.VibeCollab.open(). */
+export const OPEN_EVENT = 'vibe-collab:open'
+export type OpenWhat = 'comment' | 'list'
 
 const NAME_KEY = `${NS}name`
 const OPEN_KEY = `${NS}open`
@@ -151,6 +165,19 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     window.location.href = url
   }
 
+  // The site's own buttons (data-vibe="comment" | "comments") and the JS API arrive as events on the host element.
+  const startRef = useRef(() => {})
+  startRef.current = () => (placing ? setPlacing(false) : start())
+  useEffect(() => {
+    const on = (e: Event) => {
+      const what = (e as CustomEvent<OpenWhat>).detail
+      if (what === 'list') setPanel(true)
+      else startRef.current()
+    }
+    host.addEventListener(OPEN_EVENT, on)
+    return () => host.removeEventListener(OPEN_EVENT, on)
+  }, [host])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -173,7 +200,8 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const open = here.find((t) => t.id === openId)
 
   return (
-    <div className={`vc ${config.position}`} ref={root} onPointerUp={onFieldPointer}>
+    <div className={`vc ${config.position} ${config.mode}`} ref={root} onPointerUp={onFieldPointer} style={{ ['--vc-accent' as string]: config.accent }}>
+      {config.preview && <div className="vc-preview" role="status">Preview · draft settings <button onClick={config.preview.exit}>Exit preview</button></div>}
       {here.map((t) => {
         const p = place(t.anchor)
         if (p.y < -20 || p.y > window.innerHeight + 20) return null
@@ -219,14 +247,14 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
           onPick={go} onClose={() => setPanel(false)} number={(t) => threads.filter((x) => x.page === t.page).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).indexOf(t) + 1} />
       )}
 
-      <div className="vc-dock" role="toolbar" aria-label="Collaboration">
+      {config.launcher === 'floating' && <div className="vc-dock" role="toolbar" aria-label="Collaboration">
         <button className={`vc-btn primary ${placing ? 'on' : ''}`} onClick={() => (placing ? setPlacing(false) : start())} title={config.shortcut ? 'Comment (C)' : 'Comment'}>
-          <MessageSquarePlus size={15} /> {placing ? 'Cancel' : 'Comment'}
+          <MessageSquarePlus size={15} /> {placing ? 'Cancel' : config.label}
         </button>
         <button className="vc-icon dock" onClick={() => setPanel((v) => !v)} aria-label={`All comments, ${openOnPage} open on this page`} aria-expanded={panel}>
           <MessagesSquare size={15} />{openOnPage > 0 && <span className="vc-count">{openOnPage}</span>}
         </button>
-      </div>
+      </div>}
 
       {toast && <div className={`vc-toast ${toast.error ? 'error' : ''}`} role="status">{toast.text}</div>}
     </div>

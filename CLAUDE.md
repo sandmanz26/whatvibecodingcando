@@ -18,6 +18,10 @@
   - Signing in, SaaS only (`src/pages/saas/Auth.tsx`, `Onboarding.tsx`): register → onboarding → panel, plus login, forgot and reset password.
   - It is local to the browser: passwords only as a PBKDF2 hash, no email sent (forgot password shows a labelled demo inbox).
   - The panel's guards: no account → register, signed out → login, not onboarded → onboarding.
+  - The SaaS script's behaviour is the project's published widget configuration (`src/core/embed/config.ts`, built in `#/app/widget`): data only, validated, versioned, with rollback.
+    - The snippet carries only `data-project`. Never add options back to the snippet.
+    - Default audience is reviewers only (review link with a one-time token).
+    - Anything that needs the server (review links or previews on a customer's own domain, install checks there) must say so in the UI.
 - Content only: `__reset` (`/content/__reset` or `#/__reset`, `src/reset.tsx`) clears the content site's browser data, never `saas:` keys. Keep it unlinked.
 - Frontend only (React + TypeScript + Vite). No backend: catalogue in `src/data/shop.ts`, simulated AI in `src/lib/ai.ts`, cart/orders in localStorage via `src/store/store.tsx`.
 - **Git: always push finished work to `main`** (the owner asked for this explicitly). Push the working branch too if one is in use.
