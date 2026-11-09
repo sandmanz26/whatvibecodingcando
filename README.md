@@ -3,7 +3,7 @@
 | Path | System | Run / build |
 |---|---|---|
 | `apps/content` | **The content site.** The AI marketplace prototype, with the research dock and console used to show what vibe coding can do. It also has a copy of the SaaS website, panel and script. | `npm run dev` · `npm run build:content` → `dist/content` (served at `/content/`) |
-| `apps/saas` | **Vibe Collab, the SaaS.** It opens on its website (`#/landingpage`), with sign-up, the user panel, the install page, the script and every research tool built so far. React + Vite for now; backend later. | `npm run dev:saas` · `npm run build:saas` → `dist/saas` (served at `/saas/`) |
+| `apps/saas` | **Vibe Collab, the SaaS.** It opens on its website (`#/landingpage`), with sign-up, the user panel, the install page, the script and every research tool built so far. React + Vite for now; backend later. | `npm run dev:saas` · `npm run build:saas` → the root of `dist` (served at `/`) |
 
 **The two are separate systems.**
 - **Code.** Each has its own code (including its own copy of the script, the heatmap renderer and the eye-movement analysis, in `src/core`).
@@ -24,12 +24,15 @@ One Vercel project serves both apps. `vercel.json` at the root sets the install 
 
 | URL | App | Built into |
 |---|---|---|
+| `/` | the SaaS (opens on its website, `#/landingpage`) | the root of `dist` |
 | `/content/` | the content site | `dist/content` |
-| `/saas/` | the SaaS (opens on its website) | `dist/saas` |
-| `/` | redirects to `/content/` (a hash such as `#/console/...` is kept) | — |
+| `/saas/…` | old addresses: redirect to the same path at the root. This includes `/saas/embed/vibe.js`, so snippets installed before the move keep working; the hash, such as `#/app`, is kept. | — |
 | `/content/__reset` (and `/__reset`) | the content site's hidden "reset everything" page; `/content/__reset` is rewritten to the content app | `dist/content` |
 
-`/content` and `/saas` without the slash redirect to the version with it, so the relative asset paths resolve. Locally, `npm run build && npm run preview` serves the same layout at `http://localhost:4173/content/` and `/saas/`.
+Live at `https://whatvibecodingcando.vercel.app/`.
+- **Build.** `npm run build` empties `dist` once, then builds the content site into `dist/content` and the SaaS into the root of `dist` (its build doesn't empty `dist`, so the two don't erase each other).
+- **Locally.** `npm run build && npm run preview` serves the same layout at `http://localhost:4173/` (SaaS) and `/content/`.
+- `/content` without the slash redirects to `/content/`, so the relative asset paths resolve.
 
 Both apps are on one domain, so the SaaS keeps its browser data apart.
 - It prefixes every storage key with `saas:` (`apps/saas/src/storage-scope.ts`).

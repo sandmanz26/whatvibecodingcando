@@ -4,7 +4,7 @@ The hosted product: website (`#/landingpage`, the default page), register, login
 
 This is a separate system from the content site. It has its own code (including `src/core`: the script's widget and storage interface, the heatmap renderer and the eye-movement analysis), its own dependencies and its own browser data (`saas:` storage prefix, `saas:vibe:` for the script, its own voice database). Changes made here stay here.
 
-Run: `npm run dev:saas` · build: `npm run build:saas` (output `dist/saas`, served at `/saas/` on the shared Vercel deployment).
+Run: `npm run dev:saas` · build: `npm run build:saas` (output: the root of `dist`, served at `/` on the shared Vercel deployment, https://whatvibecodingcando.vercel.app/; old `/saas/…` addresses redirect there).
 
 The rest of this file is the content app's documentation as it was when the SaaS app was copied from it; it describes the same features.
 

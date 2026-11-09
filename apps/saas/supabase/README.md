@@ -28,8 +28,8 @@ The SaaS's backend, in this app only (`apps/saas/supabase`). It is not connected
 1. **Plan and region.** Pro (Free pauses when idle and has no daily backups). Region Southeast Asia (Singapore) for users in Indonesia.
 2. **Run the migration.** SQL Editor → paste `migrations/20261109000000_init.sql` → Run. Or the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.
 3. **Auth → URL Configuration.**
-   - Site URL: `https://<your-domain>/saas/`.
-   - Redirect URLs: `https://<your-domain>/saas/**` and `http://localhost:5174/**` for development.
+   - Site URL: `https://whatvibecodingcando.vercel.app/`.
+   - Redirect URLs: `https://whatvibecodingcando.vercel.app/**` and `http://localhost:5174/**` for development.
 4. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
 5. **Keys.**
    - The project URL and the anon (publishable) key are public by design and go into the app's build (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` in Vercel).

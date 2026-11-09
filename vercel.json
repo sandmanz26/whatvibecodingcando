@@ -6,18 +6,23 @@
   "outputDirectory": "dist",
   "redirects": [
     {
-      "source": "/",
-      "destination": "/content/",
-      "permanent": false
-    },
-    {
       "source": "/content",
       "destination": "/content/",
       "permanent": false
     },
     {
       "source": "/saas",
-      "destination": "/saas/",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/saas/",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/saas/:path*",
+      "destination": "/:path*",
       "permanent": false
     },
     {
