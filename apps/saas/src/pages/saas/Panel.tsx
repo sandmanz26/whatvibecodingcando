@@ -7,7 +7,9 @@ import { BRAND, PRODUCTS, productOf } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
 import { liveOf, openAsReviewer, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
-import { canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, validEmail, type Project, type SaasState } from '../../saas/account'
+import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, refreshCloud, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
+import { cloud, supabase, authMessage } from '../../saas/supabase'
+import { deleteWorkspaceCloud } from '../../saas/cloud'
 import { LocalBackend, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
@@ -60,7 +62,15 @@ export function PanelLayout() {
   useEffect(() => { setExit(null) }, [pathname])
   // The script reads each project's published settings (and draft, for previews) from the configuration stand-in.
   useEffect(() => { for (const p of s.projects) serveProject(p) }, [s.projects])
+  const ready = useSaasReady()
+  // A change the server refused: say so (the panel has already been reloaded from the server).
+  useEffect(() => {
+    const on = (e: Event) => toast(`Not saved: ${(e as CustomEvent<string>).detail}`, 'error')
+    window.addEventListener(SAAS_ERROR, on)
+    return () => window.removeEventListener(SAAS_ERROR, on)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   if (exit) return <Navigate to={exit} replace />
+  if (!ready) return <div className="up"><main className="up-main"><p className="up-muted">Loading your workspace…</p></main></div>
   if (!s.account) return <Navigate to="/app/register" replace />
   if (!isSignedIn(s)) return <Navigate to={`/app/login?next=${encodeURIComponent(pathname)}`} replace />
   if (!isOnboarded(s)) return <Navigate to="/app/onboarding" replace />
@@ -102,7 +112,9 @@ export function PanelLayout() {
         <Link to="/landingpage" className="up-back"><ArrowLeft size={14} /> Website</Link>
       </aside>
       <main className="up-main">
-        <div className="up-beta"><TriangleAlert size={14} /> Beta without a server: this workspace is saved in this browser only.</div>
+        <div className="up-beta"><TriangleAlert size={14} /> {cloud
+          ? 'Beta: your account, projects and widget settings are saved on the server. Comments and the installation check still work on the demo site only, until the script is connected.'
+          : 'Beta without a server: this workspace is saved in this browser only.'}</div>
         {project || pathname === '/app/settings' ? <Outlet context={{ s, update, project, setProject, leave, logOut } satisfies Ctx} /> : (
           <div className="up-empty"><h1>No project yet</h1><p>Create a project for a site or app to get its snippet.</p><button className="lp-btn primary" onClick={() => setCreating(true)}><Plus size={15} /> New project</button></div>
         )}
@@ -294,7 +306,7 @@ export function Install() {
               <p className="up-muted">{seen.shown ? 'The widget was shown.' : `The widget stayed hidden: ${seen.why}`}</p>
             </>
           ) : <p className="up-muted">Not seen yet. Open your site, or the demo site, after installing.</p>}
-          <p className="up-note">Beta without a server: this check only sees the demo site opened in this browser. Once the server is live, every site with your snippet reports here.</p>
+          <p className="up-note">{cloud ? 'Until the script is connected to the server' : 'Beta without a server'}: this check only sees the demo site opened in this browser. Once it is, every site with your snippet reports here.</p>
         </section>
       </div>
       <section className="up-card">
@@ -402,7 +414,7 @@ export function Team() {
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Team</h1><p>People who review “{project.name}”.</p></div></div>
-      <p className="up-note">No emails are sent yet: invites are kept as pending until shared projects arrive. Until then, teammates can comment on your site with the snippet, under their own name.</p>
+      <p className="up-note">No emails are sent yet: invites are {cloud ? 'saved on the server and ' : ''}kept as pending until shared projects arrive. Until then, teammates can comment on your site with the snippet, under their own name.</p>
       <section className="up-card">
         <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); invite() }} noValidate>
           <input className="up-search grow" type="email" value={email} onChange={(ev) => setEmail(ev.target.value)} placeholder="teammate@company.com" aria-label="Email" aria-invalid={tried && !!problem} />
@@ -449,7 +461,10 @@ export function SettingsPage() {
           <label className="lp-field">Name<input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} aria-invalid={!name.trim()} /></label>
           <label className="lp-field">Email<input type="email" value={email} maxLength={120} onChange={(e) => setEmail(e.target.value)} aria-invalid={!validEmail(email)} /></label>
         </div>
-        <div className="up-row"><button className="lp-btn primary sm" disabled={!accountDirty || !accountOk} onClick={() => { if (update((x) => ({ ...x, account: { ...x.account!, name: name.trim(), email: email.trim() } }))) toast('Saved') }}>Save</button>
+        <div className="up-row"><button className="lp-btn primary sm" disabled={!accountDirty || !accountOk} onClick={() => {
+          const emailChanged = email.trim().toLowerCase() !== s.account!.email.toLowerCase()
+          if (update((x) => ({ ...x, account: { ...x.account!, name: name.trim(), email: email.trim() } }))) toast(cloud && emailChanged ? 'Saved. Confirm the new address from the email we sent to it; until then you log in with the old one.' : 'Saved')
+        }}>Save</button>
           {accountDirty && <button className="lp-btn sm ghost" onClick={() => { setName(s.account!.name); setEmail(s.account!.email) }}>Cancel</button>}</div>
       </section>
       <PasswordCard />
@@ -481,6 +496,14 @@ export function SettingsPage() {
                 update((x) => { const projects = x.projects.filter((p) => p.id !== project.id); return { ...x, projects, current: projects[0]?.id ?? null, invites: x.invites.filter((i) => i.projectId !== project.id) } })
                 toast('Project deleted'); setConfirm(null); nav('/app')
               } else {
+                if (cloud) {
+                  // On the server: the workspace, its projects and comments go; installed snippets show nothing.
+                  const ids = s.projects.map((p) => p.id)
+                  setConfirm(null)
+                  void deleteWorkspaceCloud(ids).then(() => { for (const id of ids) unserveProject(id); toast('Workspace deleted'); return refreshCloud() })
+                    .catch((e) => toast(`Not deleted: ${e?.message ?? 'the server refused'}`, 'error'))
+                  return
+                }
                 leave('/landingpage', () => {
                   // Its sites stop showing the widget too: the published settings go with it.
                   for (const p of s.projects) unserveProject(p.id)
@@ -505,12 +528,24 @@ function PasswordCard() {
   const [pw2, setPw2] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const has = !!s.account?.password
+  const has = cloud || !!s.account?.password
   const problem = passwordProblem(pw, s.account?.email)
   const save = async () => {
     setError('')
     if (problem) { setError(problem); return }
     if (pw !== pw2) { setError('The new passwords don’t match.'); return }
+    if (cloud && supabase) {
+      setBusy(true)
+      try {
+        // The current password is checked by logging in with it again.
+        const check = await supabase.auth.signInWithPassword({ email: s.account!.email, password: cur })
+        if (check.error) { setError(check.error.code === 'invalid_credentials' ? 'The current password is incorrect.' : authMessage(check.error)); return }
+        const { error: e } = await supabase.auth.updateUser({ password: pw })
+        if (e) { setError(authMessage(e)); return }
+        toast('Password changed'); setCur(''); setPw(''); setPw2('')
+      } finally { setBusy(false) }
+      return
+    }
     if (!canHash()) { setError('This page isn’t on a secure address, so a password can’t be set here.'); return }
     setBusy(true)
     try {

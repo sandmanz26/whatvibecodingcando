@@ -1,6 +1,12 @@
 # Vibe Collab backend (Supabase)
 
-The SaaS's backend, in this app only (`apps/saas/supabase`). It is not connected to the app yet: the panel and the script still use this browser's storage until the next steps below are done.
+The SaaS's backend, in this app only (`apps/saas/supabase`).
+
+- **Connected now: the panel.** When the build has a project (see Keys), it uses it for:
+  - accounts: register with email confirmation, login, forgot and reset password;
+  - workspaces, projects and invites;
+  - widget settings: draft, publish and releases, and the published file on Storage.
+- **Not connected yet: the script.** Comments, review links and the installation check still use the browser.
 
 ## What is here
 
@@ -19,6 +25,10 @@ The SaaS's backend, in this app only (`apps/saas/supabase`). It is not connected
     - Anonymous access (the public anon key) is refused everywhere.
     - Releases and review tokens are written only by Edge Functions (service role).
   - **Data checks repeat the script's own rules:** pages must stay on the site, selectors are at most 400 characters, text at most 4,000.
+- **`migrations/20261109010000_publish.sql`**: publishing from the panel.
+  - Members insert releases for their own projects (never edit them).
+  - A public Storage bucket `widget-config`, holding small JSON files only.
+  - Only a project's members may write its file `widget-config/<public_id>.json`.
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.
@@ -26,12 +36,16 @@ The SaaS's backend, in this app only (`apps/saas/supabase`). It is not connected
 ## Setting up the Supabase project (owner, once)
 
 1. **Plan and region.** Pro (Free pauses when idle and has no daily backups). Region Southeast Asia (Singapore) for users in Indonesia.
-2. **Run the migration.** SQL Editor → paste `migrations/20261109000000_init.sql` → Run. Or the Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.
+2. **Run the migrations, in order.** SQL Editor → paste each file in `migrations/` (oldest first) → Run. Or with the Supabase CLI: `supabase link --project-ref <ref>`, then `supabase db push`.
 3. **Auth → URL Configuration.**
    - Site URL: `https://whatvibecodingcando.vercel.app/`.
    - Redirect URLs: `https://whatvibecodingcando.vercel.app/**` and `http://localhost:5174/**` for development.
 4. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
-5. **Keys.**
+5. **Auth → Email Templates.** So links work on any device (the default links only work in the browser that asked), set the link in two templates. Keep the rest of the text as you like.
+   - **Confirm signup:** `<a href="https://whatvibecodingcando.vercel.app/#/app/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>`
+   - **Reset Password:** `<a href="https://whatvibecodingcando.vercel.app/#/app/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>`
+   - The default `{{ .ConfirmationURL }}` links also work, but only when opened in the same browser (they come back as `/?auth=…&code=…`).
+6. **Keys.**
    - The project URL and the anon (publishable) key are public by design and go into the app's build.
      - Set them as `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in Vercel, or connect Vercel's Supabase integration: the build also reads its `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_…` names (`apps/saas/vite.config.ts`).
      - The build log says `[supabase] connected: <url>` or `not configured`.

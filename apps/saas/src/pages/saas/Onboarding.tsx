@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Check, ArrowLeft, ArrowRight, MousePointer2, Copy, ExternalLink, LogOut } from 'lucide-react'
 import { BRAND, PRODUCTS, parseProducts, productOf } from '../../saas/products'
-import { freeId, isOnboarded, isSignedIn, newProject, originOf, slug, useSaas } from '../../saas/account'
+import { SAAS_ERROR, settled, freeId, isOnboarded, isSignedIn, newProject, originOf, slug, useSaas, useSaasReady } from '../../saas/account'
 import { copyText, demoUrl, installSnippet } from '../../saas/snippet'
 import { publish } from '../../saas/widget'
+import { cloud } from '../../saas/supabase'
 import '../../saas/saas.css'
 
 const STEPS = ['Tools', 'Project', 'Install']
@@ -19,23 +20,39 @@ export default function Onboarding() {
   const nav = useNavigate()
   const [state, update] = useSaas()
   const [step, setStep] = useState(0)
-  const [products, setProducts] = useState<string[]>(() => { const p = parseProducts(params.get('products')); return p.length ? p : ['comments'] })
+  const ready = useSaasReady()
+  // Picked on the website; kept across the email confirmation in this tab.
+  const [products, setProducts] = useState<string[]>(() => {
+    let saved = ''
+    try { saved = sessionStorage.getItem('vibe.onboarding.products') ?? '' } catch { /* ignore */ }
+    const p = parseProducts(params.get('products') || saved)
+    return p.length ? p : ['comments']
+  })
   const [project, setProject] = useState('')
   const [site, setSite] = useState('')
   const [tried, setTried] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [finished, setFinished] = useState(false)
+  // On the server: wait for its answer before leaving onboarding, so a refusal is shown here.
+  const [saving, setSaving] = useState(false)
   useEffect(() => { setTried(false); window.scrollTo(0, 0) }, [step])
   useEffect(() => { document.title = `Set up your workspace · ${BRAND}` }, [])
+  // The server refused the new workspace or project (the state is back to what it has): say why.
+  useEffect(() => {
+    const on = (e: Event) => { setFinished(false); setError(`Couldn’t create your project: ${(e as CustomEvent<string>).detail}`) }
+    window.addEventListener(SAAS_ERROR, on)
+    return () => window.removeEventListener(SAAS_ERROR, on)
+  }, [])
 
   const taken = state.projects.map((p) => p.id)
   const draft = useMemo(() => newProject(project || 'my-project', site, products, taken), [project, site, products, taken.join()]) // eslint-disable-line react-hooks/exhaustive-deps
   const code = installSnippet(draft.id)
 
+  if (!ready) return null
   if (!state.account) return <Navigate to="/app/register" replace />
   if (!isSignedIn(state)) return <Navigate to="/app/login?next=/app/onboarding" replace />
-  if (isOnboarded(state)) return <Navigate to={finished ? '/app?welcome=1' : '/app'} replace />
+  if (isOnboarded(state) && !saving) return <Navigate to={finished ? '/app?welcome=1' : '/app'} replace />
 
   const siteOk = !site.trim() || !!originOf(site)
   const projectOk = !!slug(project)
@@ -45,8 +62,10 @@ export default function Onboarding() {
     // The first widget settings are published with the project, so the snippet works as soon as it is pasted:
     // reviewers only, on the site's address (when one was given) and the demo site.
     const p = publish({ ...draft, ...(copied === code ? { copiedSnippet: code } : {}) }, state.account?.name ?? 'You')
+    if (cloud) setSaving(true)
     const ok = update((x) => ({ ...x, projects: [...x.projects, p], current: p.id, onboarded: true }))
-    if (!ok) { setFinished(false); setError('This browser’s storage is full or blocked, so the workspace couldn’t be saved.') }
+    if (!ok) { setSaving(false); setFinished(false); setError('This browser’s storage is full or blocked, so the workspace couldn’t be saved.'); return }
+    if (cloud) void settled().then(() => setSaving(false))
   }
   const next = () => {
     setTried(true)
@@ -126,7 +145,7 @@ export default function Onboarding() {
             {step > 0 && <button type="button" className="lp-btn" onClick={() => setStep(step - 1)}><ArrowLeft size={15} /> Back</button>}
             <span className="lp-grow" />
             {step === 2 && copied !== code && <button type="button" className="lp-btn ghost" onClick={finish}>Skip for now</button>}
-            <button type="submit" className="lp-btn primary">{step < 2 ? <>Continue <ArrowRight size={15} /></> : 'Finish'}</button>
+            <button type="submit" className="lp-btn primary" disabled={saving}>{step < 2 ? <>Continue <ArrowRight size={15} /></> : saving ? 'Creating…' : 'Finish'}</button>
           </div>
         </form>
       </main>

@@ -1,7 +1,9 @@
 /**
  * The user panel's account and projects.
  *
- * There is no backend yet, so this is a demo account kept in this browser (localStorage).
+ * Two modes. With a Supabase project in the build (cloud), the account is a real one and the data
+ * lives on the server (saas/cloud.ts); this file then keeps a cache of it. Without one, this is a
+ * demo account kept in this browser (localStorage).
  * The UI says so wherever it matters: invites aren't sent, allowed domains aren't enforced,
  * and only comments made on this domain reach the inbox. When a backend arrives, these
  * functions are what it replaces.
@@ -9,6 +11,8 @@
 import { useEffect, useState } from 'react'
 import type { SnippetOptions } from './snippet'
 import type { Release, WidgetConfig } from '../core/embed/config'
+import { cloud, finishAuthReturn, supabase } from './supabase'
+import { idSuffix, loadCloud, pushCloud } from './cloud'
 
 export interface Project {
   /** the data-project value: fixed once created, because comments are stored under it */
@@ -46,8 +50,11 @@ export interface SaasState {
   lock?: { fails: number; until: number }
 }
 
-const KEY = 'vibe.saas'
+// The server's copy is cached under its own key: the browser-only demo's data is never mixed in.
+const KEY = cloud ? 'vibe.saas.cloud' : 'vibe.saas'
 const EVENT = 'vibe:saas'
+/** A change the server refused (the panel shows it); the state has been reloaded from the server. */
+export const SAAS_ERROR = 'vibe:saas-error'
 const EMPTY: SaasState = { account: null, projects: [], current: null, invites: [] }
 
 export function loadSaas(): SaasState {
@@ -62,6 +69,69 @@ export function saveSaas(s: SaasState): boolean {
   window.dispatchEvent(new Event(EVENT))
   return true
 }
+
+/* ---------- the server (Supabase), when the build has one ---------- */
+
+// Writes go out one after another, in order; a reload waits for them.
+let queue: Promise<unknown> = Promise.resolve()
+let ready = !cloud
+const READY = 'vibe:saas-ready'
+const fail = (e: unknown) => {
+  const msg = e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : 'The server refused the change.'
+  window.dispatchEvent(new CustomEvent(SAAS_ERROR, { detail: msg }))
+}
+/** Reloads everything from the server (after signing in, on returning to the tab, after a refused change). */
+export function refreshCloud(): Promise<void> {
+  if (!cloud) return Promise.resolve()
+  queue = queue.then(async () => {
+    try {
+      const next = await loadCloud(loadSaas().current)
+      saveSaas(next ?? EMPTY)
+    } catch (e) { fail(e) }
+    if (!ready) { ready = true; window.dispatchEvent(new Event(READY)) }
+  })
+  return queue as Promise<void>
+}
+if (cloud && supabase) {
+  void finishAuthReturn().then(() => refreshCloud())
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT') { saveSaas(EMPTY); return }
+    if (event === 'SIGNED_IN' || event === 'USER_UPDATED') void refreshCloud()
+  })
+  // A teammate may have changed something meanwhile.
+  let last = 0
+  window.addEventListener('focus', () => { if (Date.now() - last > 30_000 && isSignedIn(loadSaas())) { last = Date.now(); void refreshCloud() } })
+}
+/** False until the first answer from the server: guards wait instead of redirecting on stale data. */
+export function useSaasReady(): boolean {
+  const [r, setR] = useState(ready)
+  useEffect(() => {
+    if (ready) { setR(true); return }
+    const on = () => setR(true)
+    window.addEventListener(READY, on)
+    return () => window.removeEventListener(READY, on)
+  }, [])
+  return r
+}
+
+function cloudUpdate(fn: (s: SaasState) => SaasState): boolean {
+  const prev = loadSaas()
+  const next = fn(prev)
+  if (!saveSaas(next)) return false
+  queue = queue.then(async () => {
+    try {
+      if (prev.signedIn !== false && next.signedIn === false) { await supabase!.auth.signOut(); saveSaas(EMPTY); return }
+      await pushCloud(prev, next)
+    } catch (e) {
+      fail(e)
+      try { saveSaas((await loadCloud(next.current)) ?? EMPTY) } catch { /* keep what is shown */ }
+    }
+  })
+  return true
+}
+/** Resolves once every change made so far has reached the server (or was refused). */
+export const settled = () => queue.then(() => undefined)
+
 export function useSaas(): [SaasState, (fn: (s: SaasState) => SaasState) => boolean] {
   const [s, setS] = useState(loadSaas)
   useEffect(() => {
@@ -70,7 +140,7 @@ export function useSaas(): [SaasState, (fn: (s: SaasState) => SaasState) => bool
     window.addEventListener('storage', sync)
     return () => { window.removeEventListener(EVENT, sync); window.removeEventListener('storage', sync) }
   }, [])
-  const update = (fn: (s: SaasState) => SaasState) => saveSaas(fn(loadSaas()))
+  const update = (fn: (s: SaasState) => SaasState) => (cloud ? cloudUpdate(fn) : saveSaas(fn(loadSaas())))
   return [s, update]
 }
 
@@ -86,8 +156,10 @@ export function originOf(s: string): string | null {
   } catch { return null }
 }
 /** A project id that isn't taken yet: "shop", "shop-2", … */
+// On the server, project ids are unique across every customer: they get a short random part.
+const SUFFIX = cloud ? idSuffix() : ''
 export function freeId(base: string, taken: string[]) {
-  const b = slug(base) || 'project'
+  const b = SUFFIX ? `${(slug(base) || 'project').slice(0, 56).replace(/-+$/, '')}-${SUFFIX}` : slug(base) || 'project'
   if (!taken.includes(b)) return b
   for (let i = 2; ; i++) if (!taken.includes(`${b}-${i}`)) return `${b}-${i}`
 }

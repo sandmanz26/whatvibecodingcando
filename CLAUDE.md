@@ -22,7 +22,10 @@
     - The snippet carries only `data-project`. Never add options back to the snippet.
     - Default audience is reviewers only (review link with a one-time token).
     - Anything that needs the server (review links or previews on a customer's own domain, install checks there) must say so in the UI.
-- SaaS backend: Supabase, in `apps/saas/supabase` (migrations, row level security tests, setup in its README); not wired to the app yet.
+- SaaS backend: Supabase, in `apps/saas/supabase` (migrations, row level security tests, setup in its README).
+  - The panel uses it when the build has a project (`src/saas/supabase.ts`, `cloud.ts`, `AuthCloud.tsx`), otherwise the browser demo.
+  - The script isn't connected yet.
+  - Keep both modes working; text that says "no server" must depend on the mode.
   - Every table has row level security and no anon access.
   - The script's traffic goes through Edge Functions; widget configuration is a CDN file, never a database read per page view.
   - Keep `supabase/tests/run.sh` passing.

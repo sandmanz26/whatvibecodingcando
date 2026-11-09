@@ -26,7 +26,9 @@ import TokenCompare from './pages/TokenCompare'
 import Install from './pages/Install'
 import Landing from './pages/saas/Landing'
 import Onboarding from './pages/saas/Onboarding'
-import { Forgot, Login, Register, Reset } from './pages/saas/Auth'
+import { Forgot as LocalForgot, Login as LocalLogin, Register as LocalRegister, Reset as LocalReset } from './pages/saas/Auth'
+import { CloudForgot, CloudLogin, CloudRegister, CloudReset, Confirm } from './pages/saas/AuthCloud'
+import { cloud } from './saas/supabase'
 import { WidgetBuilder } from './pages/saas/WidgetBuilder'
 import { PanelLayout, Overview, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
@@ -53,6 +55,7 @@ export default function App() {
           <Route path="app/login" element={<Login />} />
           <Route path="app/forgot" element={<Forgot />} />
           <Route path="app/reset" element={<Reset />} />
+          <Route path="app/confirm" element={cloud ? <Confirm /> : <Navigate to="/app/login" replace />} />
           <Route path="app/onboarding" element={<Onboarding />} />
           <Route path="app/signup" element={<SignupRedirect />} />
           <Route path="app" element={<PanelLayout />}>
@@ -131,3 +134,9 @@ function SignupRedirect() {
   const { search } = useLocation()
   return <Navigate to={`/app/register${search}`} replace />
 }
+
+// With a Supabase project in the build: real accounts and emails. Without: the browser-only demo.
+const Register = cloud ? CloudRegister : LocalRegister
+const Login = cloud ? CloudLogin : LocalLogin
+const Forgot = cloud ? CloudForgot : LocalForgot
+const Reset = cloud ? CloudReset : LocalReset

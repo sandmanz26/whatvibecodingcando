@@ -15,9 +15,9 @@ import '../../saas/saas.css'
  */
 
 /** Only paths inside the panel can be the place to go after logging in. */
-const safeNext = (v: string | null) => (v && /^\/app(\/[\w/-]*)?(\?[\w=&%-]*)?$/.test(v) ? v : '/app')
+export const safeNext = (v: string | null) => (v && /^\/app(\/[\w/-]*)?(\?[\w=&%-]*)?$/.test(v) ? v : '/app')
 
-function Shell({ title, sub, children, foot }: { title: string; sub?: React.ReactNode; children: React.ReactNode; foot?: React.ReactNode }) {
+export function Shell({ title, sub, children, foot }: { title: string; sub?: React.ReactNode; children: React.ReactNode; foot?: React.ReactNode }) {
   useEffect(() => { document.title = `${title} · ${BRAND}`; window.scrollTo(0, 0) }, [title])
   return (
     <div className="lp lp-signup lp-auth">
@@ -38,7 +38,7 @@ function Shell({ title, sub, children, foot }: { title: string; sub?: React.Reac
   )
 }
 
-function PasswordField({ label, value, onChange, autoComplete, invalid, error, hint, autoFocus }: {
+export function PasswordField({ label, value, onChange, autoComplete, invalid, error, hint, autoFocus }: {
   label: string; value: string; onChange: (v: string) => void; autoComplete: 'new-password' | 'current-password'; invalid?: boolean; error?: string; hint?: React.ReactNode; autoFocus?: boolean
 }) {
   const [show, setShow] = useState(false)
@@ -54,7 +54,7 @@ function PasswordField({ label, value, onChange, autoComplete, invalid, error, h
 }
 
 const STRENGTH = ['', 'Weak', 'Fair', 'Good', 'Strong']
-function Strength({ pw }: { pw: string }) {
+export function Strength({ pw }: { pw: string }) {
   const n = passwordScore(pw)
   if (!pw) return <span className="lp-hint">At least 8 characters. Longer is stronger.</span>
   return (
@@ -65,8 +65,8 @@ function Strength({ pw }: { pw: string }) {
   )
 }
 
-const LocalNote = ({ children }: { children: React.ReactNode }) => <p className="lp-note"><TriangleAlert size={13} /> {children}</p>
-const NoCrypto = () => <p className="lp-error">This page isn’t on a secure address (https or localhost), so the browser can’t protect a password here.</p>
+export const LocalNote = ({ children }: { children: React.ReactNode }) => <p className="lp-note"><TriangleAlert size={13} /> {children}</p>
+export const NoCrypto = () => <p className="lp-error">This page isn’t on a secure address (https or localhost), so the browser can’t protect a password here.</p>
 
 /* ---------- register ---------- */
 

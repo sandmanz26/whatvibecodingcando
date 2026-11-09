@@ -386,7 +386,21 @@ Everything else is the project's **published configuration**, built in the panel
   - Each product says honestly where it works today: **On your site today** (in the script) or **Early access** (built and usable in the demo console).
   - It also has how it works, a live demo of the script in an iframe, beta pricing and FAQ.
   - The picks carry into registering, then into onboarding.
-- **Signing in** (`src/pages/saas/Auth.tsx`, helpers in `src/saas/account.ts`). There is no server yet, so the account lives in this browser, one workspace per browser. Each page says so.
+- **Two modes.** The build picks one (`src/saas/supabase.ts`).
+  - **With a Supabase project** (`VITE_SUPABASE_URL` and the anon key, or Vercel's Supabase integration; see `supabase/README.md`), the panel uses it:
+    - real accounts: register with email confirmation, login, forgot and reset password by email (`src/pages/saas/AuthCloud.tsx`);
+    - one workspace per account;
+    - projects, invites, drafts and releases in the database;
+    - publish also writes `widget-config/<project>.json` to Storage for the script.
+  - **How the cloud panel stays in sync** (`src/saas/cloud.ts`):
+    - it keeps the same state shape as before, cached under `vibe.saas.cloud`;
+    - every change is sent as the difference, in order;
+    - a change the server refuses is shown, and the panel reloads from the server;
+    - it reloads on sign-in and when the tab regains focus.
+  - **Project ids** get a short random part (`toko-budi-x7k2`): they are unique across customers.
+  - **The script, comments, review links and the installation check** still run on the browser stand-ins until the next step.
+  - **Without one**, everything below runs as a demo in this browser.
+- **Signing in, demo mode** (`src/pages/saas/Auth.tsx`, helpers in `src/saas/account.ts`). There is no server, so the account lives in this browser, one workspace per browser. Each page says so.
   - **`#/app/register`:** name, work email, password and confirmation.
     - Password: at least 8 characters, not a common one, not the email. A strength meter and show/hide are shown.
     - Storage: only a salted PBKDF2-SHA-256 hash is kept, never the password.

@@ -52,13 +52,44 @@ do $$ declare rina_ws uuid; begin
   perform pg_temp.check(false, 'joined rina''s workspace by id');
 exception when insufficient_privilege then perform pg_temp.check(true, 'cannot join rina''s workspace even knowing its id');
 end $$;
--- Releases, handoffs, rate limits: never written from the panel.
+-- Releases: a member publishes for their own project, as themselves; nobody else can.
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
+insert into releases (project_id, version, config, created_by) select id, 1, '{"v":1}', '00000000-0000-0000-0000-00000000000a' from projects where public_id = 'toko-budi-x7k2';
+select pg_temp.check((select count(*) from releases) = 1, 'owner publishes a release for her project');
 do $$ begin
-  insert into releases (project_id, version, config) select id, 1, '{}' from projects;
-  perform pg_temp.check(false, 'panel wrote a release directly');
-exception when insufficient_privilege then perform pg_temp.check(true, 'releases only through the publish function');
+  insert into releases (project_id, version, config, created_by) select id, 2, '{}', '00000000-0000-0000-0000-00000000000b' from projects;
+  perform pg_temp.check(false, 'published in someone else''s name');
+exception when insufficient_privilege then perform pg_temp.check(true, 'cannot publish in someone else''s name');
 end $$;
+do $$ begin
+  update releases set config = '{"hacked":1}';
+  perform pg_temp.check((select config->>'hacked' from releases limit 1) is null, 'releases cannot be edited');
+end $$;
+-- Widget files on Storage: only the project's own file, only by its members.
+insert into storage.objects (bucket_id, name) values ('widget-config', 'toko-budi-x7k2.json');
+select pg_temp.check(true, 'owner writes her project''s widget file');
+do $$ begin
+  insert into storage.objects (bucket_id, name) values ('widget-config', 'sari-shop-a1b2.json');
+  perform pg_temp.check(false, 'wrote another customer''s widget file');
+exception when insufficient_privilege then perform pg_temp.check(true, 'cannot write another customer''s widget file');
+end $$;
+do $$ begin
+  insert into storage.objects (bucket_id, name) values ('widget-config', 'made-up-name.json');
+  perform pg_temp.check(false, 'wrote a file for no project');
+exception when insufficient_privilege then perform pg_temp.check(true, 'cannot write a file that is no project''s');
+end $$;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+do $$ begin
+  insert into releases (project_id, version, config, created_by) select p.id, 9, '{}', '00000000-0000-0000-0000-00000000000b' from projects p;
+  reset role;
+  perform pg_temp.check((select count(*) from releases where version = 9) = 1, 'sari publishes only for her own project');
+  set role authenticated;
+end $$;
+update storage.objects set name = 'x.json' where name = 'toko-budi-x7k2.json';
+reset role;
+select pg_temp.check(exists (select 1 from storage.objects where name = 'toko-budi-x7k2.json'), 'sari cannot replace rina''s widget file');
+set role authenticated;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 do $$ begin
   insert into handoffs (token_hash, project_id, expires_at) select repeat('a', 64), id, now() + interval '1 minute' from projects;
   perform pg_temp.check(false, 'panel wrote a review token directly');
