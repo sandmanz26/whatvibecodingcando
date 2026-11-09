@@ -62,6 +62,8 @@ export function authMessage(e: { message?: string; code?: string; status?: numbe
   if (code === 'weak_password') return 'That password is too weak. Use a longer one.'
   if (code === 'same_password') return 'Use a password different from the current one.'
   if (code === 'email_address_not_authorized') return 'Emails can’t be sent to this address yet: the project’s email (SMTP) isn’t set up.'
+  // The project's email provider refused or failed (wrong SMTP settings, or an address it may not send to).
+  if (/error sending .*email/i.test(e.message ?? '')) return 'We couldn’t send the email just now. Try again in a little while; if it keeps happening, let us know.'
   if (code === 'otp_expired' || code === 'flow_state_expired' || code === 'flow_state_not_found') return 'expired'
   if (e.status === 0 || /fetch|network/i.test(e.message ?? '')) return 'Can’t reach the server. Check your connection and try again.'
   return e.message ?? 'Something went wrong. Try again.'
