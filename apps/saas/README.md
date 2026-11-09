@@ -337,7 +337,13 @@ The first step towards a hosted product: one script tag adds comments to any sit
 - **Pins stick to elements.** A pin is anchored to its element by a selector and its position on it, so it follows layout changes and scrolling. If the element is gone, the pin shows where it was, dashed, and says so.
 - **Pages.** A page is the path plus a hash route (`#/pricing`). Queries are left out.
 - **Isolation.** The UI lives in a shadow root, so the site's CSS can't reach it. Installing twice keeps the first, and the script never reads the site's field values.
-- **Build.** `npm run build` also builds `dist/embed/vibe.js` (`vite.embed.config.ts`, one IIFE file with React inside, about 77 kB gzipped).
+- **Build.** `npm run build` also builds `dist/embed/vibe.js` (`vite.embed.config.ts`, one IIFE file with React inside, about 77 kB gzipped). The file is ASCII only, so host pages without a UTF-8 charset show its text correctly.
+- **Safe on other people's sites.** Each case was checked against a host page built to cause it.
+  - **Placement.** The widget is a `<vibe-collab>` element on `<html>`, not a `div` in `body`, with its box set inline with `!important`. Host CSS (even `!important`), a `transform` on `body`, and frameworks that redraw `body` can't hide or move it, and it is put back if removed.
+  - **CSS and CSP.** Its CSS is a constructed stylesheet (`adoptedStyleSheets`), so a strict `style-src` policy doesn't strip it. The host's CSP must still allow the script's own address in `script-src`.
+  - **Stored data.** It is checked before use. Malformed threads, selectors over 400 characters, and page addresses that would leave the site (`//evil.com`, `@evil.com/x`) are refused, in the widget and in the panel's "open on site" link. Saving reads the data back, and survives hosts that patch `Array.prototype.toJSON` (Prototype.js).
+  - **Focus traps.** A host dialog that traps the keyboard (Radix, MUI, Headless UI) can't be overridden from outside. The widget says so instead of leaving a field that ignores typing.
+  - **Comment text** is rendered as text only (no `innerHTML`).
 - **Storage.** Code is in `src/embed/`. For now there is `LocalBackend` (localStorage per project), so teammates don't see each other's comments yet. The widget only talks to a `Backend` interface (`list`, `upsert` one thread, `remove` one, `subscribe` to changes elsewhere). A shared database needs only a new implementation of that interface, plus decisions on accounts, project keys and allowed domains.
 
 ## Website and user panel for the hosted product

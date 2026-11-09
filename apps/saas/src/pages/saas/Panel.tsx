@@ -6,7 +6,7 @@ import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
 import { copyText, demoUrl, snippet } from '../../saas/snippet'
 import { canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, validEmail, type Project, type SaasState } from '../../saas/account'
-import { LocalBackend, STATUS_LABEL, statusOf, type Status, type Thread } from '../../core/embed/store'
+import { LocalBackend, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
 interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
@@ -309,7 +309,8 @@ export function Comments() {
   const count = (v: Status | 'all') => threads.filter((t) => v === 'all' || statusOf(t) === v).length
   const save = async (t: Thread, msg: string) => { try { await backend.upsert(t); reload(); toast(msg) } catch { toast('Not saved: storage is blocked.', 'error') } }
   // Comments made on the demo site live on this domain; others on the project's own site.
-  const openUrl = (t: Thread) => (t.page.startsWith('/embed-demo.html') ? demoUrl(project.id) + (t.page.split('#')[1] ? `#${t.page.split('#')[1]}` : '') : project.siteUrl ? project.siteUrl + t.page : null)
+  // Only ever a page of the project's own site (or the demo): a page key that would lead elsewhere gets no link.
+  const openUrl = (t: Thread) => (t.page.startsWith('/embed-demo.html') ? demoUrl(project.id) + (t.page.split('#')[1] ? `#${t.page.split('#')[1]}` : '') : project.siteUrl ? pageUrl(t.page, project.siteUrl) : null)
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Comments</h1><p>Everything your team left on “{project.name}”.</p></div></div>

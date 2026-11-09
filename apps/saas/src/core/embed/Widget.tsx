@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff } from 'lucide-react'
-import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, pageKey, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
+import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
 
 export interface Config { project: string; position: 'left' | 'right'; shortcut: boolean }
 
@@ -17,11 +17,6 @@ const ago = (iso: string) => {
 const typing = (e: KeyboardEvent) => {
   const path = e.composedPath() as HTMLElement[]
   return path.some((n) => n instanceof HTMLElement && (n.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(n.tagName)))
-}
-/** The page's URL for a page key, to open a comment that is on another page. */
-const urlOf = (page: string) => {
-  const [path, route] = page.split('#')
-  return `${window.location.origin}${path}${route ? `#${route}` : ''}`
 }
 
 interface Draft { anchor: Anchor; page: string; text: string }
@@ -92,6 +87,27 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   // A comment deleted elsewhere closes here.
   useEffect(() => { if (openId && loaded && !threads.some((t) => t.id === openId)) setOpenId(null) }, [threads, openId, loaded])
 
+  /* ---- keyboard focus held by the host page ---- */
+  // A dialog on the host page (Radix, MUI, Headless UI…) may keep the keyboard focus inside itself,
+  // and the widget's fields then can't be typed in. That can't be undone from outside the dialog,
+  // so say what is going on instead of leaving a field that silently ignores the keyboard.
+  const root = useRef<HTMLDivElement>(null)
+  const warnedFocus = useRef(0)
+  const checkFocus = useCallback((field: Element | null) => {
+    window.setTimeout(() => {
+      const active = host.shadowRoot?.activeElement
+      if (!field || !field.isConnected || active === field) return
+      if (Date.now() - warnedFocus.current < 4000) return
+      warnedFocus.current = Date.now()
+      say('A dialog on this page is holding the keyboard. Close it, then write your comment.', true)
+    }, 60)
+  }, [host, say])
+  const onFieldPointer = (e: React.PointerEvent) => {
+    const t = e.target as Element
+    if (t.closest('textarea, input')) checkFocus(t.closest('textarea, input'))
+  }
+  useEffect(() => { if (draft) checkFocus(root.current?.querySelector('textarea') ?? null) }, [!!draft]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ---- flow ---- */
   const busy = () => { if (draft?.text.trim()) { setNudge((n) => n + 1); return true } return false }
   const start = () => {
@@ -128,8 +144,11 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     if (busy()) return
     setPanel(false)
     if (t.page === page) { setDraft(null); reveal(t); return }
+    // Only ever a page of this site: a stored page key that would lead elsewhere is refused.
+    const url = pageUrl(t.page)
+    if (!url) { say('That comment’s page address isn’t on this site, so it wasn’t opened.', true); return }
     try { sessionStorage.setItem(OPEN_KEY, t.id) } catch { /* ignore */ }
-    window.location.href = urlOf(t.page)
+    window.location.href = url
   }
 
   useEffect(() => {
@@ -154,7 +173,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const open = here.find((t) => t.id === openId)
 
   return (
-    <div className={`vc ${config.position}`}>
+    <div className={`vc ${config.position}`} ref={root} onPointerUp={onFieldPointer}>
       {here.map((t) => {
         const p = place(t.anchor)
         if (p.y < -20 || p.y > window.innerHeight + 20) return null

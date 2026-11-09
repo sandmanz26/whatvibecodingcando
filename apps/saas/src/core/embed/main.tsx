@@ -23,6 +23,35 @@ declare global { interface Window { __vibeCollab?: { version: string; project: s
 
 const VERSION = '0.1.0'
 
+/**
+ * The host element's own box, set inline with !important: that beats even !important rules in the
+ * host's stylesheets, which ":host" in the shadow root can't. Setting styles through the CSSOM is
+ * allowed under a strict Content-Security-Policy.
+ */
+function pinHostStyle(host: HTMLElement) {
+  const set: [string, string][] = [
+    ['all', 'initial'], ['display', 'block'], ['position', 'static'], ['visibility', 'visible'], ['opacity', '1'],
+    ['transform', 'none'], ['filter', 'none'], ['contain', 'none'], ['width', '0'], ['height', '0'], ['margin', '0'], ['padding', '0'], ['border', '0'],
+  ]
+  for (const [k, v] of set) host.style.setProperty(k, v, 'important')
+}
+
+/**
+ * The widget's CSS. A constructed stylesheet is used where the browser has one: unlike a <style>
+ * element, it isn't blocked by a host's "style-src" policy without 'unsafe-inline'.
+ */
+function addStyles(root: ShadowRoot, css: string) {
+  try {
+    const sheet = new CSSStyleSheet()
+    sheet.replaceSync(css)
+    root.adoptedStyleSheets = [sheet]
+    return
+  } catch { /* older browser: fall back to a style element */ }
+  const style = document.createElement('style')
+  style.textContent = css
+  root.appendChild(style)
+}
+
 function boot() {
   if (window.__vibeCollab) return // installed twice: keep the first
   const script = (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
@@ -35,14 +64,19 @@ function boot() {
   if (d.products !== undefined && !d.products.split(',').map((x) => x.trim()).includes('comments')) return
 
   const start = () => {
-    const host = document.createElement('div')
+    // A custom tag, not a div: the host's rules for div (or body > div) don't reach it.
+    const host = document.createElement('vibe-collab')
     host.id = 'vibe-collab'
     host.setAttribute('data-vibe-collab', VERSION)
-    document.body.appendChild(host)
+    pinHostStyle(host)
+    // On <html>, not <body>: a transform or filter on body would make "position: fixed" follow the
+    // body instead of the window, and frameworks that redraw body would remove the widget.
+    document.documentElement.appendChild(host)
+    // Put back if the host page removes it (a framework replacing the document's children).
+    new MutationObserver(() => { if (!host.isConnected) document.documentElement.appendChild(host) })
+      .observe(document.documentElement, { childList: true })
     const root = host.attachShadow({ mode: 'open' })
-    const style = document.createElement('style')
-    style.textContent = CSS.replace('--vc-accent: #e8590c', `--vc-accent: ${color}`)
-    root.appendChild(style)
+    addStyles(root, CSS.replace('--vc-accent: #e8590c', `--vc-accent: ${color}`))
     const mount = document.createElement('div')
     root.appendChild(mount)
     createRoot(mount).render(<Widget backend={new LocalBackend(project)} config={config} host={host} />)

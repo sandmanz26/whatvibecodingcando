@@ -59,13 +59,19 @@ export class LocalBackend implements Backend {
   constructor(project: string) { this.key = `${NS}${project}:threads` }
   private read(): Thread[] {
     try {
-      const v = JSON.parse(localStorage.getItem(this.key) ?? '[]')
-      return Array.isArray(v) ? v : []
+      let v: unknown = JSON.parse(localStorage.getItem(this.key) ?? '[]')
+      // Written by an older version while the host had Array.prototype.toJSON (Prototype.js): a JSON string inside.
+      if (typeof v === 'string') v = JSON.parse(v)
+      return Array.isArray(v) ? v.filter(isThread) : []
     } catch { return [] }
   }
   private write(list: Thread[]) {
-    // A full or blocked storage must surface as an error, not as a silent loss.
-    localStorage.setItem(this.key, JSON.stringify(list))
+    // A full or blocked storage, or a host library that changes how JSON is written, must surface
+    // as an error, not as a silent loss: what was written is read back and checked.
+    const text = toJson(list)
+    localStorage.setItem(this.key, text)
+    const back = JSON.parse(localStorage.getItem(this.key) ?? 'null')
+    if (!Array.isArray(back) || back.length !== list.length) throw new Error('not saved')
   }
   async list() { return this.read() }
   async upsert(t: Thread) {
@@ -80,6 +86,49 @@ export class LocalBackend implements Backend {
     window.addEventListener('storage', on)
     return () => window.removeEventListener('storage', on)
   }
+}
+
+/**
+ * JSON.stringify that a host page can't bend. Old libraries (Prototype.js and friends) add
+ * Array.prototype.toJSON, which makes arrays come out as strings; it is set aside while writing.
+ */
+export function toJson(v: unknown): string {
+  const own = Object.getOwnPropertyDescriptor(Array.prototype, 'toJSON')
+  if (!own) return JSON.stringify(v)
+  try {
+    delete (Array.prototype as { toJSON?: unknown }).toJSON
+    return JSON.stringify(v)
+  } finally {
+    Object.defineProperty(Array.prototype, 'toJSON', own)
+  }
+}
+
+/** Longest selector accepted from stored data: pins run their selector many times a second. */
+export const MAX_SELECTOR = 400
+const str = (v: unknown, max: number) => typeof v === 'string' && v.length <= max
+const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v)
+/**
+ * Stored threads come from outside this code (another browser, later a server, or the host page,
+ * which can write to the same storage). Anything malformed is left out instead of breaking the widget.
+ */
+export function isThread(v: unknown): v is Thread {
+  const t = v as Thread
+  return !!t && typeof t === 'object' && str(t.id, 64) && str(t.page, 2000) && str(t.author, 80) && str(t.text, MAX_TEXT) && str(t.createdAt, 40)
+    && !!t.anchor && str(t.anchor.sel, MAX_SELECTOR) && num(t.anchor.rx) && num(t.anchor.ry) && num(t.anchor.x) && num(t.anchor.y) && num(t.anchor.vw)
+    && Array.isArray(t.replies) && t.replies.every((r) => !!r && str(r.id, 64) && str(r.author, 80) && str(r.text, MAX_TEXT) && str(r.at, 40))
+}
+
+/**
+ * The address of a stored page key on this site, or null. A page key is a path; it is resolved
+ * against this site and refused if it would leave it ("//evil.com", "@evil.com/x" glued to the
+ * origin would otherwise send people to another site).
+ */
+export function pageUrl(page: string, origin = window.location.origin): string | null {
+  if (typeof page !== 'string' || !page.startsWith('/') || page.startsWith('//') || /[\\\s]/.test(page)) return null
+  try {
+    const u = new URL(page, origin)
+    return u.origin === origin ? u.href : null
+  } catch { return null }
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
@@ -100,6 +149,7 @@ export function pageKey(loc: Location = window.location): string {
 
 const visible = (el: Element) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 }
 function firstVisible(sel: string): Element | null {
+  if (sel.length > MAX_SELECTOR) return null
   try { for (const el of document.querySelectorAll(sel)) if (visible(el)) return el } catch { /* invalid selector */ }
   return null
 }
@@ -128,7 +178,10 @@ export function selectorFor(el: Element): string {
   }
   // Start from body (or an id) so the path can't match the same shape somewhere else first.
   if (!parts[0]?.startsWith('#')) parts.unshift('body')
-  return parts.join(' > ')
+  // Deep pages can make a long path: keep its start and the steps nearest the element, joined as a descendant.
+  let path = parts.join(' > ')
+  for (let k = 1; path.length > MAX_SELECTOR && k < parts.length - 1; k++) path = `${parts[0]} ${parts.slice(k + 1).join(' > ')}`
+  return path.length > MAX_SELECTOR ? tag : path
 }
 
 export function anchorAt(el: Element, clientX: number, clientY: number): Anchor {
