@@ -32,7 +32,10 @@ The SaaS's backend, in this app only (`apps/saas/supabase`). It is not connected
    - Redirect URLs: `https://whatvibecodingcando.vercel.app/**` and `http://localhost:5174/**` for development.
 4. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
 5. **Keys.**
-   - The project URL and the anon (publishable) key are public by design and go into the app's build (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` in Vercel).
+   - The project URL and the anon (publishable) key are public by design and go into the app's build.
+     - Set them as `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in Vercel, or connect Vercel's Supabase integration: the build also reads its `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_…` names (`apps/saas/vite.config.ts`).
+     - The build log says `[supabase] connected: <url>` or `not configured`.
+     - The build refuses to run if the browser key is a service role or secret key.
    - The service role key and the database password never go into the app, the repository or a chat. Only the Edge Functions use the service role.
 
 ## Next steps (in order)
