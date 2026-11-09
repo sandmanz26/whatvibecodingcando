@@ -37,7 +37,8 @@ export const authReturnUrl = (what: 'signup' | 'recovery' | 'email_change') =>
 export async function finishAuthReturn() {
   if (!supabase) return
   const q = new URLSearchParams(window.location.search)
-  const what = q.get('auth')
+  // ?auth= is ours; a bare ?code= comes back when Supabase used its Site URL instead (redirect not allowed).
+  const what = q.get('auth') ?? (q.has('code') ? 'signup' : null)
   const err = q.get('error_description') || new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('error_description')
   if (!what && !err) return
   const { data } = await supabase.auth.getSession()
