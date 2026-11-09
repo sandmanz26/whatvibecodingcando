@@ -56,7 +56,9 @@ export function authMessage(e: { message?: string; code?: string; status?: numbe
   const code = e.code ?? ''
   if (code === 'invalid_credentials') return 'Email or password is incorrect.'
   if (code === 'email_not_confirmed') return 'confirm-first'
-  if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit' || e.status === 429) return 'Too many tries. Wait a minute and try again.'
+  // Two different limits: emails per hour for the whole project, and attempts per person.
+  if (code === 'over_email_send_rate_limit') return 'We can’t send more emails right now: the hourly email limit is reached. Try again in an hour.'
+  if (code === 'over_request_rate_limit' || e.status === 429) return 'Too many tries. Wait a few minutes and try again.'
   if (code === 'weak_password') return 'That password is too weak. Use a longer one.'
   if (code === 'same_password') return 'Use a password different from the current one.'
   if (code === 'email_address_not_authorized') return 'Emails can’t be sent to this address yet: the project’s email (SMTP) isn’t set up.'
