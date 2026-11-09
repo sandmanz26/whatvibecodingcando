@@ -382,7 +382,7 @@ Everything else is the project's **published configuration**, built in the panel
 ## Website and user panel for the hosted product
 
 - **`#/landingpage`** is the product's website (working name in `src/saas/products.ts` → `BRAND`).
-  - Visitors pick the tools they want from a catalogue of 12 products, filtered by category, with a running "Your stack" summary.
+  - Visitors pick the tools they want from a catalogue of 15 products, filtered by category, with a running "Your stack" summary.
   - Each product says honestly where it works today: **On your site today** (in the script) or **Early access** (built and usable in the demo console).
   - It also has how it works, a live demo of the script in an iframe, beta pricing and FAQ.
   - The picks carry into registering, then into onboarding.
