@@ -30,6 +30,7 @@ import { Forgot as LocalForgot, Login as LocalLogin, Register as LocalRegister, 
 import { CloudForgot, CloudLogin, CloudRegister, CloudReset, Confirm } from './pages/saas/AuthCloud'
 import { cloud } from './saas/supabase'
 import { WidgetBuilder } from './pages/saas/WidgetBuilder'
+import { Privacy, Terms } from './pages/saas/Legal'
 import { PanelLayout, Overview, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { Inspector } from './tools/inspect/Inspector'
@@ -51,6 +52,8 @@ export default function App() {
         <Routes>
           {/* The hosted product's website and user panel: their own look, no research tools. */}
           <Route path="landingpage" element={<Landing />} />
+          <Route path="privacy" element={<Privacy />} />
+          <Route path="terms" element={<Terms />} />
           <Route path="app/register" element={<Register />} />
           <Route path="app/login" element={<Login />} />
           <Route path="app/forgot" element={<Forgot />} />
@@ -110,7 +113,7 @@ export default function App() {
 /** Research tools sit around the marketplace and its console; never on the hosted product's own pages. */
 function ResearchTools() {
   const { pathname } = useLocation()
-  if (pathname === '/landingpage' || pathname === '/app' || pathname.startsWith('/app/')) return null
+  if (pathname === '/landingpage' || pathname === '/privacy' || pathname === '/terms' || pathname === '/app' || pathname.startsWith('/app/')) return null
   return (
     <>
       <DesignLayer />

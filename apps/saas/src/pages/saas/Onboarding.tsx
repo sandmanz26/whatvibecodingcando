@@ -36,11 +36,13 @@ export default function Onboarding() {
   const [finished, setFinished] = useState(false)
   // On the server: wait for its answer before leaving onboarding, so a refusal is shown here.
   const [saving, setSaving] = useState(false)
+  // The server refused part of it (the project may exist already): stay here and say so.
+  const [failed, setFailed] = useState(false)
   useEffect(() => { setTried(false); window.scrollTo(0, 0) }, [step])
   useEffect(() => { document.title = `Set up your workspace · ${BRAND}` }, [])
   // The server refused the new workspace or project (the state is back to what it has): say why.
   useEffect(() => {
-    const on = (e: Event) => { setFinished(false); setError(`Couldn’t create your project: ${(e as CustomEvent<string>).detail}`) }
+    const on = (e: Event) => { setFinished(false); setFailed(true); setError(`Couldn’t finish setting up: ${(e as CustomEvent<string>).detail}`) }
     window.addEventListener(SAAS_ERROR, on)
     return () => window.removeEventListener(SAAS_ERROR, on)
   }, [])
@@ -52,7 +54,7 @@ export default function Onboarding() {
   if (!ready) return null
   if (!state.account) return <Navigate to="/app/register" replace />
   if (!isSignedIn(state)) return <Navigate to="/app/login?next=/app/onboarding" replace />
-  if (isOnboarded(state) && !saving) return <Navigate to={finished ? '/app?welcome=1' : '/app'} replace />
+  if (isOnboarded(state) && !saving && !failed) return <Navigate to={finished ? '/app?welcome=1' : '/app'} replace />
 
   const siteOk = !site.trim() || !!originOf(site)
   const projectOk = !!slug(project)
@@ -140,12 +142,13 @@ export default function Onboarding() {
               {products.some((id) => productOf(id)?.status !== 'script') && <p className="lp-hint">Only Comments runs in the script today; the other tools you picked are marked early access.</p>}
             </>
           )}
-          {error && <p className="lp-error">{error}</p>}
+          {error && <p className="lp-error" role="alert">{error}</p>}
+          {failed && isOnboarded(state) && <p className="lp-hint">Your project was created. <button type="button" className="up-linkbtn" onClick={() => nav('/app/widget', { replace: true })}>Open your panel</button> and publish the widget from Widget.</p>}
           <div className="lp-row lp-form-foot">
             {step > 0 && <button type="button" className="lp-btn" onClick={() => setStep(step - 1)}><ArrowLeft size={15} /> Back</button>}
             <span className="lp-grow" />
             {step === 2 && copied !== code && <button type="button" className="lp-btn ghost" onClick={finish}>Skip for now</button>}
-            <button type="submit" className="lp-btn primary" disabled={saving}>{step < 2 ? <>Continue <ArrowRight size={15} /></> : saving ? 'Creating…' : 'Finish'}</button>
+            <button type="submit" className="lp-btn primary" disabled={saving || (failed && isOnboarded(state))}>{step < 2 ? <>Continue <ArrowRight size={15} /></> : saving ? 'Creating…' : 'Finish'}</button>
           </div>
         </form>
       </main>

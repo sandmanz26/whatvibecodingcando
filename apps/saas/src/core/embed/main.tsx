@@ -22,15 +22,16 @@
 import { Component, useEffect, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Widget, OPEN_EVENT, type Config, type OpenWhat } from './Widget'
-import { LocalBackend, NS } from './store'
+import { LocalBackend, NS, type Backend } from './store'
 import { CSS } from './styles'
-import { LocalConfigSource, envFor, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
+import { LocalConfigSource, envFor, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
+import * as server from './server'
 
 /** The public API: window.VibeCollab.open('comment' | 'list'). Calls made before the script loaded are queued in q. */
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
 declare global { interface Window { __vibeCollab?: { version: string; project: string }; VibeCollab?: Api | { q?: unknown[][] } } }
 
-const VERSION = '0.2.0'
+const VERSION = '0.3.0'
 
 /**
  * The host element's own box, set inline with !important: that beats even !important rules in the
@@ -65,23 +66,6 @@ function readSession(project: string): ReviewerSession | null {
     const v = JSON.parse(localStorage.getItem(sessionKey(project)) ?? 'null') as ReviewerSession | null
     return v && v.project === project && typeof v.exp === 'number' && v.exp > Date.now() ? v : null
   } catch { return null }
-}
-
-/**
- * A review link (#vibe_t=<one-time token>) signs this browser in as a reviewer of the project. The
- * token is taken off the address at once, so it isn't left in history, shared or sent on.
- */
-function takeReviewToken(project: string, source: ConfigSource): ReviewerSession | null {
-  const h = window.location.hash
-  const m = /(?:^#|&)vibe_t=([0-9a-f]{32,64})/.exec(h)
-  if (!m) return null
-  const rest = h.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_t=')).join('&')
-  try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
-  const s = source.redeem(project, m[1])
-  if (!s) { console.warn('[Vibe Collab] that review link has expired or was already used. Ask for a new one.'); return null }
-  try { localStorage.setItem(sessionKey(project), JSON.stringify({ ...s, preview: false })) } catch { /* ignore */ }
-  if (s.preview) ss.set(previewKey(project), '1')
-  return s
 }
 
 /** Is this the hosted demo site, served from where the script itself comes from? It runs whatever the environments say. */
@@ -125,7 +109,106 @@ function addStyles(root: ShadowRoot, css: string) {
   root.appendChild(style)
 }
 
-function boot() {
+/**
+ * Where the widget's settings, reviewer state and comments come from. Two kinds:
+ *   server  the project's settings file on the CDN, reviewer sessions and comments on the server
+ *   local   this browser's stand-in (the browser-only demo, and installs that never published)
+ */
+/** skipEnvs: installs that never published (0.1 snippet options) run wherever the snippet is. */
+interface Snapshot { live: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; reviewer: boolean; gone: boolean; skipEnvs: boolean }
+interface Mode {
+  /** true on the server: reading and posting need a reviewer session for this browser */
+  readonly sessions: boolean
+  snapshot(): Snapshot
+  subscribe(cb: () => void): () => void
+  /** a review link's token, from the address */
+  useToken(token: string): Promise<void>
+  /** before showing a widget that is open to everyone: a reviewer session for this browser */
+  join(): Promise<void>
+  exitPreview(): void
+  backend(): Backend
+  reportSeen(shown: boolean, why: string): void
+}
+
+function localMode(project: string, legacy: WidgetConfig | null): Mode {
+  const source: ConfigSource = new LocalConfigSource()
+  let token: ReviewerSession | null = null
+  const subs = new Set<() => void>()
+  return {
+    sessions: false,
+    snapshot() {
+      const s = source.get(project)
+      return { live: s.live?.config ?? legacy, draft: s.draft, preview: ss.get(previewKey(project)) === '1', reviewer: !!readSession(project) || !!token, gone: !!s.gone, skipEnvs: !s.live && !!legacy }
+    },
+    subscribe(cb) { subs.add(cb); const off = source.subscribe(project, cb); return () => { subs.delete(cb); off() } },
+    async useToken(t) {
+      const s = source.redeem(project, t)
+      if (!s) { console.warn('[Vibe Collab] that review link has expired or was already used. Ask for a new one.'); return }
+      try { localStorage.setItem(sessionKey(project), JSON.stringify({ ...s, preview: false })) } catch { /* ignore */ }
+      // A fresh link decides: a tab opened from the panel can inherit an old preview flag.
+      if (s.preview) ss.set(previewKey(project), '1')
+      else ss.del(previewKey(project))
+      token = s
+      subs.forEach((f) => f())
+    },
+    async join() { /* the stand-in has no sessions: everyone may comment */ },
+    exitPreview() { ss.del(previewKey(project)); subs.forEach((f) => f()) },
+    backend: () => new LocalBackend(project),
+    reportSeen(shown, why) { reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown, why }) },
+  }
+}
+
+const draftKey = (p: string) => `${NS}draft:${p}`
+function serverMode(project: string, first: server.ServedFile): Mode {
+  let live = first.live?.config ?? null
+  let gone = first.gone
+  let reviewer = server.isReviewer(project)
+  const readDraft = () => { try { return parseConfig(JSON.parse(ss.get(draftKey(project)) ?? 'null')) } catch { return null } }
+  let draft = readDraft()
+  const subs = new Set<() => void>()
+  const notify = () => subs.forEach((f) => f())
+  const setReview = (r: server.ReviewStart | null) => {
+    reviewer = !!r
+    if (r?.preview) { ss.set(previewKey(project), '1'); ss.set(draftKey(project), JSON.stringify(r.draft ?? null)); draft = parseConfig(r.draft) }
+    if (r?.name) { try { if (!localStorage.getItem(`${NS}name`)) localStorage.setItem(`${NS}name`, r.name) } catch { /* ignore */ } }
+    notify()
+  }
+  // This browser was a reviewer: still? (A reviewer removed in the panel loses the widget here.)
+  if (reviewer) void server.startReview(project, null).then((r) => { if (!r) setReview(null) })
+  let timers: number[] = []
+  const poll = () => {
+    timers.forEach((t) => window.clearInterval(t))
+    timers = []
+    if (!reviewer) return
+    // Reviewers follow publishing (and the off switch) within a minute; previews follow the draft as it is edited.
+    timers.push(window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void server.fetchSettings(project, true).then((f) => { if (f.gone !== gone || f.live?.version !== undefined) { gone = f.gone; live = f.live?.config ?? live; notify() } })
+    }, 60_000))
+    if (ss.get(previewKey(project)) === '1') timers.push(window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void server.getDraft(project).then((d) => { if (d && JSON.stringify(d) !== JSON.stringify(draft)) { draft = d; ss.set(draftKey(project), JSON.stringify(d)); notify() } })
+    }, 4000))
+  }
+  subs.add(poll)
+  poll()
+  return {
+    sessions: true,
+    snapshot: () => ({ live, draft, preview: ss.get(previewKey(project)) === '1', reviewer, gone, skipEnvs: false }),
+    subscribe(cb) { subs.add(cb); return () => subs.delete(cb) },
+    async useToken(t) {
+      // A fresh link decides whether this tab previews: a tab opened from the panel can inherit an old flag.
+      ss.del(previewKey(project)); ss.del(draftKey(project)); draft = null
+      setReview(await server.startReview(project, t, (() => { try { return localStorage.getItem(`${NS}name`) ?? undefined } catch { return undefined } })()))
+    },
+    async join() { if (!reviewer) setReview(await server.startReview(project, null, undefined, true)) },
+    exitPreview() { ss.del(previewKey(project)); ss.del(draftKey(project)); draft = null; notify() },
+    backend: () => new server.ServerBackend(project),
+    reportSeen: (shown, why) => server.reportSeen(project, VERSION, shown, why),
+  }
+}
+
+async function boot() {
   if (window.__vibeCollab) { console.warn('[Vibe Collab] the script is on this page twice; the second copy does nothing.'); return }
   const script = (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
   const d = script?.dataset ?? {}
@@ -133,57 +216,87 @@ function boot() {
   if (d.disabled !== undefined && d.disabled !== 'false') return
   const project = /^[\w-]{1,64}$/.test(d.project ?? '') ? d.project! : (window.location.hostname || 'local').replace(/[^\w-]/g, '-')
   window.__vibeCollab = { version: VERSION, project }
-
-  const source: ConfigSource = new LocalConfigSource()
   const demo = isHostedDemo(script)
-  let token = takeReviewToken(project, source)
   const SESSION_EVENT = 'vibe-collab:session'
 
-  // Before the project has published settings, the snippet's own data- attributes apply, as in 0.1.
-  const first = source.get(project)
-  if (first.gone) { console.info('[Vibe Collab] this project was deleted; nothing to show.'); reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown: false, why: 'The project was deleted.' }); return }
-  const legacy: WidgetConfig | null = first.live ? null : {
-    v: 1, on: d.products === undefined || d.products.split(',').map((x) => x.trim()).includes('comments'),
-    modules: { comments: true },
-    theme: { accent: /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color! : '#e8590c', mode: 'light' },
-    launcher: { kind: 'floating', position: d.position === 'left' ? 'left' : 'right', label: 'Comment', shortcut: d.shortcut !== 'off' },
-    audience: 'everyone', envs: [],
+  // The review link's token, taken off the address at once (so it isn't left in history or shared on).
+  const takeToken = (): string | null => {
+    const h = window.location.hash
+    const m = /(?:^#|&)vibe_t=([0-9a-f]{32,64})/.exec(h)
+    if (!m) return null
+    const rest = h.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_t=')).join('&')
+    try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
+    return m[1]
   }
+  const token = takeToken()
+
+  // Server first: a project with a published settings file on the CDN runs on the server.
+  let mode: Mode | null = null
+  if (server.hasServer) {
+    const file = await server.fetchSettings(project, !!token)
+    if (file.gone) { console.info('[Vibe Collab] this project was deleted; nothing to show.'); return }
+    if (file.live) mode = serverMode(project, file)
+  }
+  if (!mode) {
+    const first = new LocalConfigSource().get(project)
+    if (first.gone) { console.info('[Vibe Collab] this project was deleted; nothing to show.'); reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown: false, why: 'The project was deleted.' }); return }
+    // Before the project has published settings, the snippet's own data- attributes apply, as in 0.1.
+    const legacy: WidgetConfig | null = first.live ? null : {
+      v: 1, on: d.products === undefined || d.products.split(',').map((x) => x.trim()).includes('comments'),
+      modules: { comments: true },
+      theme: { accent: /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color! : '#e8590c', mode: 'light' },
+      launcher: { kind: 'floating', position: d.position === 'left' ? 'left' : 'right', label: 'Comment', shortcut: d.shortcut !== 'off' },
+      audience: 'everyone', envs: [],
+    }
+    mode = localMode(project, legacy)
+  }
+  const m = mode
+  if (token) await m.useToken(token)
 
   const host = document.createElement('vibe-collab')
   host.id = 'vibe-collab'
   host.setAttribute('data-vibe-collab', VERSION)
   pinHostStyle(host)
 
-  /** Re-decides whenever the settings change (published, or the draft while previewing). */
+  /** Re-decides whenever the settings or the reviewer state change. */
   function Root() {
-    const read = () => {
-      const s = source.get(project)
-      if (s.gone) return { show: false as const, why: 'The project was deleted.' }
+    const read = (): Decision => {
+      const s = m.snapshot()
+      if (s.gone) return { show: false, why: 'The project was deleted.' }
       return decide({
-        config: s.live?.config ?? legacy, draft: s.draft, preview: ss.get(previewKey(project)) === '1',
-        host: window.location.host, hostname: window.location.hostname, demo: demo || !!legacy, reviewer: !!readSession(project) || !!token,
+        config: s.live, draft: s.draft, preview: s.preview,
+        host: window.location.host, hostname: window.location.hostname,
+        demo: demo || s.skipEnvs, reviewer: s.reviewer,
       })
     }
     const [decision, setDecision] = useState(read)
-    useEffect(() => source.subscribe(project, () => setDecision(read())), []) // eslint-disable-line react-hooks/exhaustive-deps
+    const [backend] = useState(() => m.backend())
+    const [joining, setJoining] = useState(false)
+    useEffect(() => m.subscribe(() => setDecision(read())), []) // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
       const on = () => setDecision(read())
       host.addEventListener(SESSION_EVENT, on)
       return () => host.removeEventListener(SESSION_EVENT, on)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // Open to everyone: this browser needs a reviewer session before it can read or post.
+    const needsJoin = m.sessions && decision.show && decision.config.audience === 'everyone' && !m.snapshot().reviewer
     useEffect(() => {
-      reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown: decision.show, why: decision.show ? '' : decision.why })
+      if (!needsJoin || joining) return
+      setJoining(true)
+      void m.join().finally(() => setJoining(false))
+    }, [needsJoin]) // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+      m.reportSeen(decision.show, decision.show ? '' : decision.why)
       if (!decision.show) console.info(`[Vibe Collab] not shown: ${decision.why}`)
     }, [decision])
-    if (!decision.show) return null
+    if (!decision.show || needsJoin) return null
     const c = decision.config
     const config: Config = {
       project, position: c.launcher.position, shortcut: c.launcher.shortcut, launcher: c.launcher.kind, label: c.launcher.label,
       accent: c.theme.accent, mode: c.theme.mode,
-      ...(decision.preview ? { preview: { exit: () => { ss.del(previewKey(project)); setDecision(read()) } } } : {}),
+      ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
     }
-    return <Widget backend={new LocalBackend(project)} config={config} host={host} />
+    return <Widget backend={backend} config={config} host={host} />
   }
 
   const open = (what: OpenWhat = 'comment') => host.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: what === 'list' ? 'list' : 'comment' }))
@@ -200,10 +313,8 @@ function boot() {
 
   // A review link opened on a page that is already open changes only the address's hash.
   window.addEventListener('hashchange', () => {
-    if (!/(?:^#|&)vibe_t=/.test(window.location.hash)) return
-    const s = takeReviewToken(project, source)
-    if (s) token = s
-    host.dispatchEvent(new Event(SESSION_EVENT))
+    const t = takeToken()
+    if (t) void m.useToken(t).then(() => host.dispatchEvent(new Event(SESSION_EVENT)))
   })
 
   const start = () => {
@@ -228,4 +339,4 @@ function boot() {
   else document.addEventListener('DOMContentLoaded', start, { once: true })
 }
 
-try { boot() } catch (e) { console.warn('[Vibe Collab] could not start; the page is unaffected.', e) }
+boot().catch((e) => console.warn('[Vibe Collab] could not start; the page is unaffected.', e))

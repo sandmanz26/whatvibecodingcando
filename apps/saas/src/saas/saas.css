@@ -359,3 +359,13 @@
 .up-check.ok { color: #237032; }
 .up-check.warn { color: #8a3b00; }
 .wb-choices span span { display: block; }
+
+.up-linkbox { margin-top: 12px; padding: 12px; border-radius: 12px; background: #f3f9f4; border: 1.5px solid #b9dcc2; display: flex; flex-direction: column; gap: 8px; }
+.up-linkbox p { margin: 0; }
+.up-linkbox .up-code { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Privacy and terms */
+.lp-legal-main { max-width: 760px; padding: 10px 0 80px; display: flex; flex-direction: column; gap: 14px; }
+.lp-legal-main h1 { font-size: 34px; }
+.lp-legal-main h2 { font-size: 19px; margin-top: 14px; }
+.lp-legal-main ul { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; line-height: 1.6; }

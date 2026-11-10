@@ -86,6 +86,7 @@ export function CloudRegister() {
         <PasswordField label="Confirm password" value={pw2} onChange={setPw2} autoComplete="new-password" invalid={tried && !match} error={tried && !match ? 'The passwords don’t match.' : ''} />
         {error && <p className="lp-error" role="alert">{error}</p>}
         <button type="submit" className="lp-btn primary full" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
+        <p className="lp-hint">By creating an account you agree to the <Link to="/terms">terms</Link> and the <Link to="/privacy">privacy policy</Link>.</p>
       </form>
     </Shell>
   )

@@ -2,11 +2,16 @@
 
 The SaaS's backend, in this app only (`apps/saas/supabase`).
 
-- **Connected now: the panel.** When the build has a project (see Keys), it uses it for:
+- **The panel** uses it for:
   - accounts: register with email confirmation, login, forgot and reset password;
-  - workspaces, projects and invites;
-  - widget settings: draft, publish and releases, and the published file on Storage.
-- **Not connected yet: the script.** Comments, review links and the installation check still use the browser.
+  - workspaces, projects, invites and reviewers;
+  - widget settings: draft, publish and releases, and the published file on Storage;
+  - the comment inbox and the installation check.
+- **The script** on customers' sites uses it for:
+  - settings: the published file on Storage (CDN), cached in the browser five minutes;
+  - reviewer sessions: anonymous sign-in, only after a review link;
+  - comments, through database functions;
+  - the installation check, sampled.
 
 ## What is here
 
@@ -29,6 +34,20 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
   - Members insert releases for their own projects (never edit them).
   - A public Storage bucket `widget-config`, holding small JSON files only.
   - Only a project's members may write its file `widget-config/<public_id>.json`.
+- **`migrations/20261110000000_reviewers.sql`**: reviewers and comments from customers' sites.
+  - **Review links:** `create_review_link`, members only. One-time links last 2 minutes; invites last 1–30 days and work on up to 5 devices. Only a SHA-256 of the token is stored.
+  - **Reviewers:** an anonymous Supabase session per browser, traded for a `reviewers` row by `start_review`.
+  - **Functions for the script:** `list_threads`, `post_thread`, `post_reply`, `edit_thread`, `set_resolved`, `delete_thread`, `delete_reply`, `set_reviewer_name`, `get_draft` (preview only) and `report_seen`.
+  - **Every function checks**, in order:
+    - the project exists;
+    - the request's `Origin` is one of the project's environments that are switched on (or `allowed_origins`, the hosted demo);
+    - the widget is on;
+    - the caller is a reviewer;
+    - a per-person rate limit.
+  - **Rights:** only authors edit or delete their comments and replies; any reviewer completes or reopens.
+  - **Anonymous sessions** can't create workspaces.
+  - **`delete_my_account`** removes the login, the workspaces it owns, their projects and comments.
+  - **Housekeeping:** an hourly `pg_cron` job clears old rate-limit counters and expired links, when the extension is available.
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.
@@ -40,31 +59,31 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 3. **Auth → URL Configuration.**
    - Site URL: `https://whatvibecodingcando.vercel.app/`.
    - Redirect URLs: `https://whatvibecodingcando.vercel.app/**` and `http://localhost:5174/**` for development.
-4. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
-5. **Auth → Email Templates.** So links work on any device (the default links only work in the browser that asked), set the link in two templates. Keep the rest of the text as you like.
+4. **Auth → Sign In / Providers → allow anonymous sign-ins.** Reviewers on customers' sites need it (they have no account). Turning on CAPTCHA protection (Turnstile) as well is recommended before opening to the public.
+5. **Database → Extensions → pg_cron** (optional, before running the third migration): enables the hourly cleanup.
+6. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
+7. **Auth → Email Templates.** So links work on any device (the default links only work in the browser that asked), set the link in two templates. Keep the rest of the text as you like.
    - **Confirm signup:** `<a href="https://whatvibecodingcando.vercel.app/#/app/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>`
    - **Reset Password:** `<a href="https://whatvibecodingcando.vercel.app/#/app/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>`
    - The default `{{ .ConfirmationURL }}` links also work, but only when opened in the same browser (they come back as `/?auth=…&code=…`).
-6. **Keys.**
+8. **Keys.**
    - The project URL and the anon (publishable) key are public by design and go into the app's build.
      - Set them as `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in Vercel, or connect Vercel's Supabase integration: the build also reads its `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_…` names (`apps/saas/vite.config.ts`).
      - The build log says `[supabase] connected: <url>` or `not configured`.
      - The build refuses to run if the browser key is a service role or secret key.
    - The service role key and the database password never go into the app, the repository or a chat. Only the Edge Functions use the service role.
 
-## Next steps (in order)
+## Tests
 
-1. **Edge Functions.**
-   - `handoff`: the panel asks for a review link; it returns a token and stores its hash.
-   - `redeem`: a token becomes a short-lived reviewer session.
-   - `comments`: list, post, reply and resolve, with an origin check against the project's environments and rate limits.
-   - `publish`: validates the configuration, writes the release, and writes `widget-config/<public_id>.json` to Storage, cached on the CDN.
-   - `ping`: the installation check, at most once per host per hour.
-2. **Panel on Supabase Auth.** Register, login, forgot and reset password, and workspaces and projects through the client with row level security.
-3. **The script.**
-   - A `SupabaseBackend` behind the existing `Backend` interface, through the `comments` function.
-   - The configuration read from the CDN file instead of browser storage.
-   - Review links through `redeem`.
+- `tests/run.sh` runs `rls_test.sql` (row level security) and `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account) on a fresh database.
+- The full path (panel → invite link → reviewer on another domain → comment in the database → panel inbox, plus kill switch, preview and delete account) was checked in a browser against these migrations on Postgres 16. It is not in CI yet.
+
+## Not done yet (before a public launch)
+
+- **Emails:** invite emails to reviewers and notifications of new comments. Today the owner copies the link and sends it.
+- **CAPTCHA** on anonymous sign-ins and sign-up.
+- **Reviewer sessions** are kept in the customer site's storage. Move them into an iframe on our domain before "everyone" mode is used widely.
+- **CI** running these tests on every push.
 
 ## Rules for later migrations
 

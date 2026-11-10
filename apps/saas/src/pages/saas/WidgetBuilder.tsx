@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ExternalLink, RotateCcw, TriangleAlert, Plus, X, RefreshCw, Rocket, History, Lock, Users } from 'lucide-react'
 import { useStore } from '../../store/store'
@@ -8,6 +8,7 @@ import { demoUrl } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, publish, reviewerUrl } from '../../saas/widget'
 import { MAX_ENVS, MAX_LABEL, hostProblem, sameConfig, type Env, type WidgetConfig } from '../../core/embed/config'
 import { ago, openDemo, usePanel } from './Panel'
+import { cloud } from '../../saas/supabase'
 
 /**
  * Widget: what the script shows on a project's sites, built here and published. Edits are a draft
@@ -213,9 +214,15 @@ function Preview({ projectId, siteUrl }: { projectId: string; siteUrl: string })
   const { toast } = useStore()
   const [n, setN] = useState(0)
   // A fresh one-time link for each (re)load of the frame.
-  const src = useMemo(() => reviewerUrl(projectId, demoUrl(projectId), true), [projectId, n])
+  const [src, setSrc] = useState<string | null>(null)
   const frame = useRef<HTMLIFrameElement>(null)
-  useEffect(() => { if (!src) toast('Preview unavailable: this browser’s storage is blocked.', 'error') }, [src]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let live = true
+    setSrc(null)
+    void reviewerUrl(projectId, demoUrl(projectId), true).then((u) => { if (!live) return; setSrc(u); if (!u) toast('Preview unavailable: couldn’t make a review link.', 'error') })
+    return () => { live = false }
+  }, [projectId, n]) // eslint-disable-line react-hooks/exhaustive-deps
+  const open = (url: string) => void openAsReviewer(projectId, url, true).then((ok) => { if (!ok) toast('Couldn’t open the preview.', 'error') })
   return (
     <section className="up-card wb-preview">
       <div className="up-row"><h2 className="lp-grow">Preview · draft</h2>
@@ -223,11 +230,14 @@ function Preview({ projectId, siteUrl }: { projectId: string; siteUrl: string })
       </div>
       {src && <iframe ref={frame} key={n} src={src} title="Preview of the widget on the demo site" />}
       <div className="up-row">
-        <button className="lp-btn sm" onClick={() => { if (!openAsReviewer(projectId, demoUrl(projectId), true)) toast('Couldn’t open the preview.', 'error') }}>Open preview <ExternalLink size={12} /></button>
-        <button className="lp-btn sm ghost" onClick={() => openDemo(projectId, toast)}>Open as a reviewer <ExternalLink size={12} /></button>
+        <button className="lp-btn sm" onClick={() => open(demoUrl(projectId))}>Open preview <ExternalLink size={12} /></button>
+        {cloud && siteUrl
+          ? <button className="lp-btn sm ghost" onClick={() => open(siteUrl)}>Preview on your site <ExternalLink size={12} /></button>
+          : <button className="lp-btn sm ghost" onClick={() => openDemo(projectId, toast)}>Open as a reviewer <ExternalLink size={12} /></button>}
       </div>
-      <p className="up-muted">The preview shows your draft only to you, in this browser. Visitors keep the published version.</p>
-      {siteUrl && <p className="up-note">Previewing on <code>{siteUrl.replace(/^https?:\/\//, '')}</code> itself needs the server: review links are checked by it. Until then they work on the demo site only.</p>}
+      <p className="up-muted">The preview shows your draft only to you{cloud ? '' : ', in this browser'}. Visitors keep the published version.</p>
+      {siteUrl && !cloud && <p className="up-note">Previewing on <code>{siteUrl.replace(/^https?:\/\//, '')}</code> itself needs the server: review links are checked by it. Until then they work on the demo site only.</p>}
+      {cloud && <p className="up-note">On your own site the preview needs the snippet installed and an environment switched on in Where. Publish first if this is your first version.</p>}
     </section>
   )
 }

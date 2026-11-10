@@ -19,7 +19,8 @@ export interface Anchor {
   y: number
   vw: number
 }
-export interface Reply { id: string; author: string; text: string; at: string }
+/** `mine`: set by the server (it knows who wrote what); without one, the widget compares names. */
+export interface Reply { id: string; author: string; text: string; at: string; mine?: boolean }
 export interface Thread {
   id: string
   page: string
@@ -30,6 +31,7 @@ export interface Thread {
   editedAt?: string
   resolved?: { by: string; at: string }
   replies: Reply[]
+  mine?: boolean
 }
 export type Status = 'open' | 'ongoing' | 'completed'
 export const statusOf = (t: Thread): Status => (t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open')
@@ -44,6 +46,8 @@ export interface Backend {
   remove(id: string): Promise<void>
   /** calls back when threads change somewhere else (another tab, another person) */
   subscribe(cb: () => void): () => void
+  /** the reviewer's display name changed (servers keep it per reviewer) */
+  setName?(name: string): void
 }
 
 /**
@@ -131,7 +135,8 @@ export function pageUrl(page: string, origin = window.location.origin): string |
   } catch { return null }
 }
 
-export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
+/** Ids are UUIDs: the server keeps the id the widget gave a comment. */
+export const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4))
 
 /**
  * The page a comment belongs to: the path, plus the route of a hash router (#/orders).

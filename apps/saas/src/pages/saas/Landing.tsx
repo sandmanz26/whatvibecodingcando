@@ -198,6 +198,8 @@ export default function Landing() {
         <a href={demoUrl()} target="_blank" rel="noopener">Demo site</a>
         <Link to="/console/prompts">Prompts</Link>
         <Link to="/app">Your panel</Link>
+        <Link to="/privacy">Privacy</Link>
+        <Link to="/terms">Terms</Link>
       </footer>
     </div>
   )

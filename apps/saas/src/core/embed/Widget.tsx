@@ -48,7 +48,14 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)
   const [, setTick] = useState(0)
   const me = name.trim() || 'Guest'
-  const setName = (v: string) => { setNameState(v); try { localStorage.setItem(NAME_KEY, v) } catch { /* ignore */ } }
+  const nameTimer = useRef(0)
+  const setName = (v: string) => {
+    setNameState(v)
+    try { localStorage.setItem(NAME_KEY, v) } catch { /* ignore */ }
+    // The server keeps one name per reviewer: sent once typing pauses.
+    window.clearTimeout(nameTimer.current)
+    if (v.trim()) nameTimer.current = window.setTimeout(() => backend.setName?.(v.trim()), 800)
+  }
   const say = useCallback((text: string, error = false) => { setToast({ text, error }); window.setTimeout(() => setToast((t) => (t?.text === text ? null : t)), 3200) }, [])
 
   /* ---- data ---- */
@@ -277,7 +284,7 @@ function ThreadView({ t, n, me, lost, onSave, onRemove, onClose }: {
   const [edit, setEdit] = useState<string | null>(null)
   const [reply, setReply] = useState('')
   const [confirm, setConfirm] = useState(false)
-  const mine = t.author === me
+  const mine = t.mine ?? t.author === me
   const status: Status = statusOf(t)
   useEffect(() => { setEdit(null); setReply(''); setConfirm(false) }, [t.id])
   const send = () => {
@@ -319,7 +326,7 @@ function ThreadView({ t, n, me, lost, onSave, onRemove, onClose }: {
           {t.replies.map((r) => (
             <li key={r.id}>
               <div className="vc-meta"><CornerDownRight size={11} /> <b>{r.author}</b> · {ago(r.at)}
-                {r.author === me && !t.resolved && <button className="vc-icon sm" onClick={() => void onSave({ ...t, replies: t.replies.filter((x) => x.id !== r.id) })} aria-label="Delete reply"><Trash2 size={11} /></button>}
+                {(r.mine ?? r.author === me) && !t.resolved && <button className="vc-icon sm" onClick={() => void onSave({ ...t, replies: t.replies.filter((x) => x.id !== r.id) })} aria-label="Delete reply"><Trash2 size={11} /></button>}
               </div>
               <p className="vc-text">{r.text}</p>
             </li>

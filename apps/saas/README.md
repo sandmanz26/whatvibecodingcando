@@ -398,7 +398,11 @@ Everything else is the project's **published configuration**, built in the panel
     - a change the server refuses is shown, and the panel reloads from the server;
     - it reloads on sign-in and when the tab regains focus.
   - **Project ids** get a short random part (`toko-budi-x7k2`): they are unique across customers.
-  - **The script, comments, review links and the installation check** still run on the browser stand-ins until the next step.
+  - **The script runs on the server too** (`src/core/embed/server.ts`). When the project's settings file is on the CDN:
+    - reviewers come in through review links and get an anonymous session;
+    - comments go through the database functions;
+    - the panel's inbox, Reviewers (Team page: invite links for clients) and installation check read the server.
+  - **Projects without a settings file on the CDN** (the website's demo, 0.1 installs) keep the browser stand-in.
   - **Without one**, everything below runs as a demo in this browser.
 - **Signing in, demo mode** (`src/pages/saas/Auth.tsx`, helpers in `src/saas/account.ts`). There is no server, so the account lives in this browser, one workspace per browser. Each page says so.
   - **`#/app/register`:** name, work email, password and confirmation.

@@ -24,7 +24,9 @@
     - Anything that needs the server (review links or previews on a customer's own domain, install checks there) must say so in the UI.
 - SaaS backend: Supabase, in `apps/saas/supabase` (migrations, row level security tests, setup in its README).
   - The panel uses it when the build has a project (`src/saas/supabase.ts`, `cloud.ts`, `AuthCloud.tsx`), otherwise the browser demo.
-  - The script isn't connected yet.
+  - The script uses it too when its project has a published file on the CDN (`src/core/embed/server.ts`).
+    - Reviewers: anonymous sessions after a review link.
+    - Comments: through the database functions in `supabase/migrations/…_reviewers.sql`, which check origin, reviewer and rate limits.
   - Keep both modes working; text that says "no server" must depend on the mode.
   - Every table has row level security and no anon access.
   - The script's traffic goes through Edge Functions; widget configuration is a CDN file, never a database read per page view.

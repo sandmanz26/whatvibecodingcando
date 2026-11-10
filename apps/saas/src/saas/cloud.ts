@@ -12,7 +12,8 @@
  * Row level security on the server decides what is allowed; nothing here is trusted by it.
  */
 import { supabase } from './supabase'
-import { parseConfig, type Release } from '../core/embed/config'
+import { parseConfig, type Release, type Seen } from '../core/embed/config'
+import type { Backend, Thread } from '../core/embed/store'
 import type { Invite, Project, SaasState } from './account'
 
 const BUCKET = 'widget-config'
@@ -60,7 +61,7 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
   const byDb = new Map([...dbIds].map(([pub, id]) => [id, pub]))
   const invites: Invite[] = (inv ?? []).map((i) => ({ email: i.email, role: i.role === 'admin' ? 'admin' : 'member', projectId: byDb.get(i.project_id) ?? '', at: i.created_at }))
   const current = projects.some((p) => p.id === prevCurrent) ? prevCurrent : projects[0]?.id ?? null
-  return { account, projects, current, invites, signedIn: true, onboarded: meta.onboarded ?? projects.length > 0 }
+  return { account, projects, current, invites, signedIn: true, onboarded: !!meta.onboarded || projects.length > 0 }
 }
 
 /* "Copied the snippet" is a note for this browser only. */
@@ -154,16 +155,106 @@ export async function pushCloud(prev: SaasState, next: SaasState): Promise<void>
   }
 }
 
-/** Deletes the whole workspace (owners only; the server checks), and its published files. */
-export async function deleteWorkspaceCloud(publicIds: string[]) {
-  if (!supabase || !workspaceId) return
-  for (const id of publicIds) await writeFile(id, { v: 1, gone: true }).catch(() => { /* best effort */ })
-  const { error } = await supabase.from('workspaces').delete().eq('id', workspaceId)
-  if (error) throw error
-  workspaceId = null
-  dbIds.clear()
-  await supabase.auth.updateUser({ data: { onboarded: false } })
-}
-
 /** A short random part for new project ids: they must be unique across every customer. */
 export const idSuffix = () => Array.from(crypto.getRandomValues(new Uint8Array(3)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 4)
+
+/* ---------- comments, reviewers and the installation check (panel side) ---------- */
+
+
+/** The project's database id, by its public id (null when it isn't on the server). */
+export const projectDbId = (publicId: string) => dbIds.get(publicId) ?? null
+
+interface ThreadRow {
+  id: string; page: string; anchor: Thread['anchor']; author_name: string; text: string; created_at: string; edited_at: string | null
+  resolved_at: string | null; resolved_by: string | null; replies: { id: string; author_name: string; text: string; created_at: string }[] | null
+}
+const rowToThread = (r: ThreadRow): Thread => ({
+  id: r.id, page: r.page, anchor: r.anchor, author: r.author_name, text: r.text, createdAt: r.created_at,
+  ...(r.edited_at ? { editedAt: r.edited_at } : {}),
+  ...(r.resolved_at ? { resolved: { by: r.resolved_by ?? '', at: r.resolved_at } } : {}),
+  replies: [...(r.replies ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((x) => ({ id: x.id, author: x.author_name, text: x.text, at: x.created_at })),
+})
+
+/** A project's comments for the panel's inbox: read and changed under the members' row level security. */
+export class PanelBackend implements Backend {
+  readonly where = 'Saved on the server'
+  private last = new Map<string, Thread>()
+  constructor(private publicId: string, private me: string) {}
+  private get id() { const id = dbIds.get(this.publicId); if (!id) throw new Error('This project isn’t on the server.'); return id }
+  async list() {
+    const { data, error } = await supabase!.from('threads').select('id, page, anchor, author_name, text, created_at, edited_at, resolved_at, resolved_by, replies(id, author_name, text, created_at)').eq('project_id', this.id).order('created_at')
+    if (error) throw error
+    const list = (data as ThreadRow[]).map(rowToThread)
+    this.last = new Map(list.map((t) => [t.id, t]))
+    return list
+  }
+  async upsert(t: Thread) {
+    const before = this.last.get(t.id)
+    if (!before) throw new Error('Comments are made on the site, not in the panel.')
+    if (!!t.resolved !== !!before.resolved) {
+      const { error } = await supabase!.from('threads').update({ resolved_at: t.resolved ? new Date().toISOString() : null, resolved_by: t.resolved ? this.me : null }).eq('id', t.id)
+      if (error) throw error
+    }
+    const had = new Set(before.replies.map((r) => r.id))
+    const { data: u } = await supabase!.auth.getUser()
+    for (const r of t.replies) {
+      if (had.has(r.id)) continue
+      const { error } = await supabase!.from('replies').insert({ thread_id: t.id, author_name: this.me, author_id: u.user?.id, text: r.text })
+      if (error) throw error
+    }
+    this.last.set(t.id, t)
+  }
+  async remove(id: string) {
+    const { error } = await supabase!.from('threads').delete().eq('id', id)
+    if (error) throw error
+    this.last.delete(id)
+  }
+  subscribe(cb: () => void) {
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') cb() }, 10_000)
+    return () => window.clearInterval(t)
+  }
+}
+
+/**
+ * A review link token from the server. Without days: one use, valid two minutes (to open the site
+ * yourself). With days: an invite for a person, valid that many days, on up to five devices.
+ */
+export async function createReviewLink(publicId: string, o: { preview?: boolean; name?: string; days?: number } = {}): Promise<string> {
+  const id = dbIds.get(publicId)
+  if (!id) throw new Error('This project isn’t on the server.')
+  const { data, error } = await supabase!.rpc('create_review_link', { p_project: id, p_preview: !!o.preview, p_name: o.name ?? null, p_days: o.days ?? null })
+  if (error) throw error
+  return data as string
+}
+
+export interface ReviewerRow { id: string; name: string; created_at: string; last_seen: string }
+export async function listReviewers(publicId: string): Promise<ReviewerRow[]> {
+  const id = dbIds.get(publicId)
+  if (!id) return []
+  const { data, error } = await supabase!.from('reviewers').select('id, name, created_at, last_seen').eq('project_id', id).order('last_seen', { ascending: false })
+  if (error) throw error
+  return data as ReviewerRow[]
+}
+export async function removeReviewer(id: string) {
+  const { error } = await supabase!.from('reviewers').delete().eq('id', id)
+  if (error) throw error
+}
+
+/** The most recent report from the script, on any site of the project. */
+export async function latestInstall(publicId: string): Promise<Seen | null> {
+  const id = dbIds.get(publicId)
+  if (!id) return null
+  const { data } = await supabase!.from('installs').select('host, last_seen, version, shown, why').eq('project_id', id).order('last_seen', { ascending: false }).limit(1)
+  const r = data?.[0]
+  return r ? { at: r.last_seen, host: r.host, page: '', version: r.version, shown: r.shown, why: r.why } : null
+}
+
+/** Deletes the account: its workspaces, projects and comments, and the login itself. */
+export async function deleteAccountCloud(publicIds: string[]) {
+  for (const id of publicIds) await writeFile(id, { v: 1, gone: true }).catch(() => { /* best effort */ })
+  const { error } = await supabase!.rpc('delete_my_account')
+  if (error) throw error
+  dbIds.clear()
+  workspaceId = null
+  await supabase!.auth.signOut()
+}

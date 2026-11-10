@@ -7,9 +7,10 @@ import { BRAND, PRODUCTS, productOf } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
 import { liveOf, openAsReviewer, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
-import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, refreshCloud, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
+import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
 import { cloud, supabase, authMessage } from '../../saas/supabase'
-import { deleteWorkspaceCloud } from '../../saas/cloud'
+import { PanelBackend, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
+import { inviteLink } from '../../saas/widget'
 import { LocalBackend, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
@@ -25,20 +26,22 @@ const ago = (iso: string) => {
 /** The snippet for a project: the script and the project id. The widget's settings live in the panel. */
 const snippetOf = (p: Project) => installSnippet(p.id)
 /** Opens the demo site as a reviewer of the project (the widget shows to reviewers only by default). */
-export const openDemo = (projectId: string, toast: (t: string, k?: 'error') => void) => { if (!openAsReviewer(projectId, demoUrl(projectId))) toast('Couldn’t open the review link: this browser’s storage is blocked.', 'error') }
+export const openDemo = (projectId: string, toast: (t: string, k?: 'error') => void) => { void openAsReviewer(projectId, demoUrl(projectId)).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') }) }
 /** "x min ago" for the panel. */
 export { ago }
 
 /** A project's comments. On this domain only, until shared projects exist: see the inbox note. */
-function useThreads(projectId: string | undefined) {
-  const backend = useMemo(() => (projectId ? new LocalBackend(projectId) : null), [projectId])
+function useThreads(projectId: string | undefined, me = 'You') {
+  // On the server: the project's comments from the database; in the demo: this browser's.
+  const backend = useMemo(() => (projectId ? (cloud ? new PanelBackend(projectId, me) : new LocalBackend(projectId)) : null), [projectId, me])
   const [threads, setThreads] = useState<Thread[]>([])
   useEffect(() => {
     if (!backend) { setThreads([]); return }
-    const load = () => void backend.list().then(setThreads)
+    const load = () => void backend.list().then(setThreads).catch(() => { /* keep what is shown; the next check retries */ })
     load()
     const off = backend.subscribe(load)
-    const iv = window.setInterval(load, 4000) // a tab of the demo site may have changed them
+    // A tab of the demo site may have changed them (the demo only; the server's backend checks by itself).
+    const iv = cloud ? 0 : window.setInterval(load, 4000)
     return () => { off(); clearInterval(iv) }
   }, [backend])
   return { threads, backend, reload: () => void backend?.list().then(setThreads) }
@@ -153,15 +156,15 @@ export function Overview() {
   const { s, project } = usePanel()
   const { toast } = useStore()
   const [params, setParams] = useSearchParams()
-  const { threads } = useThreads(project?.id)
+  const { threads } = useThreads(project?.id, s.account?.name)
   if (!project) return null
   const invited = s.invites.some((i) => i.projectId === project.id)
-  const seen = lastSeen(project.id)
+  const seen = cloud ? null : lastSeen(project.id)
   const steps = [
     { done: project.products.length > 0, label: 'Pick your tools', to: '/app/products' },
     { done: !!liveOf(project), label: 'Publish your widget settings', to: '/app/widget' },
     { done: !!project.copiedSnippet, label: 'Copy your snippet into your site', to: '/app/install' },
-    { done: !!seen, label: 'See the script running', to: '/app/install', hint: 'Shown once the script has loaded on the demo site in this browser' },
+    ...(cloud ? [] : [{ done: !!seen, label: 'See the script running', to: '/app/install', hint: 'Shown once the script has loaded on the demo site in this browser' }]),
     { done: threads.length > 0, label: 'Leave the first comment', to: '/app/install', hint: 'On your site, or on the demo site with this project' },
     { done: invited, label: 'Invite a teammate', to: '/app/team' },
   ]
@@ -269,10 +272,13 @@ export function Install() {
   const { project, setProject } = usePanel()
   const { toast } = useStore()
   const [guide, setGuide] = useState('html')
-  const [seen, setSeen] = useState(() => (project ? lastSeen(project.id) : null))
+  const [seen, setSeen] = useState(() => (project && !cloud ? lastSeen(project.id) : null))
   useEffect(() => {
     if (!project) return
-    const t = window.setInterval(() => setSeen(lastSeen(project.id)), 3000)
+    // On the server: what the script on any of the project's sites last reported.
+    const read = () => (cloud ? void latestInstall(project.id).then(setSeen).catch(() => { /* retried */ }) : setSeen(lastSeen(project.id)))
+    read()
+    const t = window.setInterval(read, cloud ? 15000 : 3000)
     return () => window.clearInterval(t)
   }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!project) return null
@@ -306,7 +312,7 @@ export function Install() {
               <p className="up-muted">{seen.shown ? 'The widget was shown.' : `The widget stayed hidden: ${seen.why}`}</p>
             </>
           ) : <p className="up-muted">Not seen yet. Open your site, or the demo site, after installing.</p>}
-          <p className="up-note">{cloud ? 'Until the script is connected to the server' : 'Beta without a server'}: this check only sees the demo site opened in this browser. Once it is, every site with your snippet reports here.</p>
+          <p className="up-note">{cloud ? 'Every site with your snippet reports here: right away when the widget shows, and now and then (a sample) when it stays hidden, so plain page views barely reach the server.' : 'Beta without a server: this check only sees the demo site opened in this browser.'}</p>
         </section>
       </div>
       <section className="up-card">
@@ -335,10 +341,10 @@ export function Install() {
 /* ---------- comments inbox ---------- */
 
 export function Comments() {
-  const { project } = usePanel()
+  const { s, project } = usePanel()
   const { toast } = useStore()
   const [params, setParams] = useSearchParams()
-  const { threads, backend, reload } = useThreads(project?.id)
+  const { threads, backend, reload } = useThreads(project?.id, s.account?.name)
   const [q, setQ] = useState('')
   const [deleting, setDeleting] = useState<Thread | null>(null)
   const status = (params.get('status') ?? 'all') as Status | 'all'
@@ -376,9 +382,9 @@ export function Comments() {
                   {t.resolved
                     ? <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: undefined }, 'Reopened')}><RotateCcw size={13} /> Reopen</button>
                     : <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: { by: 'panel', at: new Date().toISOString() } }, 'Set as completed')}><Check size={13} /> Set as completed</button>}
-                  {url ? (t.page.startsWith('/embed-demo.html')
-                    ? <button className="lp-btn sm ghost" onClick={() => { if (!openAsReviewer(project.id, url)) toast('Couldn’t open the review link.', 'error') }} title="Opens the page as a reviewer">Open on site <ExternalLink size={12} /></button>
-                    // Review links on your own site need the server; until then this opens the page as it is.
+                  {url ? (cloud || t.page.startsWith('/embed-demo.html')
+                    ? <button className="lp-btn sm ghost" onClick={() => void openAsReviewer(project.id, url).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })} title="Opens the page as a reviewer">Open on site <ExternalLink size={12} /></button>
+                    // In the browser-only demo, review links work on the demo site only: this opens the page as it is.
                     : <a className="lp-btn sm ghost" href={url} target="_blank" rel="noopener" title="Opens the page. Signing in as a reviewer there needs the server.">Open on site <ExternalLink size={12} /></a>) : <span className="up-muted" title="Add the site address in Settings">No site address</span>}
                   <span className="lp-grow" />
                   <button className="lp-btn sm ghost danger" onClick={() => setDeleting(t)} aria-label="Delete comment"><Trash2 size={13} /></button>
@@ -414,7 +420,9 @@ export function Team() {
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Team</h1><p>People who review “{project.name}”.</p></div></div>
-      <p className="up-note">No emails are sent yet: invites are {cloud ? 'saved on the server and ' : ''}kept as pending until shared projects arrive. Until then, teammates can comment on your site with the snippet, under their own name.</p>
+      {cloud && <Reviewers />}
+      <h2 className="up-sub">Panel access</h2>
+      <p className="up-note">Teammates who manage the project in this panel. No emails are sent yet: these invites are {cloud ? 'saved on the server and ' : ''}kept as pending until shared workspaces arrive.{cloud ? ' To let someone comment on your site, use a review link above.' : ' Until then, teammates can comment on your site with the snippet, under their own name.'}</p>
       <section className="up-card">
         <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); invite() }} noValidate>
           <input className="up-search grow" type="email" value={email} onChange={(ev) => setEmail(ev.target.value)} placeholder="teammate@company.com" aria-label="Email" aria-invalid={tried && !!problem} />
@@ -485,10 +493,12 @@ export function SettingsPage() {
       <section className="up-card danger">
         <h2>Danger zone</h2>
         {project && <div className="up-row"><span className="lp-grow">Delete “{project.name}”: its settings and invites. Comments saved on sites stay there.</span><button className="lp-btn sm danger" onClick={() => { setTyped(''); setConfirm('project') }}>Delete project</button></div>}
-        <div className="up-row"><span className="lp-grow">Delete this demo workspace from this browser: your account, every project and invite.</span><button className="lp-btn sm danger" onClick={() => { setTyped(''); setConfirm('account') }}>Delete workspace</button></div>
+        <div className="up-row"><span className="lp-grow">{cloud
+          ? 'Delete your account: the login, the workspace, every project, comment and reviewer. Snippets left on sites show nothing.'
+          : 'Delete this demo workspace from this browser: your account, every project and invite.'}</span><button className="lp-btn sm danger" onClick={() => { setTyped(''); setConfirm('account') }}>{cloud ? 'Delete account' : 'Delete workspace'}</button></div>
       </section>
       {confirm && (
-        <Modal title={confirm === 'project' ? `Delete “${project?.name}”?` : 'Delete this workspace?'} description={confirm === 'project' ? `Type the project id (${project?.id}) to confirm.` : 'Type DELETE to confirm. This can’t be undone.'} onClose={() => setConfirm(null)}
+        <Modal title={confirm === 'project' ? `Delete “${project?.name}”?` : cloud ? 'Delete your account?' : 'Delete this workspace?'} description={confirm === 'project' ? `Type the project id (${project?.id}) to confirm.` : 'Type DELETE to confirm. This can’t be undone.'} onClose={() => setConfirm(null)}
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Keep it</button>
             <button className="btn primary" disabled={typed !== (confirm === 'project' ? project?.id : 'DELETE')} onClick={() => {
               if (confirm === 'project' && project) {
@@ -497,10 +507,10 @@ export function SettingsPage() {
                 toast('Project deleted'); setConfirm(null); nav('/app')
               } else {
                 if (cloud) {
-                  // On the server: the workspace, its projects and comments go; installed snippets show nothing.
+                  // On the server: the login, the workspace, its projects and comments go; installed snippets show nothing.
                   const ids = s.projects.map((p) => p.id)
                   setConfirm(null)
-                  void deleteWorkspaceCloud(ids).then(() => { for (const id of ids) unserveProject(id); toast('Workspace deleted'); return refreshCloud() })
+                  void deleteAccountCloud(ids).then(() => leave('/landingpage', () => toast('Your account was deleted')))
                     .catch((e) => toast(`Not deleted: ${e?.message ?? 'the server refused'}`, 'error'))
                   return
                 }
@@ -571,3 +581,56 @@ function PasswordCard() {
     </section>
   )
 }
+
+/**
+ * Reviewers: people who comment on the site (your client, testers). Each gets an invite link: the
+ * site's address with a token valid seven days, on up to five devices. The link is copied and sent
+ * by you (email, chat); no email is sent from here yet.
+ */
+function Reviewers() {
+  const { project } = usePanel()
+  const { toast } = useStore()
+  const [rows, setRows] = useState<ReviewerRow[]>([])
+  const [name, setName] = useState('')
+  const [link, setLink] = useState<{ name: string; url: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const site = project?.siteUrl ?? ''
+  const load = () => { if (project) void listReviewers(project.id).then(setRows).catch(() => { /* retried on the next visit */ }) }
+  useEffect(load, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!project) return null
+  const make = async (target: string) => {
+    if (!name.trim() || busy) return
+    setBusy(true)
+    try { setLink({ name: name.trim(), url: await inviteLink(project.id, target, name.trim()) }); setName('') }
+    catch (e) { toast(`Couldn’t make the link: ${(e as Error).message}`, 'error') }
+    finally { setBusy(false) }
+  }
+  return (
+    <section className="up-card">
+      <h2>Reviewers</h2>
+      <p className="up-muted">People who comment on your site, like your client. Make a link for each person and send it to them yourself (email, WhatsApp). It works for 7 days, on up to 5 of their devices; after that they stay a reviewer in that browser.</p>
+      <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); void make(site || demoUrl(project.id)) }}>
+        <input className="up-search grow" value={name} onChange={(ev) => setName(ev.target.value)} maxLength={80} placeholder="Their name, e.g. Pak Budi" aria-label="Reviewer name" />
+        <button className="lp-btn primary" type="submit" disabled={!name.trim() || busy}><Plus size={14} /> {site ? 'Make link for your site' : 'Make link (demo site)'}</button>
+        {site && <button className="lp-btn" type="button" disabled={!name.trim() || busy} onClick={() => void make(demoUrl(project.id))}>For the demo site</button>}
+      </form>
+      {!site && <p className="up-hint">Add your site address in Settings to make links for your own site.</p>}
+      {link && (
+        <div className="up-linkbox">
+          <p>Link for <b>{link.name}</b>:</p>
+          <pre className="up-code">{link.url}</pre>
+          <button className="lp-btn sm" onClick={() => void copyText(link.url).then((ok) => toast(ok ? 'Link copied' : 'Copy failed. Select and copy it by hand.', ok ? undefined : 'error'))}><Copy size={13} /> Copy link</button>
+          <p className="up-hint">The snippet must be on that page, and its environment switched on in Widget → Where.</p>
+        </div>
+      )}
+      <ul className="up-people">
+        {rows.map((r) => (
+          <li key={r.id} className="up-card"><span className="up-avatar muted">{r.name[0]?.toUpperCase()}</span><span className="lp-grow"><b>{r.name}</b><small>Reviewer · last seen {ago(r.last_seen)}</small></span>
+            <button className="lp-btn sm ghost" onClick={() => void removeReviewer(r.id).then(() => { toast(`${r.name} can no longer comment`); load() }).catch(() => toast('Couldn’t remove. Try again.', 'error'))} aria-label={`Remove ${r.name}`}><X size={14} /></button></li>
+        ))}
+        {!rows.length && <li className="up-muted">No reviewers yet.</li>}
+      </ul>
+    </section>
+  )
+}
+
