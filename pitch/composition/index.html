@@ -1,0 +1,299 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Vibe Collab pitch</title>
+<style>
+:root{--bg:#f6f2ea;--paper:#fffdf8;--ink:#16130f;--mute:#6b6358;--line:#d9d1c3;--accent:#e8590c;--accent2:#ffd8bf;--green:#2f9e44;--red:#e03131;--blue:#3b5bdb}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg)}
+body{font-family:Inter,system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+#stage{position:absolute;inset:0;overflow:hidden;background:radial-gradient(circle at 1px 1px,rgba(22,19,15,.09) 1.2px,transparent 1.6px) 0 0/32px 32px,var(--bg)}
+.scene{position:absolute;inset:0;opacity:0;will-change:opacity,transform}
+.abs{position:absolute}
+.mono{font-family:'JetBrains Mono','DejaVu Sans Mono',monospace}
+.mark{display:inline-grid;place-items:center;border-radius:22%;background:var(--accent);color:#fff;border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink)}
+.chip{display:inline-flex;align-items:center;gap:10px;border:2px solid var(--ink);border-radius:999px;padding:8px 18px;background:var(--paper);font-weight:600;font-size:22px}
+.card{background:var(--paper);border:2.5px solid var(--ink);border-radius:20px;box-shadow:8px 8px 0 var(--ink)}
+/* browser frame */
+.frame{position:absolute;left:600px;top:118px;width:1240px;background:var(--paper);border:2.5px solid var(--ink);border-radius:18px;box-shadow:10px 10px 0 var(--ink);overflow:hidden}
+.bar{height:42px;border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:9px;padding:0 16px;background:#efe8dc}
+.bar i{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--ink);background:#fff;display:block}
+.bar .url{margin-left:18px;flex:1;height:26px;border-radius:8px;border:1.5px solid var(--line);background:#fff;font:500 15px/24px Inter;color:var(--mute);padding:0 12px;white-space:nowrap;overflow:hidden}
+.vp{position:relative;width:1235px;height:772px;overflow:hidden;background:#fff}
+.vp img{position:absolute;left:0;top:0;width:1235px;height:772px;transform-origin:0 0;opacity:0}
+/* left column */
+.side{position:absolute;left:80px;top:150px;width:470px}
+.kicker{font:700 20px/1 Inter;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:22px}
+.title{font:800 54px/1.06 Inter;letter-spacing:-.025em;margin-bottom:40px}
+.bul{display:flex;gap:16px;align-items:flex-start;font:600 27px/1.25 Inter;margin-bottom:24px;opacity:0}
+.bul b{flex:none;width:34px;height:34px;border-radius:10px;border:2px solid var(--ink);background:var(--accent2);display:grid;place-items:center;font:800 17px/1 Inter;margin-top:-1px}
+.bul.on b{background:var(--accent);color:#fff}
+.call{position:absolute;padding:10px 18px;border-radius:12px;background:var(--ink);color:#fff;font:700 24px/1.1 Inter;white-space:nowrap;opacity:0;box-shadow:5px 5px 0 var(--accent)}
+.call.o{background:var(--accent);box-shadow:5px 5px 0 var(--ink)}
+/* captions */
+#cap{position:absolute;left:0;right:0;bottom:30px;text-align:center;pointer-events:none}
+#cap span{display:inline-block;max-width:1500px;background:rgba(22,19,15,.86);color:#fff;font:500 29px/1.35 Inter;padding:9px 22px;border-radius:12px}
+#prog{position:absolute;left:0;bottom:0;height:6px;background:var(--accent)}
+/* s1 */
+.big{font:800 108px/1.02 Inter;letter-spacing:-.035em}
+.prompt{width:900px;padding:26px 30px;font:500 32px/1.3 Inter}
+.code{white-space:pre-wrap;font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;background:#1d1a16;color:#e9e1d3;border:2.5px solid var(--ink);border-radius:18px;box-shadow:8px 8px 0 var(--accent);padding:26px 30px;font:500 22px/1.65 'JetBrains Mono',monospace;overflow:hidden}
+.code .k{color:#ff9e64}.code .s{color:#a9dc76}.code .c{color:#8a8173}
+/* s2 chat */
+.chat{left:150px;top:110px;width:760px;height:800px;padding:0;overflow:hidden}
+.chat .hd{height:78px;border-bottom:2.5px solid var(--ink);display:flex;align-items:center;gap:16px;padding:0 26px;font:700 26px Inter;background:#efe8dc}
+.av{width:44px;height:44px;border-radius:50%;border:2px solid var(--ink);display:grid;place-items:center;font:800 18px Inter;color:#fff}
+.msg{position:absolute;max-width:560px;padding:14px 20px;border-radius:18px;border:2px solid var(--ink);font:500 25px/1.3 Inter;opacity:0;background:#fff}
+.msg.me{background:#ffe8d6}
+.msg small{display:block;font:700 16px Inter;color:var(--mute);margin-bottom:4px}
+.q{font:800 76px/1.1 Inter;letter-spacing:-.03em;opacity:0}
+.strike{position:absolute;height:8px;background:var(--red);border-radius:4px;transform-origin:0 50%}
+</style></head>
+<body><div id="stage">
+
+<!-- S1 hook -->
+<div class="scene" id="s1">
+  <div class="abs big" id="s1a" style="left:150px;top:150px">Anyone can build an app</div>
+  <div class="abs big" id="s1b" style="left:150px;top:265px;color:var(--accent)">in an afternoon.</div>
+  <div class="abs card prompt" id="s1p" style="left:150px;top:470px"><span style="color:var(--mute);font-weight:700;font-size:20px;letter-spacing:.1em">YOU DESCRIBE IT</span><br><span id="s1t"></span><span id="s1c" style="border-left:3px solid var(--ink);margin-left:2px"></span></div>
+  <div class="abs code" id="s1code" style="left:1110px;top:430px;width:680px;height:440px"></div>
+  <div class="abs" id="s1site" style="left:1090px;top:420px;width:700px;height:437px;border:2.5px solid var(--ink);border-radius:18px;overflow:hidden;box-shadow:10px 10px 0 var(--ink);opacity:0;background:#fff">
+    <img src="../shots/site-widget.png" style="position:absolute;left:0;top:0;width:1120px;height:700px">
+  </div>
+  <div class="abs chip" id="s1chip" style="left:1090px;top:885px;opacity:0"><span style="width:12px;height:12px;border-radius:50%;background:var(--green)"></span>AI writes the code. It's live.</div>
+</div>
+
+<!-- S2 problem -->
+<div class="scene" id="s2">
+  <div class="abs card chat">
+    <div class="hd"><div class="av" style="background:var(--blue)">TB</div>Toko Budi · feedback<span style="margin-left:auto;font:600 18px Inter;color:var(--mute)">group chat</span></div>
+    <div class="msg" id="m1" style="left:26px;top:105px"><small>Client</small><img src="../shots/site-pins.png" style="width:330px;border-radius:10px;border:1.5px solid var(--line);display:block;margin:2px 0 8px"> the button looks off??</div>
+    <div class="msg me" id="m2" style="right:26px;top:430px"><small>You</small>which button? which page?</div>
+    <div class="msg" id="m3" style="left:26px;top:525px"><small>Client</small>the one on mobile. the orange one</div>
+    <div class="msg me" id="m4" style="right:26px;top:620px"><small>You</small>before or after today's 3rd deploy? 😅</div>
+    <div class="msg" id="m5" style="left:26px;top:715px"><small>Designer</small>also the font. see screenshot_final_v2.png</div>
+  </div>
+  <div class="abs" style="left:1010px;top:170px">
+    <div class="q" id="q1">Which page?</div>
+    <div class="q" id="q2">Which button?</div>
+    <div class="q" id="q3">Which version?</div>
+  </div>
+  <div class="abs code" id="s2code" style="left:1010px;top:560px;width:780px;height:300px;opacity:0"></div>
+  <div class="abs chip" id="s2gone" style="left:1250px;top:820px;opacity:0;background:var(--red);color:#fff;border-color:var(--ink);font-size:26px">AI rewrote it. Context: gone.</div>
+</div>
+
+<!-- S3 solution -->
+<div class="scene" id="s3">
+  <div class="abs" id="s3logo" style="left:0;right:0;top:170px;text-align:center">
+    <span class="mark" style="width:128px;height:128px;vertical-align:middle"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></svg></span>
+    <span style="font:800 120px/1 Inter;letter-spacing:-.04em;vertical-align:middle;margin-left:34px">Vibe Collab</span>
+  </div>
+  <div class="abs" id="s3tag" style="left:0;right:0;top:360px;text-align:center;font:600 46px/1.2 Inter;color:var(--mute)">The <span style="color:var(--ink);background:linear-gradient(transparent 60%,var(--accent2) 60%)">review layer</span> for vibe-coded products.</div>
+  <div class="abs code" id="s3code" style="left:260px;top:500px;width:1400px;padding:30px 36px;font-size:27px;opacity:0"><span class="c">&lt;&zwnj;!&zwnj;-&zwnj;- one line, on any site -&zwnj;-&zwnj;&gt;</span><br><span id="s3t"></span></div>
+  <div class="abs" id="s3chips" style="left:0;right:0;top:760px;text-align:center;opacity:0">
+    <span class="chip" style="font-size:28px;margin:0 10px">Built with Claude</span>
+    <span class="chip" style="font-size:28px;margin:0 10px">Lovable</span>
+    <span class="chip" style="font-size:28px;margin:0 10px">or by hand</span>
+  </div>
+</div>
+
+<!-- screen scenes: filled by JS -->
+<div class="scene" id="s4"></div>
+<div class="scene" id="s5"></div>
+<div class="scene" id="s6"></div>
+<div class="scene" id="s7"></div>
+
+<!-- S8 trust -->
+<div class="scene" id="s8">
+  <div class="abs" style="left:0;right:0;top:120px;text-align:center"><div class="kicker" style="margin-bottom:18px">Trust by design</div><div class="title" style="font-size:66px">Built to live on other people's sites.</div></div>
+  <div class="abs card t8" style="left:150px;top:390px;width:500px;height:400px;padding:40px;opacity:0"><div class="mark" style="width:76px;height:76px;font:800 34px Inter;box-shadow:4px 4px 0 var(--ink)">⬚</div><div style="font:800 40px/1.1 Inter;margin:30px 0 16px">Isolated</div><div style="font:500 26px/1.35 Inter;color:var(--mute)">Runs in its own shadow root. It can't break the host page, and the page can't break it.</div></div>
+  <div class="abs card t8" style="left:710px;top:390px;width:500px;height:400px;padding:40px;opacity:0"><div class="mark" style="width:76px;height:76px;font:800 34px Inter;box-shadow:4px 4px 0 var(--ink)">⌨</div><div style="font:800 40px/1.1 Inter;margin:30px 0 16px">Never reads typing</div><div style="font:500 26px/1.35 Inter;color:var(--mute)">Field values on the host site are never read or recorded.</div></div>
+  <div class="abs card t8" style="left:1270px;top:390px;width:500px;height:400px;padding:40px;opacity:0"><div class="mark" style="width:76px;height:76px;font:800 34px Inter;box-shadow:4px 4px 0 var(--ink)">✓</div><div style="font:800 40px/1.1 Inter;margin:30px 0 16px">Every request checked</div><div style="font:500 26px/1.35 Inter;color:var(--mute)">Origin, reviewer and rate limit on the server, with row-level security on every table.</div></div>
+</div>
+
+<!-- S9 close -->
+<div class="scene" id="s9">
+  <div class="abs" id="s9logo" style="left:0;right:0;top:190px;text-align:center">
+    <span class="mark" style="width:110px;height:110px;vertical-align:middle"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></svg></span>
+    <span style="font:800 104px/1 Inter;letter-spacing:-.04em;vertical-align:middle;margin-left:30px">Vibe Collab</span>
+  </div>
+  <div class="abs" id="s9tag" style="left:0;right:0;top:360px;text-align:center;font:800 64px/1.15 Inter;letter-spacing:-.03em">Review what you vibe-coded, <span style="color:var(--accent)">together.</span></div>
+  <div class="abs" style="left:0;right:0;top:530px;text-align:center">
+    <span class="chip s9c" style="font-size:30px;padding:14px 26px;margin:0 12px;opacity:0"><span style="width:14px;height:14px;border-radius:50%;background:var(--green)"></span>Beta is live</span>
+    <span class="chip s9c" style="font-size:30px;padding:14px 26px;margin:0 12px;opacity:0;background:var(--accent2)">Next: AI that fixes what reviewers find</span>
+  </div>
+  <div class="abs" id="s9cta" style="left:0;right:0;top:680px;text-align:center;opacity:0">
+    <span style="display:inline-block;background:var(--ink);color:#fff;font:800 52px/1 Inter;padding:26px 50px;border-radius:20px;box-shadow:8px 8px 0 var(--accent)">Let's talk.</span>
+    <div style="margin-top:34px;font:600 30px Inter;color:var(--mute)">whatvibecodingcando.vercel.app</div>
+  </div>
+</div>
+
+<div id="cap"><span id="capt"></span></div>
+<div id="prog"></div>
+</div>
+
+<script>
+const DURS=[7.37,14.09,10.22,16.50,15.84,11.75,17.28,9.97,9.80], LEAD=0.6, GAP=0.7, TOTAL=120, XF=0.4
+const START=[]; {let t=LEAD; for(const d of DURS){START.push(t); t+=d+GAP}}
+window.TIMING={START,DURS,TOTAL}
+const NARR=[
+ ["Today, anyone can build an app in an afternoon.","You describe it, and AI writes the code."],
+ ["But shipping it right is still a team sport.","Feedback arrives as screenshots in a chat.","Nobody knows which page, which button, which version.","And when the AI rewrites the code, the context is gone."],
+ ["Meet Vibe Collab: the review layer for vibe-coded products.","One line of code adds it to any site, built with Claude, Lovable, or by hand."],
+ ["Paste the snippet once.","Everything else lives in the panel: who sees the widget, where it runs, from production to previews, and how it looks.","Draft, preview, publish, roll back.","One switch turns it off everywhere."],
+ ["Invite your client with a link.","They open your real site, click anything, and leave a comment pinned to that exact element.","No account, no plugin.","It lands in your inbox, with the page and the person."],
+ ["Your dashboard shows what is open, what is done, and which pages hurt most.","Share the whole list with your team in one link: read-only, and revocable."],
+ ["And feedback is only the start.","The same platform runs UX research: heatmaps, session paths, usability tests, even webcam eye tracking.","Fifteen tools, already working in our demo."],
+ ["It is built to live on other people's sites:","isolated from the host page, it never reads what visitors type, and the server checks every request."],
+ ["Vibe Collab. Review what you vibe-coded, together.","Our beta is live.","Next, AI that fixes what your reviewers find.","Let's talk."],
+]
+// caption cues: split each clip by character share (with a small weight per sentence for pauses)
+const CUES=[]; NARR.forEach((ss,i)=>{const w=ss.map(s=>s.length+14), W=w.reduce((a,b)=>a+b,0); let t=START[i]; ss.forEach((s,k)=>{const d=DURS[i]*w[k]/W; CUES.push([t,t+d,s]); t+=d})})
+
+const $=id=>document.getElementById(id)
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x))
+const eio=x=>{x=cl(x);return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2}
+const eo=x=>1-Math.pow(1-cl(x),3)
+const back=x=>{x=cl(x);const c1=1.6,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)}
+const lin=(t,a,b)=>cl((t-a)/(b-a))
+// window opacity: fade in at a, out at b
+const win=(t,a,b,fi=.35,fo=.35)=>Math.min(lin(t,a,a+fi), b>=999?1:1-lin(t,b-fo,b))
+function pop(el,t,a,b=999,dy=24){const o=win(t,a,b,.4,.3); const p=back(lin(t,a,a+.5)); el.style.opacity=o; el.style.transform=`translateY(${(1-p)*dy}px) scale(${.92+.08*p})`}
+
+/* ---------- screen scenes ---------- */
+const W=1235,H=772
+const SCREENS={
+ s4:{kicker:'01 · Install once',title:'One snippet. The rest lives in the panel.',
+   bullets:[[0,'Paste the snippet once'],[.22,'Who sees it, where it runs'],[.58,'Draft · Preview · Publish · Roll back'],[.82,'One switch: off everywhere']],
+   shots:[
+    {img:'install',url:'whatvibecodingcando.vercel.app/#/app/install',a:0,b:.24,f:[.37,.33,1.55],g:[.37,.36,1.7]},
+    {img:'widget-builder',url:'whatvibecodingcando.vercel.app/#/app/widget',a:.24,b:.58,f:[.38,.55,1.45],g:[.38,.78,1.6]},
+    {img:'widget-builder',url:'whatvibecodingcando.vercel.app/#/app/widget',a:.58,b:.82,f:[.76,.4,1.5],g:[.78,.3,1.65]},
+    {img:'widget-builder',url:'whatvibecodingcando.vercel.app/#/app/widget',a:.82,b:1.01,f:[.42,.3,1.7],g:[.5,.3,2.1]},
+   ],
+   calls:[[.06,.24,'Same snippet forever',.06,.82,'o'],[.32,.58,'Reviewers only by default',.55,.12],[.45,.58,'Production → previews',.55,.86],[.62,.82,'Publish v2 · roll back any time',.06,.86,'o'],[.86,1.01,'Widget off = gone from every site',.06,.86,'o']]},
+ s5:{kicker:'02 · Reviewers',title:'Clients comment on the real site.',
+   bullets:[[0,'Invite with a link'],[.2,'Pinned to the exact element'],[.55,'No account, no plugin'],[.74,'Lands in your inbox']],
+   shots:[
+    {img:'team-invite',url:'whatvibecodingcando.vercel.app/#/app/team',a:0,b:.2,f:[.55,.38,1.5],g:[.55,.44,1.65]},
+    {img:'site-draft',url:'tokobudi.test/  ·  your client’s browser',a:.2,b:.44,f:[.28,.5,1.6],g:[.3,.55,1.8]},
+    {img:'site-thread',url:'tokobudi.test/',a:.44,b:.72,f:[.3,.3,1.45],g:[.34,.33,1.7]},
+    {img:'inbox',url:'whatvibecodingcando.vercel.app/#/app/comments',a:.72,b:1.01,f:[.42,.35,1.3],g:[.42,.55,1.35]},
+   ],
+   calls:[[.05,.2,'Link works for 7 days',.58,.82,'o'],[.26,.44,'Click anything → comment',.55,.14,'o'],[.5,.72,'Open · Ongoing · Completed',.55,.84],[.78,1.01,'Page + person + version',.55,.12,'o']]},
+ s6:{kicker:'03 · Dashboard & sharing',title:'Know what’s open, what’s done.',
+   bullets:[[0,'Every project, its own dashboard'],[.18,'Pages that hurt most'],[.52,'Share in one link'],[.74,'Read-only, revocable']],
+   shots:[
+    {img:'dashboard',url:'whatvibecodingcando.vercel.app/#/app',a:0,b:.5,f:[.58,.3,1.3],g:[.6,.62,1.42]},
+    {img:'share-modal',url:'whatvibecodingcando.vercel.app/#/app/comments',a:.5,b:.74,f:[.5,.45,1.45],g:[.5,.6,1.55]},
+    {img:'share-page',url:'whatvibecodingcando.vercel.app/#/share/f2d0…',a:.74,b:1.01,f:[.45,.3,1.4],g:[.45,.5,1.45]},
+   ],
+   calls:[[.08,.5,'Numbers counted on the server',.06,.86,'o'],[.58,.74,'7 days · 30 days · no expiry',.55,.86],[.8,1.01,'No account needed to read',.55,.12,'o']]},
+ s7:{kicker:'04 · Research suite',title:'Feedback is only the start.',
+   bullets:[[.08,'Heatmaps'],[.3,'Session paths'],[.44,'Usability tests'],[.56,'Webcam eye tracking']],
+   shots:[
+    {img:'research-heatmap',url:'whatvibecodingcando.vercel.app/#/console/heatmap',a:0,b:.3,f:[.45,.75,1.5],g:[.42,.8,1.7]},
+    {img:'research-tests',url:'whatvibecodingcando.vercel.app/#/console/tests',a:.3,b:.5,f:[.4,.4,1.4],g:[.4,.35,1.55]},
+    {img:'research-eyes',url:'whatvibecodingcando.vercel.app/#/console/heatmap',a:.5,b:.72,f:[.6,.82,1.7],g:[.6,.82,1.95]},
+    {img:'onboarding-tools',url:'whatvibecodingcando.vercel.app/#/app/onboarding',a:.72,b:1.01,f:[.5,.5,1.15],g:[.5,.55,1.3]},
+   ],
+   calls:[[.1,.3,'Where first clicks went',.55,.12,'o'],[.55,.72,'Gaze stays in the browser',.06,.12,'o'],[.78,1.01,'15 tools · pick what you need',.55,.12,'o']]},
+}
+function buildScreen(id,cfg){
+  const s=$(id)
+  let h=`<div class="side"><div class="kicker">${cfg.kicker}</div><div class="title">${cfg.title}</div>`
+  cfg.bullets.forEach((b,i)=>h+=`<div class="bul" data-i="${i}"><b>${i+1}</b><span>${b[1]}</span></div>`)
+  h+=`</div><div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url"></div></div><div class="vp">`
+  cfg.shots.forEach(sh=>h+=`<img src="../shots/${sh.img}.png">`)
+  cfg.calls.forEach(c=>h+=`<div class="call ${c[5]||''}">${c[2]}</div>`)
+  h+=`</div></div>`
+  s.innerHTML=h
+  cfg.el={side:s.querySelector('.side'),frame:s.querySelector('.frame'),url:s.querySelector('.url'),imgs:[...s.querySelectorAll('.vp img')],calls:[...s.querySelectorAll('.call')],buls:[...s.querySelectorAll('.bul')]}
+}
+for(const k in SCREENS) buildScreen(k,SCREENS[k])
+function kb(img,x,y,z){let tx=W/2-x*W*z, ty=H/2-y*H*z; tx=cl(tx,W-W*z,0); ty=cl(ty,H-H*z,0); img.style.transform=`translate(${tx}px,${ty}px) scale(${z})`}
+function renderScreen(cfg,lt,D){
+  const p=lt/D, e=cfg.el
+  // entry
+  const ent=eo(lin(lt,-.3,.6))
+  e.frame.style.transform=`translateX(${(1-ent)*80}px)`; e.side.style.transform=`translateX(${(1-ent)*-40}px)`
+  let cur=null
+  cfg.shots.forEach((sh,i)=>{
+    const a=sh.a*D, b=sh.b*D, img=e.imgs[i]
+    const o= i===0? (lt<b-XF/2?1:1-lin(lt,b-XF/2,b+XF/2)) : Math.min(lin(lt,a-XF/2,a+XF/2), sh.b>1?1:1-lin(lt,b-XF/2,b+XF/2))
+    img.style.opacity=o
+    if(o>0){const k=eio(lin(lt,a-XF/2,b+XF/2)); kb(img,sh.f[0]+(sh.g[0]-sh.f[0])*k,sh.f[1]+(sh.g[1]-sh.f[1])*k,sh.f[2]+(sh.g[2]-sh.f[2])*k)}
+    if(lt>=a-XF/2) cur=sh
+  })
+  if(cur) e.url.textContent='https://'+cur.url.replace(/^https:\/\//,'')
+  cfg.calls.forEach((c,i)=>{const el=e.calls[i]; el.style.left=(c[3]*W)+'px'; el.style.top=(c[4]*H)+'px'; pop(el,lt,c[0]*D+.25,c[1]*D-.1,18)})
+  cfg.bullets.forEach((b,i)=>{const el=e.buls[i]; const a=b[0]*D+(i===0?.3:0); const nx=i+1<cfg.bullets.length?cfg.bullets[i+1][0]*D:1e9
+    const o=lin(lt,a,a+.4); el.style.opacity=.25+.75*o*(lt<nx?1:.62); el.style.transform=`translateX(${(1-eo(lin(lt,a,a+.5)))*-24}px)`; el.classList.toggle('on',lt>=a&&lt<nx); if(lt<a) el.style.opacity=0})
+}
+
+/* ---------- S1 ---------- */
+const CODE1=[['<span class="k">export default function</span> Shop() {'],['  <span class="k">const</span> [cart, setCart] = useState([])'],['  <span class="k">return</span> ('],['    &lt;Hero title=<span class="s">"Kopi Gayo"</span> price={89000} /&gt;'],['    &lt;Grid items={coffees} onAdd={add} /&gt;'],['    &lt;Checkout cart={cart} /&gt;'],['  )'],['}'],[''],['<span class="c">// generated in 41 seconds</span>'],['<span class="k">function</span> add(item) {'],['  setCart(c =&gt; [...c, item])'],['}'],['<span class="k">const</span> coffees = ['],['  { name: <span class="s">"Kintamani"</span>, price: 79000 },'],['  { name: <span class="s">"Toraja Sapan"</span>, price: 95000 },'],['  { name: <span class="s">"Flores Bajawa"</span>, price: 85000 },'],[']']]
+const PROMPT1='Build an online coffee shop for Toko Budi, with a cart and checkout.'
+function r1(lt,D){
+  pop($('s1a'),lt,.1,999,30); pop($('s1b'),lt,.6,999,30)
+  const pp=lin(lt,1.6,2.2); $('s1p').style.opacity=pp; $('s1p').style.transform=`translateY(${(1-eo(pp))*30}px)`
+  const n=Math.floor(cl((lt-2.2)/1.9)*PROMPT1.length); $('s1t').textContent=PROMPT1.slice(0,n); $('s1c').style.opacity=(Math.floor(lt*2.5)%2)?1:0
+  const c=$('s1code'); const lines=Math.floor(cl((lt-3.7)/1.7)*11); c.innerHTML=CODE1.slice(0,lines).map(l=>l[0]).join('<br>')
+  c.style.opacity=Math.min(lin(lt,3.4,3.8),1-lin(lt,5.4,5.8))
+  const so=lin(lt,5.4,5.9); $('s1site').style.opacity=so; $('s1site').style.transform=`scale(${.9+.1*back(lin(lt,5.4,6.1))})`
+  $('s1site').querySelector('img').style.transform=`translate(${-lin(lt,5.4,D+1)*60}px,0)`
+  pop($('s1chip'),lt,6.0,999,20)
+}
+/* ---------- S2 ---------- */
+const CODE2=['<span class="k">function</span> BuyButton() {','  <span class="k">return</span> &lt;Button size=<span class="s">"lg"</span> /&gt;','}']
+const CODE2B=['<span class="k">const</span> Cta = styled.a`','  padding: 12px 28px;','`  <span class="c">// AI refactor #14</span>']
+function r2(lt,D){
+  const ts=[.4,2.4,3.6,4.6,5.6]; ts.forEach((a,i)=>pop($('m'+(i+1)),lt,a,999,20))
+  ;['q1','q2','q3'].forEach((q,i)=>{const a=5.3+i*1.15; const el=$(q); el.style.opacity=lin(lt,a,a+.3); el.style.transform=`translateX(${(1-eo(lin(lt,a,a+.4)))*40}px)`; el.style.color=lt>a+1.15||i==2?'var(--ink)':'var(--accent)'})
+  const c=$('s2code'); c.style.opacity=lin(lt,9.2,9.6)
+  const sw=lt>10.6; c.innerHTML=(sw?CODE2B:CODE2).join('<br>')
+  c.style.transform=`translateX(${(lt>10.4&&lt<10.8)?Math.sin(lt*90)*8:0}px)`
+  pop($('s2gone'),lt,11.3,999,20)
+}
+/* ---------- S3 ---------- */
+const SNIP='<script src="https://whatvibecodingcando.vercel.app/embed/vibe.js" data-project="toko-budi" defer><\/script>'
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+const TOK=SNIP.split(/(src=|data-project=|defer|"[^"]*")/).filter(Boolean).map(x=>[x, /^"/.test(x)?'s':/^(src=|data-project=|defer)$/.test(x)?'k':''])
+function hl(s){let n=s.length,out='';for(const [x,c] of TOK){if(n<=0)break;const p=x.slice(0,n);n-=x.length;out+=c?`<span class="${c}">${esc(p)}</span>`:esc(p)}return out}
+function r3(lt,D){
+  const l=$('s3logo'); const p=back(lin(lt,.1,.8)); l.style.opacity=lin(lt,.05,.4); l.style.transform=`scale(${.7+.3*p})`
+  pop($('s3tag'),lt,1.3,999,24)
+  $('s3code').style.opacity=lin(lt,4.0,4.4); $('s3code').style.transform=`translateY(${(1-eo(lin(lt,4,4.5)))*30}px)`
+  const n=Math.floor(cl((lt-4.4)/2.0)*SNIP.length); $('s3t').innerHTML=hl(SNIP.slice(0,n))+(lt<7?'<span style="border-left:3px solid #fff"></span>':'')
+  pop($('s3chips'),lt,6.9,999,24)
+}
+/* ---------- S8 ---------- */
+function r8(lt,D){document.querySelectorAll('.t8').forEach((el,i)=>pop(el,lt,[1.4,3.5,5.6][i],999,40))}
+/* ---------- S9 ---------- */
+function r9(lt,D){
+  const l=$('s9logo'); l.style.opacity=lin(lt,.05,.4); l.style.transform=`scale(${.8+.2*back(lin(lt,.05,.7))})`
+  pop($('s9tag'),lt,1.1,999,30)
+  const cs=document.querySelectorAll('.s9c'); pop(cs[0],lt,4.0,999,20); pop(cs[1],lt,5.3,999,20)
+  pop($('s9cta'),lt,8.1,999,30)
+}
+const R=[r1,r2,r3,(lt,D)=>renderScreen(SCREENS.s4,lt,D),(lt,D)=>renderScreen(SCREENS.s5,lt,D),(lt,D)=>renderScreen(SCREENS.s6,lt,D),(lt,D)=>renderScreen(SCREENS.s7,lt,D),r8,r9]
+
+window.render=function(t){
+  for(let i=0;i<9;i++){
+    const el=$('s'+(i+1))
+    const a= i===0?0:START[i]-0.35, b= i===8?TOTAL+1:START[i+1]-0.35
+    const D= (i===8?TOTAL:START[i+1]) - START[i]
+    let o=1
+    if(i>0) o=Math.min(o,lin(t,a-.25,a+.25))
+    if(i<8) o=Math.min(o,1-lin(t,b-.25,b+.25))
+    if(i===8) o=Math.min(o,1-lin(t,TOTAL-.5,TOTAL))*1
+    el.style.opacity=o
+    el.style.display=o>0?'block':'none'
+    if(o>0){ const sc= i>0 && t<a+.25 ? .985+.015*lin(t,a-.25,a+.25) : 1; el.style.transform=`scale(${sc})`; R[i](t-START[i],D) }
+  }
+  const c=CUES.find(c=>t>=c[0]-.05&&t<c[1]+.1)
+  $('capt').textContent=c?c[2]:''; $('cap').style.opacity=c?1:0
+  $('prog').style.width=(t/TOTAL*100)+'%'
+}
+window.ready=Promise.all([...document.images].map(i=>i.decode().catch(()=>{}))).then(()=>document.fonts.ready)
+render(0)
+</script>
+</body></html>
