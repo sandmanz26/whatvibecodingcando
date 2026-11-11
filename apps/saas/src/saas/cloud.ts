@@ -14,6 +14,7 @@
 import { supabase } from './supabase'
 import { parseConfig, type Release, type Seen } from '../core/embed/config'
 import type { Backend, Thread } from '../core/embed/store'
+import type { Stats, SharedList, ShareRow } from './stats'
 import type { Invite, Project, SaasState } from './account'
 
 const BUCKET = 'widget-config'
@@ -257,4 +258,52 @@ export async function deleteAccountCloud(publicIds: string[]) {
   dbIds.clear()
   workspaceId = null
   await supabase!.auth.signOut()
+}
+
+/* ---------- dashboard, clearing data, share links ---------- */
+
+
+export async function projectStats(publicId: string): Promise<Stats | null> {
+  const id = dbIds.get(publicId)
+  if (!id) return null
+  const { data, error } = await supabase!.rpc('project_stats', { p_project: id })
+  if (error) throw error
+  return data as Stats
+}
+
+/** Clears one kind of data for a project (members only; the server checks). */
+export async function clearCloud(publicId: string, what: 'comments' | 'reviewers' | 'reports' | 'links') {
+  const id = dbIds.get(publicId)
+  if (!id) throw new Error('This project isn’t on the server.')
+  if (what === 'links') { const { error } = await supabase!.rpc('revoke_review_links', { p_project: id }); if (error) throw error; return }
+  const table = what === 'comments' ? 'threads' : what === 'reviewers' ? 'reviewers' : 'installs'
+  const { error } = await supabase!.from(table).delete().eq('project_id', id)
+  if (error) throw error
+  // Removed reviewers must not come back with a link they still hold.
+  if (what === 'reviewers') await supabase!.rpc('revoke_review_links', { p_project: id })
+}
+
+export async function createShareCloud(publicId: string, o: { label?: string; status: 'all' | 'open' | 'completed'; days: number | null }): Promise<string> {
+  const id = dbIds.get(publicId)
+  if (!id) throw new Error('This project isn’t on the server.')
+  const { data, error } = await supabase!.rpc('create_share', { p_project: id, p_label: o.label || null, p_status: o.status, p_days: o.days })
+  if (error) throw error
+  return data as string
+}
+export async function listSharesCloud(publicId: string): Promise<ShareRow[]> {
+  const id = dbIds.get(publicId)
+  if (!id) return []
+  const { data, error } = await supabase!.from('shares').select('id, label, status_filter, created_at, expires_at, revoked_at, views, last_viewed').eq('project_id', id).order('created_at', { ascending: false })
+  if (error) throw error
+  return data as ShareRow[]
+}
+export async function revokeShareCloud(id: string) {
+  const { error } = await supabase!.from('shares').update({ revoked_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw error
+}
+/** What a share link shows; needs no account. */
+export async function getShareCloud(token: string): Promise<SharedList | null> {
+  const { data, error } = await supabase!.rpc('get_share', { p_token: token })
+  if (error) return null
+  return data as SharedList
 }

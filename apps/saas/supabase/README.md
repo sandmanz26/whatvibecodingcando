@@ -48,6 +48,10 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
   - **Anonymous sessions** can't create workspaces.
   - **`delete_my_account`** removes the login, the workspaces it owns, their projects and comments.
   - **Housekeeping:** an hourly `pg_cron` job clears old rate-limit counters and expired links, when the extension is available.
+- **`migrations/20261111000000_dashboard_share.sql`**: the dashboard, clearing data, and share links.
+  - **`project_stats`** returns the dashboard's numbers in one call: status counts, replies, reviewers, 14 days of activity, top pages, sites.
+  - **Clearing data:** members may delete installation reports; `revoke_review_links` revokes the project's review links.
+  - **Share links (`shares`):** `create_share` is for members; only a SHA-256 of the token is stored, with a filter (all, open, completed), an expiry and a revoke date. `get_share` works without an account, is read-only and rate limited, and counts views.
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.

@@ -32,6 +32,17 @@ export function publish(p: Project, by: string, config = draftOf(p)): Project {
   return { ...p, config, releases: [...(p.releases ?? []), release].slice(-50) }
 }
 
+/**
+ * Switches the widget on or off on every site at once: a new release of what is live, with only
+ * the off switch changed. The draft keeps its other unpublished changes.
+ */
+export function setLiveOn(p: Project, on: boolean, by: string): Project {
+  const live = liveOf(p)
+  const base = live?.config ?? draftOf(p)
+  const draft = draftOf(p)
+  return { ...publish(p, by, { ...base, on }), config: { ...draft, on } }
+}
+
 /** Hands a project's live settings and draft to the script (the stand-in for the configuration endpoint). */
 // On the server the script reads the published file on Storage instead; the stand-in is for the demo only.
 export const serveProject = (p: Project) => { if (!cloud) serve(p.id, { live: liveOf(p), draft: draftOf(p) }) }

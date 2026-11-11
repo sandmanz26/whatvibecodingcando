@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, Circle, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar } from 'lucide-react'
+import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2 } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
@@ -9,9 +9,11 @@ import { liveOf, openAsReviewer, serveProject, unserveProject } from '../../saas
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
 import { cloud, supabase, authMessage } from '../../saas/supabase'
-import { PanelBackend, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
+import { PanelBackend, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
-import { LocalBackend, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
+import { ShareList } from './ShareList'
+import { download, threadsCsv, toShared } from '../../saas/stats'
+import { LocalBackend, NS, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
 export interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
@@ -31,7 +33,7 @@ export const openDemo = (projectId: string, toast: (t: string, k?: 'error') => v
 export { ago }
 
 /** A project's comments. On this domain only, until shared projects exist: see the inbox note. */
-function useThreads(projectId: string | undefined, me = 'You') {
+export function useThreads(projectId: string | undefined, me = 'You') {
   // On the server: the project's comments from the database; in the demo: this browser's.
   const backend = useMemo(() => (projectId ? (cloud ? new PanelBackend(projectId, me) : new LocalBackend(projectId)) : null), [projectId, me])
   const [threads, setThreads] = useState<Thread[]>([])
@@ -116,7 +118,7 @@ export function PanelLayout() {
       </aside>
       <main className="up-main">
         <div className="up-beta"><TriangleAlert size={14} /> {cloud
-          ? 'Beta: your account, projects and widget settings are saved on the server. Comments and the installation check still work on the demo site only, until the script is connected.'
+          ? 'Beta: free while we build. Your account, projects, comments and reviewers are saved on the server; products marked early access work in the demo only.'
           : 'Beta without a server: this workspace is saved in this browser only.'}</div>
         {project || pathname === '/app/settings' ? <Outlet context={{ s, update, project, setProject, leave, logOut } satisfies Ctx} /> : (
           <div className="up-empty"><h1>No project yet</h1><p>Create a project for a site or app to get its snippet.</p><button className="lp-btn primary" onClick={() => setCreating(true)}><Plus size={15} /> New project</button></div>
@@ -147,72 +149,6 @@ function NewProject({ taken, onClose, onCreate }: { taken: string[]; onClose: ()
         <p className="hint">Starts with Comments on. Change products after.</p>
       </div>
     </Modal>
-  )
-}
-
-/* ---------- overview ---------- */
-
-export function Overview() {
-  const { s, project } = usePanel()
-  const { toast } = useStore()
-  const [params, setParams] = useSearchParams()
-  const { threads } = useThreads(project?.id, s.account?.name)
-  if (!project) return null
-  const invited = s.invites.some((i) => i.projectId === project.id)
-  const seen = cloud ? null : lastSeen(project.id)
-  const steps = [
-    { done: project.products.length > 0, label: 'Pick your tools', to: '/app/products' },
-    { done: !!liveOf(project), label: 'Publish your widget settings', to: '/app/widget' },
-    { done: !!project.copiedSnippet, label: 'Copy your snippet into your site', to: '/app/install' },
-    ...(cloud ? [] : [{ done: !!seen, label: 'See the script running', to: '/app/install', hint: 'Shown once the script has loaded on the demo site in this browser' }]),
-    { done: threads.length > 0, label: 'Leave the first comment', to: '/app/install', hint: 'On your site, or on the demo site with this project' },
-    { done: invited, label: 'Invite a teammate', to: '/app/team' },
-  ]
-  const left = steps.filter((x) => !x.done).length
-  const count = (st: Status) => threads.filter((t) => statusOf(t) === st).length
-  return (
-    <div className="up-page">
-      {params.get('welcome') && (
-        <div className="up-welcome">
-          <div><h2>Welcome, {s.account!.name.split(' ')[0]}.</h2><p>Your workspace and “{project.name}” are ready. Next: put the snippet on your site.</p></div>
-          <button className="up-x" onClick={() => setParams({}, { replace: true })} aria-label="Dismiss"><X size={16} /></button>
-        </div>
-      )}
-      <div className="up-head"><div><h1>{project.name}</h1><p>Project id <code>{project.id}</code>{project.siteUrl && <> · <a href={project.siteUrl} target="_blank" rel="noopener">{project.siteUrl.replace(/^https?:\/\//, '')} <ExternalLink size={12} /></a></>}</p></div></div>
-      <div className="up-cols">
-        <section className="up-card">
-          <h2>{left ? `Get set up · ${steps.length - left} of ${steps.length}` : 'All set up'}</h2>
-          <ol className="up-steps">
-            {steps.map((x) => (
-              <li key={x.label} className={x.done ? 'done' : ''}>
-                {x.done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                <span className="lp-grow"><Link to={x.to}>{x.label}</Link>{x.hint && !x.done && <small>{x.hint}</small>}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-        <section className="up-card">
-          <h2>Comments</h2>
-          <div className="up-stats">
-            {(['open', 'ongoing', 'completed'] as const).map((st) => <Link key={st} to={`/app/comments?status=${st}`} className={`up-stat st-${st}`}><b>{count(st)}</b><span>{STATUS_LABEL[st]}</span></Link>)}
-          </div>
-          {threads.length === 0 ? <p className="up-muted">No comments yet. <button className="up-linkbtn" onClick={() => openDemo(project.id, toast)}>Try it on the demo site</button> with this project.</p> : (
-            <ul className="up-recent">
-              {[...threads].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4).map((t) => (
-                <li key={t.id}><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span><span className="up-clip">{t.text}</span><span className="up-muted">{ago(t.createdAt)}</span></li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-      <section className="up-card">
-        <div className="up-row"><h2>Tools on</h2><Link to="/app/products" className="lp-btn sm">Change</Link></div>
-        <div className="up-chips">
-          {project.products.length === 0 && <span className="up-muted">None. Turn on at least Comments to use the script.</span>}
-          {project.products.map((id) => { const p = productOf(id); if (!p) return null; const Icon = p.icon; return <span key={id} className="up-chip"><span className="lp-icon xs" style={{ background: p.hue }}><Icon size={12} /></span>{p.name}{p.status === 'console' && <small>early access</small>}</span> })}
-        </div>
-      </section>
-    </div>
   )
 }
 
@@ -348,8 +284,10 @@ export function Comments() {
   const [q, setQ] = useState('')
   const [deleting, setDeleting] = useState<Thread | null>(null)
   const status = (params.get('status') ?? 'all') as Status | 'all'
+  const sharing = params.get('share') === '1'
   if (!project || !backend) return null
   const setStatus = (v: Status | 'all') => setParams(v === 'all' ? {} : { status: v }, { replace: true })
+  const setSharing = (v: boolean) => setParams(() => { const n = new URLSearchParams(params); if (v) n.set('share', '1'); else n.delete('share'); return n }, { replace: true })
   const shown = threads
     .filter((t) => status === 'all' || statusOf(t) === status)
     .filter((t) => !q.trim() || `${t.text} ${t.author} ${t.page} ${t.replies.map((r) => r.text).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
@@ -361,8 +299,15 @@ export function Comments() {
   const openUrl = (t: Thread) => (t.page.startsWith('/embed-demo.html') ? demoUrl(project.id) + (t.page.split('#')[1] ? `#${t.page.split('#')[1]}` : '') : project.siteUrl ? pageUrl(t.page, project.siteUrl) : null)
   return (
     <div className="up-page">
-      <div className="up-head"><div><h1>Comments</h1><p>Everything your team left on “{project.name}”.</p></div></div>
-      <p className="up-note">Until shared projects arrive, this inbox shows the comments saved in this browser on this domain, for example from the <button className="up-linkbtn" onClick={() => openDemo(project.id, toast)}>demo site</button> opened with this project. Comments made on your own site stay in that site’s browser storage for now.</p>
+      <div className="up-head"><div><h1>Comments</h1><p>Everything your reviewers left on “{project.name}”.</p></div>
+        <span className="up-row">
+          <button className="lp-btn" disabled={!threads.length} onClick={() => download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(toShared)))}><Download size={14} /> CSV</button>
+          <button className="lp-btn primary" onClick={() => setSharing(true)}><Share2 size={14} /> Share list</button>
+        </span></div>
+      {cloud
+        ? <p className="up-note">Comments from every site with your snippet arrive here (checked every 10 seconds). Invite reviewers in <Link to="/app/team">Team</Link>.</p>
+        : <p className="up-note">Demo mode: this inbox shows the comments saved in this browser on this domain, for example from the <button className="up-linkbtn" onClick={() => openDemo(project.id, toast)}>demo site</button> opened with this project.</p>}
+      {sharing && <ShareList project={project} threads={threads} onClose={() => setSharing(false)} />}
       <div className="up-row wrap">
         <div className="up-tabs" role="group" aria-label="Status">
           {(['all', 'open', 'ongoing', 'completed'] as const).map((v) => <button key={v} aria-pressed={status === v} onClick={() => setStatus(v)}>{v === 'all' ? 'All' : STATUS_LABEL[v]} <span>{count(v)}</span></button>)}
@@ -490,6 +435,7 @@ export function SettingsPage() {
           <p className="up-muted">The sites the widget may show on (production, staging, previews) are its environments: <Link to="/app/widget">Widget → Where</Link>.</p>
         </section>
       )}
+      {project && <DataCard project={project} />}
       <section className="up-card danger">
         <h2>Danger zone</h2>
         {project && <div className="up-row"><span className="lp-grow">Delete “{project.name}”: its settings and invites. Comments saved on sites stay there.</span><button className="lp-btn sm danger" onClick={() => { setTyped(''); setConfirm('project') }}>Delete project</button></div>}
@@ -630,6 +576,53 @@ function Reviewers() {
         ))}
         {!rows.length && <li className="up-muted">No reviewers yet.</li>}
       </ul>
+    </section>
+  )
+}
+
+type Clearable = 'comments' | 'reviewers' | 'reports' | 'links'
+const CLEAR: Record<Clearable, { title: string; text: string; cloudOnly?: boolean }> = {
+  comments: { title: 'Clear all comments', text: 'Every comment and reply on every page of the project. Reviewers keep their access.' },
+  reviewers: { title: 'Remove all reviewers', text: 'Everyone loses access to comment, and review links not used yet stop working. Comments are kept.', cloudOnly: true },
+  links: { title: 'Revoke review links', text: 'Review and invite links not used yet stop working. Reviewers already in keep their access.', cloudOnly: true },
+  reports: { title: 'Clear installation reports', text: 'The list of sites where the script was seen. It fills again as pages load.' },
+}
+
+/** Clearing a project's data, one kind at a time, after typing the project id. */
+function DataCard({ project }: { project: Project }) {
+  const { toast } = useStore()
+  const [what, setWhat] = useState<Clearable | null>(null)
+  const [typed, setTyped] = useState('')
+  const [busy, setBusy] = useState(false)
+  const kinds = (Object.keys(CLEAR) as Clearable[]).filter((k) => cloud || !CLEAR[k].cloudOnly)
+  const run = async (k: Clearable) => {
+    setBusy(true)
+    try {
+      if (cloud) await clearCloud(project.id, k)
+      else {
+        // The demo keeps these in this browser.
+        if (k === 'comments') localStorage.removeItem(`${NS}${project.id}:threads`)
+        if (k === 'reports') localStorage.removeItem(`${NS}seen:${project.id}`)
+        window.dispatchEvent(new StorageEvent('storage', { key: `${NS}${project.id}:threads` }))
+      }
+      toast(`${CLEAR[k].title}: done`)
+      setWhat(null)
+    } catch (e) { toast(`Not cleared: ${(e as Error).message}`, 'error') } finally { setBusy(false) }
+  }
+  return (
+    <section className="up-card">
+      <h2>Data</h2>
+      <p className="up-muted">Clear this project’s data without deleting the project. Your snippet, settings and published versions stay.</p>
+      {kinds.map((k) => (
+        <div key={k} className="up-row"><span className="lp-grow"><b>{CLEAR[k].title}</b><br /><small className="up-muted">{CLEAR[k].text}</small></span>
+          <button className="lp-btn sm danger" onClick={() => { setTyped(''); setWhat(k) }}>{k === 'links' ? 'Revoke' : k === 'reviewers' ? 'Remove' : 'Clear'}</button></div>
+      ))}
+      {what && (
+        <Modal title={`${CLEAR[what].title}?`} description={`${CLEAR[what].text} This can’t be undone. Type the project id (${project.id}) to confirm.`} onClose={() => setWhat(null)}
+          footer={<><button className="btn" onClick={() => setWhat(null)}>Cancel</button><button className="btn primary" disabled={typed !== project.id || busy} onClick={() => void run(what)}>{busy ? 'Working…' : CLEAR[what].title}</button></>}>
+          <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Project id" autoFocus />
+        </Modal>
+      )}
     </section>
   )
 }

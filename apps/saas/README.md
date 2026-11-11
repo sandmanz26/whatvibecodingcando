@@ -425,7 +425,15 @@ Everything else is the project's **published configuration**, built in the panel
   - **Log out** is in the panel's sidebar and in Settings. **Settings → Password** changes the password (current one first).
   - **Workspaces from before login:** they stay signed in and set up. They can set a password in Settings, or through Forgot password.
 - **`#/app`** is the user panel:
-  - **Overview:** a setup checklist and comment counts.
+  - **Overview** (`src/pages/saas/Dashboard.tsx`) is the project's dashboard:
+    - **Widget status** with a one-click on/off switch. It publishes a new version with only the off switch changed and keeps the draft's other edits.
+    - **Numbers:** open, ongoing, completed, replies, reviewers (and active this week).
+    - **Activity:** comments per day over 14 days (one series, hover tooltip, and a table for screen readers).
+    - **Pages** with the most comments.
+    - **Latest comments.**
+    - **Sites** where the script ran.
+    - **Setup checklist**, until it is done.
+    - On the server, the numbers come from one `project_stats` call, counted in the database.
   - **Products:** turn tools on or off per project; early-access ones count as requested.
   - **Install:**
     - the project's snippet (script and project only) and where to paste it (HTML, Vite, Next.js, CMS, or a prompt for Claude);
@@ -433,8 +441,15 @@ Everything else is the project's **published configuration**, built in the panel
     - developer notes: CSP, own buttons and API, `data-disabled`, environments.
   - **Widget:** the widget builder (see "Widget settings").
   - **Comments:** an inbox with filters, search, complete, reopen, delete and "open on site".
+    - **CSV** download.
+    - **Share list** makes a read-only link, `#/share/<token>`, that anyone can open without an account. The link can be:
+      - limited to all, not completed, or completed comments;
+      - set to expire after 7, 30 or 90 days, or never;
+      - counted and revoked.
+
+      The shared page (`SharePage.tsx`) groups comments by page, with replies, CSV and print. In the demo, the list travels inside the link.
   - **Team:** invites, kept as pending because no emails are sent yet.
-  - **Settings:** account, password, log out, project, and deleting a project or the workspace by typing to confirm (their published settings go too, so the snippet shows nothing). Where the widget runs is set per environment in Widget.
+  - **Settings:** account, password, log out, project, **Data** (clear comments, remove all reviewers, revoke review links, clear installation reports; each after typing the project id), and deleting a project or the workspace by typing to confirm (their published settings go too, so the snippet shows nothing). Where the widget runs is set per environment in Widget.
   - Several projects are supported; a project id is fixed once created because the snippet and comments use it.
 - **Inbox without a backend.** The inbox reads comments through the script's `Backend` interface, so it shows those saved on this domain. Open `embed-demo.html?project=<id>` (the panel links to it) to see comments arrive in the panel.
 - **Code and storage.** Data is in `vibe.saas` (localStorage) and the code in `src/saas/` and `src/pages/saas/`. The research dock and tools are not mounted on these pages.

@@ -32,6 +32,9 @@
   - The script's traffic goes through Edge Functions; widget configuration is a CDN file, never a database read per page view.
   - Keep `supabase/tests/run.sh` passing.
   - Never put the service role key or database password in the app, the repository or chat.
+  - Dashboard (`#/app`, `Dashboard.tsx`): numbers from `project_stats` on the server, from this browser in the demo.
+  - Share links for the comment list: `#/share/<token>`, read-only, no account; revocable on the server, the list inside the link in the demo.
+  - Clearing data: Settings → Data, after typing the project id.
 - Content only: `__reset` (`/content/__reset` or `#/__reset`, `src/reset.tsx`) clears the content site's browser data, never `saas:` keys. Keep it unlinked.
 - Frontend only (React + TypeScript + Vite). No backend: catalogue in `src/data/shop.ts`, simulated AI in `src/lib/ai.ts`, cart/orders in localStorage via `src/store/store.tsx`.
 - **Git: always push finished work to `main`** (the owner asked for this explicitly). Push the working branch too if one is in use.
