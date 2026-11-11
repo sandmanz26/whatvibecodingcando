@@ -23,11 +23,12 @@ export function Dashboard() {
   const [params, setParams] = useSearchParams()
   const { threads } = useThreads(project?.id, s.account?.name)
   const [server, setServer] = useState<Stats | null>(null)
+  const [failed, setFailed] = useState('')
   const [confirmOff, setConfirmOff] = useState(false)
   useEffect(() => {
     if (!cloud || !project) return
     let live = true
-    const load = () => void projectStats(project.id).then((x) => { if (live) setServer(x) }).catch(() => { /* keep what is shown */ })
+    const load = () => void projectStats(project.id).then((x) => { if (live) { setServer(x); setFailed('') } }).catch((e) => { if (live) setFailed((e as Error).message || 'the server refused') })
     load()
     const t = window.setInterval(() => { if (document.visibilityState === 'visible') load() }, 30_000)
     return () => { live = false; window.clearInterval(t) }
@@ -68,6 +69,7 @@ export function Dashboard() {
         <div><h1>{project.name}</h1><p>Project id <code>{project.id}</code>{project.siteUrl && <> · <a href={project.siteUrl} target="_blank" rel="noopener">{project.siteUrl.replace(/^https?:\/\//, '')} <ExternalLink size={12} /></a></>}</p></div>
       </div>
 
+      {failed && !server && <p className="up-warn">Couldn’t load the numbers: {failed}. If this is a new setup, run the latest migrations in Supabase (see supabase/README.md).</p>}
       <section className={`up-card db-status ${on ? 'on' : 'off'}`}>
         <Power size={18} />
         <div className="lp-grow">
