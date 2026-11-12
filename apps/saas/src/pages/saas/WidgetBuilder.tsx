@@ -5,8 +5,8 @@ import { useStore } from '../../store/store'
 import { Modal, Switch } from '../../components/ui'
 import { PRODUCTS } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
-import { draftOf, liveOf, openAsReviewer, publish, reviewerUrl } from '../../saas/widget'
-import { MAX_ENVS, MAX_LABEL, hostProblem, sameConfig, type Env, type WidgetConfig } from '../../core/embed/config'
+import { draftOf, liveOf, openAsReviewer, publish, releasable, reviewerUrl } from '../../saas/widget'
+import { MAX_ENVS, MAX_LABEL, anyModule, hostProblem, sameConfig, type Env, type ModuleId, type WidgetConfig } from '../../core/embed/config'
 import { AnonWarning, ago, openDemo, usePanel } from './Panel'
 import { cloud } from '../../saas/supabase'
 
@@ -22,14 +22,15 @@ export function WidgetBuilder() {
   if (!project) return null
   const draft = draftOf(project)
   const live = liveOf(project)
-  const dirty = !live || !sameConfig(live.config, { ...draft, modules: { comments: draft.modules.comments && project.products.includes('comments') } })
+  const out = releasable(project, draft)
+  const dirty = !live || !sameConfig(live.config, out)
   const edit = (fn: (c: WidgetConfig) => WidgetConfig) => { if (!setProject((p) => ({ ...p, config: fn(draftOf(p)) }))) toast('Not saved: this browser’s storage is full or blocked.', 'error') }
   const by = s.account?.name ?? 'You'
 
   const warnings: string[] = []
   if (!draft.on) warnings.push('The widget is switched off: it shows nowhere.')
   if (!draft.envs.some((e) => e.on)) warnings.push('No environment is on, so it shows only on the hosted demo site.')
-  if (!draft.modules.comments || !project.products.includes('comments')) warnings.push('No module is on, so there is nothing to show.')
+  if (!anyModule(out.modules)) warnings.push('No module is on, so there is nothing to show.')
   if (draft.launcher.kind === 'hidden' && !draft.launcher.shortcut) warnings.push('No launcher and no C key: people can open it only with your own data-vibe buttons.')
   if (draft.audience === 'everyone') warnings.push('Every visitor can post comments. Until the server is live there is no spam protection.')
 
@@ -73,14 +74,18 @@ export function WidgetBuilder() {
             <h2>Modules</h2>
             {PRODUCTS.filter((p) => p.id === 'comments' || p.status === 'script').map((p) => {
               const on = project.products.includes(p.id)
+              const toggle = () => {
+                if (p.id === 'comments') { if (on) edit((c) => ({ ...c, modules: { ...c.modules, comments: !c.modules.comments } })); return }
+                if (!setProject((x) => ({ ...x, products: on ? x.products.filter((y) => y !== p.id) : [...x.products, p.id] }))) toast('Not saved: this browser’s storage is full or blocked.', 'error')
+              }
               return (
                 <div className="up-row" key={p.id}>
-                  <span className="lp-grow"><b>{p.name}</b>{!on && <small className="up-muted"> · turned off in <Link to="/app/products">Products</Link></small>}</span>
-                  <Switch checked={draft.modules.comments && on} onChange={() => on && edit((c) => ({ ...c, modules: { comments: !c.modules.comments } }))} label={p.name} />
+                  <span className="lp-grow"><b>{p.name}</b>{p.id === 'comments' && !on ? <small className="up-muted"> · turned off in <Link to="/app/products">Products</Link></small> : p.id !== 'comments' ? <small className="up-muted"> · for reviewers, in their browser only</small> : null}</span>
+                  <Switch checked={!!out.modules[p.id as ModuleId]} onChange={toggle} label={p.name} />
                 </div>
               )
             })}
-            <p className="up-muted">Feedback form, bug report with screenshot and one-question survey: coming as they move into the script.</p>
+            <p className="up-muted">Inspect, Design system check and Design tokens show as buttons beside Comments, for reviewers only. They read the page’s styles in the reviewer’s browser and send nothing. Turning one on or off here also changes it in Products; publish to apply.</p>
           </section>
 
           <section className="up-card">

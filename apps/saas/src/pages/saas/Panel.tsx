@@ -5,7 +5,7 @@ import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
-import { liveOf, openAsReviewer, serveProject, unserveProject } from '../../saas/widget'
+import { liveOf, openAsReviewer, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn } from '../../saas/supabase'
@@ -165,7 +165,7 @@ export function Products() {
       toast(on ? `${p.name} turned off` : p.status === 'script' ? `${p.name} turned on` : `${p.name}: early access requested`)
   }
   const live = liveOf(project)
-  const pending = !!live && live.config.modules.comments !== project.products.includes('comments')
+  const pending = !!live && JSON.stringify(live.config.modules) !== JSON.stringify(releasable(project, live.config).modules)
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Products</h1><p>Turn tools on or off for “{project.name}”. Early-access tools are built and usable in the demo; they switch on in your script as they move into it.</p></div></div>

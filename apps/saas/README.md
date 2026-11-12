@@ -379,11 +379,24 @@ Everything else is the project's **published configuration**, built in the panel
   - It reports itself for the panel's **Installation check**.
 - **No server yet.** The configuration endpoint, review tokens and the installation check use this browser's storage (`saas:vibe:config:*`, `saas:vibe:handoff:*`, `saas:vibe:seen:*`). That works where the panel and the site share an origin, which is the hosted demo site. On a customer's own domain, review links and previews need the server; the panel says so.
 
+### Products in the script (0.3)
+
+- **Modules.** Each product that runs in the script is a module of the published settings (`SCRIPT_MODULES` in `src/core/embed/config.ts`): today Comments, Inspect, Design system check and Design tokens.
+  - A module is on in a release only when its product is on for the project (Products, or the Modules switches in Widget). Publishing applies it; the snippet never changes.
+  - The script drops modules it doesn't know, so an older cached script stays safe.
+- **Reviewer tools** (`src/core/embed/Tools.tsx`, `design.ts`): buttons in the dock beside Comments, for reviewers only (same audience rules as Comments).
+  - **Inspect:** hover an element to see its font, size, colours, radius and padding, and whether each is one of the page's tokens. While it is on, clicks pick elements and never press the page's buttons or follow links.
+  - **Design system check:** scans the page (up to 5,000 elements) for colours, radii, font sizes and fonts that aren't tokens; click a finding to show it on the page.
+  - **Design tokens:** drop a token file (W3C, Tokens Studio or CSS variables, up to 2 MB). Use it as the reference for the two tools above, or apply it to the page: only custom properties the page already defines are set, in the reviewer's tab only, removed when unticked.
+  - The page's tokens are its CSS custom properties on `:root`, `html`, `body` or a theme selector, read from its same-origin stylesheets.
+  - **Safety:** everything runs in the reviewer's browser and is sent nowhere. Only computed styles are read; a form field is named by its tag and label, never its value. Token values with `url()`, braces, semicolons or markup are refused.
+  - With Comments off, the script doesn't ask the server for comments at all.
+
 ## Website and user panel for the hosted product
 
 - **`#/landingpage`** is the product's website (working name in `src/saas/products.ts` → `BRAND`).
   - Visitors pick the tools they want from a catalogue of 15 products, filtered by category, with a running "Your stack" summary.
-  - Each product says honestly where it works today: **On your site today** (in the script) or **Early access** (built and usable in the demo console).
+  - Each product says honestly where it works today: **On your site today** (in the script: `status: 'script'` in `src/saas/products.ts`) or **Early access** (built and usable in the demo console). Copy that lists what runs on a site is generated from that list (`inScript()`).
   - It also has how it works, a live demo of the script in an iframe, beta pricing and FAQ.
   - The picks carry into registering, then into onboarding.
 - **Two modes.** The build picks one (`src/saas/supabase.ts`).

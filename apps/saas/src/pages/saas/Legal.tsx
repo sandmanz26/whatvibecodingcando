@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, MousePointer2, TriangleAlert } from 'lucide-react'
-import { BRAND } from '../../saas/products'
+import { BRAND, inScript } from '../../saas/products'
 import '../../saas/saas.css'
 
 /**
@@ -65,7 +65,7 @@ export function Terms() {
       <h2>The beta</h2>
       <ul>
         <li>{BRAND} is in beta and free. Features can change; we’ll say so in the panel before something you use goes away.</li>
-        <li>Comments are the product that runs on your own site today. Products marked “Early access” work in the demo console only.</li>
+        <li>{inScript()} run on your own site today. Products marked “Early access” work in the demo console only.</li>
       </ul>
       <h2>Your part</h2>
       <ul>

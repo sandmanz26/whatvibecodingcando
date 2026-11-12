@@ -18,11 +18,22 @@ export const CONFIG_VERSION = 1
 /** Where the widget may run. `host` is a host name, `*.example.com`, or a pattern like `shop-git-*.vercel.app`. */
 export interface Env { id: string; name: string; host: string; on: boolean }
 export type Audience = 'reviewers' | 'everyone'
+/** The products the script runs, one switch each. Comments is always present; the others only when on. */
+export const SCRIPT_MODULES = ['comments', 'inspect', 'dscheck', 'tokens'] as const
+export type ModuleId = typeof SCRIPT_MODULES[number]
+export type Modules = { comments: boolean } & Partial<Record<Exclude<ModuleId, 'comments'>, true>>
+/** Modules in one canonical form (extras listed only when on), so two configurations compare as data. */
+export function modulesOf(on: (id: ModuleId) => boolean): Modules {
+  const m: Modules = { comments: on('comments') }
+  for (const id of SCRIPT_MODULES) if (id !== 'comments' && on(id)) m[id] = true
+  return m
+}
+export const anyModule = (m: Modules) => SCRIPT_MODULES.some((id) => !!m[id])
 export interface WidgetConfig {
   v: 1
   /** the project's off switch: false and the widget shows nowhere */
   on: boolean
-  modules: { comments: boolean }
+  modules: Modules
   theme: { accent: string; mode: 'light' | 'dark' }
   launcher: { kind: 'floating' | 'hidden'; position: 'right' | 'left'; label: string; shortcut: boolean }
   /** reviewers: only people opened in through a review link; everyone: every visitor */
@@ -86,7 +97,7 @@ export function parseConfig(v: unknown): WidgetConfig | null {
   }
   if (typeof v.on !== 'boolean' || typeof modules.comments !== 'boolean') return null
   return {
-    v: 1, on: v.on, modules: { comments: modules.comments },
+    v: 1, on: v.on, modules: modulesOf((id) => modules[id] === true),
     theme: { accent, mode: theme.mode === 'dark' ? 'dark' : 'light' },
     launcher: { kind: launcher.kind === 'hidden' ? 'hidden' : 'floating', position: launcher.position === 'left' ? 'left' : 'right', label: label || 'Comment', shortcut: launcher.shortcut !== false },
     audience: v.audience === 'everyone' ? 'everyone' : 'reviewers',

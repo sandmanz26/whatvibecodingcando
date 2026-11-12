@@ -3,7 +3,7 @@
  * to the script through the configuration stand-in (core/embed/config.ts). Publishing is what sites
  * see; editing only changes the draft, which shows in previews.
  */
-import { DEFAULT_CONFIG, newHandoff, serve, unserve, type Env, type Release, type WidgetConfig } from '../core/embed/config'
+import { DEFAULT_CONFIG, modulesOf, newHandoff, serve, unserve, type Env, type Release, type WidgetConfig } from '../core/embed/config'
 import { cloud } from './supabase'
 import { createReviewLink } from './cloud'
 import type { Project } from './account'
@@ -14,7 +14,7 @@ export function draftOf(p: Project): WidgetConfig {
   const envs: Env[] = p.domains.slice(0, 10).map((host, i) => ({ id: `e${i + 1}`, name: i === 0 ? 'Production' : host, host, on: true }))
   return {
     ...DEFAULT_CONFIG,
-    modules: { comments: p.products.includes('comments') },
+    modules: modulesOf((id) => p.products.includes(id)),
     theme: { ...DEFAULT_CONFIG.theme, accent: p.widget.color },
     launcher: { ...DEFAULT_CONFIG.launcher, position: p.widget.position, shortcut: p.widget.shortcut },
     envs,
@@ -22,8 +22,13 @@ export function draftOf(p: Project): WidgetConfig {
 }
 export const liveOf = (p: Project): Release | null => p.releases?.[p.releases.length - 1] ?? null
 
-/** What a release may contain: a module only when its product is on for the project. */
-const releasable = (p: Project, c: WidgetConfig): WidgetConfig => ({ ...c, modules: { comments: c.modules.comments && p.products.includes('comments') } })
+/**
+ * What a release contains: a module only when its product is on for the project (Products). Comments
+ * can also be switched off in the builder; the other script products follow Products.
+ */
+export const releasable = (p: Project, c: WidgetConfig): WidgetConfig => ({
+  ...c, modules: modulesOf((id) => (id === 'comments' ? c.modules.comments : true) && p.products.includes(id)),
+})
 
 export function publish(p: Project, by: string, config = draftOf(p)): Project {
   const live = liveOf(p)

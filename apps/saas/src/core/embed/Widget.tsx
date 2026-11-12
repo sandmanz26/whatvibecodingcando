@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff } from 'lucide-react'
+import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
 import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
 
 export interface Config {
@@ -11,6 +12,10 @@ export interface Config {
   label: string
   accent: string
   mode: 'light' | 'dark'
+  /** the Comments product; off, the widget shows only the other tools */
+  comments: boolean
+  /** the reviewer tools turned on for the project */
+  tools: ToolId[]
   /** showing the draft configuration (from the panel's preview), with a way out */
   preview?: { exit: () => void }
 }
@@ -44,6 +49,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const [nudge, setNudge] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [panel, setPanel] = useState(false)
+  const [tool, setTool] = useState<ToolId | null>(null)
   const [name, setNameState] = useState(readName)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)
   const [, setTick] = useState(0)
@@ -63,7 +69,8 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     try { setThreads(await backend.list()) } catch { say('Comments could not be loaded.', true) }
     setLoaded(true)
   }, [backend, say])
-  useEffect(() => { void reload(); return backend.subscribe(() => void reload()) }, [backend, reload])
+  // Comments off: the server isn't asked for them at all.
+  useEffect(() => { if (!config.comments) { setLoaded(true); return } void reload(); return backend.subscribe(() => void reload()) }, [backend, reload, config.comments])
 
   /** Shows the change at once, saves it, and puts it back if saving fails. */
   const save = async (t: Thread, msg?: string) => {
@@ -132,9 +139,15 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   /* ---- flow ---- */
   const busy = () => { if (draft?.text.trim()) { setNudge((n) => n + 1); return true } return false }
   const start = () => {
-    if (busy()) return
-    setDraft(null); setOpenId(null); setPanel(false); setPlacing(true)
+    if (busy() || !config.comments) return
+    setDraft(null); setOpenId(null); setPanel(false); setTool(null); setPlacing(true)
   }
+  const pickTool = (id: ToolId) => {
+    if (tool === id) { setTool(null); return }
+    if (busy()) return
+    setDraft(null); setOpenId(null); setPanel(false); setPlacing(false); setTool(id)
+  }
+  const closeTool = useCallback(() => setTool(null), [])
   const drop = (e: React.MouseEvent) => {
     const overlay = e.currentTarget as HTMLElement
     // Look through the overlay (and the widget) to the host element under the pointer.
@@ -178,30 +191,32 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   useEffect(() => {
     const on = (e: Event) => {
       const what = (e as CustomEvent<OpenWhat>).detail
-      if (what === 'list') setPanel(true)
+      if (!config.comments) return
+      if (what === 'list') { setTool(null); setPanel(true) }
       else startRef.current()
     }
     host.addEventListener(OPEN_EVENT, on)
     return () => host.removeEventListener(OPEN_EVENT, on)
-  }, [host])
+  }, [host, config.comments])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (tool) return
         if (placing) setPlacing(false)
         else if (draft) setDraft(null)
         else if (openId) setOpenId(null)
         else if (panel) setPanel(false)
         return
       }
-      if (config.shortcut && (e.key === 'c' || e.key === 'C') && !e.metaKey && !e.ctrlKey && !e.altKey && !typing(e) && !placing) { e.preventDefault(); start() }
+      if (config.comments && !tool && config.shortcut && (e.key === 'c' || e.key === 'C') && !e.metaKey && !e.ctrlKey && !e.altKey && !typing(e) && !placing) { e.preventDefault(); start() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
   /* ---- what is on this page ---- */
-  const here = useMemo(() => threads.filter((t) => t.page === page).sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [threads, page])
+  const here = useMemo(() => (config.comments ? threads : []).filter((t) => t.page === page).sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [threads, page])
   const number = (t: Thread) => here.indexOf(t) + 1
   const openOnPage = here.filter((t) => !t.resolved).length
   const open = here.find((t) => t.id === openId)
@@ -254,13 +269,19 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
           onPick={go} onClose={() => setPanel(false)} number={(t) => threads.filter((x) => x.page === t.page).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).indexOf(t) + 1} />
       )}
 
-      {config.launcher === 'floating' && <div className="vc-dock" role="toolbar" aria-label="Collaboration">
-        <button className={`vc-btn primary ${placing ? 'on' : ''}`} onClick={() => (placing ? setPlacing(false) : start())} title={config.shortcut ? 'Comment (C)' : 'Comment'}>
+      {tool && <ToolView tool={tool} project={config.project} onClose={closeTool} />}
+
+      {(config.launcher === 'floating' || config.tools.length > 0) && <div className="vc-dock" role="toolbar" aria-label="Collaboration">
+        {config.comments && config.launcher === 'floating' && <><button className={`vc-btn primary ${placing ? 'on' : ''}`} onClick={() => (placing ? setPlacing(false) : start())} title={config.shortcut ? 'Comment (C)' : 'Comment'}>
           <MessageSquarePlus size={15} /> {placing ? 'Cancel' : config.label}
         </button>
         <button className="vc-icon dock" onClick={() => setPanel((v) => !v)} aria-label={`All comments, ${openOnPage} open on this page`} aria-expanded={panel}>
           <MessagesSquare size={15} />{openOnPage > 0 && <span className="vc-count">{openOnPage}</span>}
-        </button>
+        </button></>}
+        {config.comments && config.launcher === 'floating' && config.tools.length > 0 && <span className="vc-sep" aria-hidden />}
+        {config.tools.map((id) => (
+          <button key={id} className={`vc-icon dock ${tool === id ? 'on' : ''}`} onClick={() => pickTool(id)} aria-pressed={tool === id} aria-label={TOOL_META[id].label} title={TOOL_META[id].label}><ToolIcon id={id} /></button>
+        ))}
       </div>}
 
       {toast && <div className={`vc-toast ${toast.error ? 'error' : ''}`} role="status">{toast.text}</div>}

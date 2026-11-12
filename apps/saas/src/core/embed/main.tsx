@@ -22,9 +22,10 @@
 import { Component, useEffect, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Widget, OPEN_EVENT, type Config, type OpenWhat } from './Widget'
+import { TOOL_IDS } from './Tools'
 import { LocalBackend, NS, type Backend } from './store'
 import { CSS } from './styles'
-import { LocalConfigSource, envFor, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
+import { LocalConfigSource, anyModule, envFor, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
 import * as server from './server'
 
 /** The public API: window.VibeCollab.open('comment' | 'list'). Calls made before the script loaded are queued in q. */
@@ -88,7 +89,7 @@ function decide(o: { config: WidgetConfig | null; draft: WidgetConfig | null; pr
     if (!env) return { show: false, why: `${o.hostname} isn’t one of this project’s environments.` }
     if (!env.on) return { show: false, why: `The widget is off in the ${env.name} environment.` }
   }
-  if (!c.modules.comments) return { show: false, why: 'No module is turned on.' }
+  if (!anyModule(c.modules)) return { show: false, why: 'No module is turned on.' }
   if (c.audience === 'reviewers' && !o.reviewer) return { show: false, why: 'Only reviewers see it; open the site through a review link.' }
   return { show: true, config: c, preview }
 }
@@ -319,6 +320,7 @@ async function boot() {
     const config: Config = {
       project, position: c.launcher.position, shortcut: c.launcher.shortcut, launcher: c.launcher.kind, label: c.launcher.label,
       accent: c.theme.accent, mode: c.theme.mode,
+      comments: c.modules.comments, tools: TOOL_IDS.filter((id) => c.modules[id]),
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
     }
     return <>{notice}<Widget backend={backend} config={config} host={host} /></>

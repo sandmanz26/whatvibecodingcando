@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, ArrowRight, Plus, ExternalLink, Code2, MousePointer2, Users, ShieldCheck, Sparkles } from 'lucide-react'
-import { BRAND, CATEGORIES, PRODUCTS, type Category } from '../../saas/products'
+import { BRAND, CATEGORIES, PRODUCTS, inScript, type Category } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
 import { isSignedIn, loadSaas } from '../../saas/account'
 import '../../saas/saas.css'
@@ -13,7 +13,7 @@ const FAQ = [
   { q: 'Where are comments saved?', a: 'During the beta, in each person’s own browser, so teammates don’t see each other’s comments yet. Shared projects with a database are the next step. The script already stores data through one small interface, so that switch doesn’t change what you install.' },
   { q: 'Does it work with my framework?', a: 'Yes. It’s one script tag, so it works with React, Next.js, Vue, Svelte, Webflow, WordPress or plain HTML. Single-page apps with normal or hash routes are followed page by page.' },
   { q: 'Can it break my site?', a: 'The widget lives in a shadow root: your CSS can’t reach it and its CSS can’t reach your site. A click used to place a comment never reaches your page. It never reads what people type into your forms.' },
-  { q: 'Which products work on my site today?', a: 'Comments are in the script now. The other tools are built and you can use them in the live demo; they move into the script one by one. Pick them now and they switch on for your project as they arrive.' },
+  { q: 'Which products work on my site today?', a: `${inScript()} are in the script now. The other tools are built and you can use them in the live demo; they move into the script one by one. Pick them now and they switch on for your project as they arrive.` },
   { q: 'What will it cost?', a: 'Everything is free during the beta. The plan after that: you pay only for the products you turn on, each with a free tier. Prices will be announced before the beta ends.' },
 ]
 
