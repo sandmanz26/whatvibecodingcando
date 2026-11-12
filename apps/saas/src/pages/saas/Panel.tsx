@@ -8,7 +8,7 @@ import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snipp
 import { liveOf, openAsReviewer, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
-import { cloud, supabase, authMessage, anonymousSignInsOn } from '../../saas/supabase'
+import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
 import { PanelBackend, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
@@ -494,7 +494,7 @@ function PasswordCard() {
       setBusy(true)
       try {
         // The current password is checked by logging in with it again.
-        const check = await supabase.auth.signInWithPassword({ email: s.account!.email, password: cur })
+        const check = await supabase.auth.signInWithPassword({ email: s.account!.email, password: cur, options: { captchaToken: await captcha() } })
         if (check.error) { setError(check.error.code === 'invalid_credentials' ? 'The current password is incorrect.' : authMessage(check.error)); return }
         const { error: e } = await supabase.auth.updateUser({ password: pw })
         if (e) { setError(authMessage(e)); return }

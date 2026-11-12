@@ -27,6 +27,7 @@ import { LocalBackend, NS, type Backend } from './store'
 import { CSS } from './styles'
 import { LocalConfigSource, anyModule, envFor, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
 import * as server from './server'
+import { frameMain } from './frame'
 
 /** The public API: window.VibeCollab.open('comment' | 'list'). Calls made before the script loaded are queued in q. */
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
@@ -235,6 +236,10 @@ const LINK_PROBLEMS: Record<string, string> = {
   origin_not_allowed: 'This review link doesn’t work on this address: the site owner hasn’t switched it on (Widget → Where), or the widget is off.',
   no_project: 'This review link is for a project that no longer exists.',
   rate_limited: 'Too many tries. Wait a minute and open the link again.',
+  captcha_failed: 'The check that you’re a person didn’t pass. Open the review link again.',
+  captcha_timeout: 'The check that you’re a person timed out. Open the review link again.',
+  captcha_unavailable: 'The check that you’re a person couldn’t load. Check your connection and open the link again.',
+  captcha_blocked: 'This site blocks the sign-in frame the review needs. The site owner can allow whatvibecodingcando.vercel.app in the site’s Content-Security-Policy (frame-src).',
 }
 function LinkNotice({ why, onClose }: { why: string; onClose: () => void }) {
   return (
@@ -246,9 +251,13 @@ function LinkNotice({ why, onClose }: { why: string; onClose: () => void }) {
 }
 
 async function boot() {
+  const me = (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
+  // Loaded by our own session.html: this is the session frame, not a widget.
+  if (me?.dataset.frame !== undefined) { if (server.hasServer) frameMain(server.serverUrl, server.serverKey); return }
   if (window.__vibeCollab) { console.warn('[Vibe Collab] the script is on this page twice; the second copy does nothing.'); return }
   const script = (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
   const d = script?.dataset ?? {}
+  if (script?.src) server.useFrame(script.src)
   // data-disabled: for test runs and local builds that shouldn't load it.
   if (d.disabled !== undefined && d.disabled !== 'false') return
   const project = /^[\w-]{1,64}$/.test(d.project ?? '') ? d.project! : (window.location.hostname || 'local').replace(/[^\w-]/g, '-')

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Vibe Collab sign-in</title>
+  <!-- The session frame: loaded hidden by the script on customers' sites (src/core/embed/frame.ts).
+       It shows only when the CAPTCHA wants a click. -->
+  <style>
+    html, body { margin: 0; background: #fff; font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1f1f1f; }
+    body { padding: 14px 16px; }
+    p { margin: 0 0 8px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <p>Confirm you’re a person to start reviewing</p>
+  <div id="ts"></div>
+  <script src="./vibe.js" data-frame defer></script>
+</body>
+</html>

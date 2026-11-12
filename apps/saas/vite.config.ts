@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(sb.url),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(sb.key),
+      'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(sb.turnstile),
     },
     build: { outDir: '../../dist', emptyOutDir: false },
   }

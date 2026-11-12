@@ -6,6 +6,7 @@
  * the database decides what a signed-in user may read or change.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { TURNSTILE_KEY, turnstileToken } from '../core/embed/turnstile'
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -25,6 +26,24 @@ export const supabase: SupabaseClient | null = URL_ && KEY
 /** Accounts, workspaces and projects live on the server (true) or only in this browser (false). */
 export const cloud = !!supabase
 export const supabaseUrl = URL_ ?? ''
+
+/**
+ * A CAPTCHA token for Supabase Auth, when the build has a Turnstile site key (else undefined and
+ * nothing loads). Usually invisible; when Cloudflare wants a click, a small box shows over the page.
+ */
+export async function captcha(): Promise<string | undefined> {
+  if (!TURNSTILE_KEY) return undefined
+  const wrap = document.createElement('div')
+  wrap.style.cssText = 'position:fixed;inset:0;display:none;place-items:center;background:rgba(0,0,0,.35);z-index:9999'
+  const box = document.createElement('div')
+  box.style.cssText = 'background:#fff;padding:16px;border-radius:12px;min-width:300px;min-height:65px'
+  wrap.append(box)
+  document.body.append(wrap)
+  // A failed check sends no token: Supabase then refuses with captcha_failed, shown by authMessage.
+  try { return await turnstileToken(box, () => { wrap.style.display = 'grid' }, () => { wrap.style.display = 'none' }) }
+  catch { return undefined }
+  finally { wrap.remove() }
+}
 
 /**
  * Whether the Supabase project lets reviewers get a session (Auth → anonymous sign-ins). Reviewers on
@@ -73,6 +92,7 @@ export function authMessage(e: { message?: string; code?: string; status?: numbe
   // Two different limits: emails per hour for the whole project, and attempts per person.
   if (code === 'over_email_send_rate_limit') return 'We can’t send more emails right now: the hourly email limit is reached. Try again in an hour.'
   if (code === 'over_request_rate_limit' || e.status === 429) return 'Too many tries. Wait a few minutes and try again.'
+  if (code === 'captcha_failed' || /captcha/i.test(e.message ?? '')) return 'The check that you’re a person didn’t pass. Try again; if it keeps failing, reload the page.'
   if (code === 'weak_password') return 'That password is too weak. Use a longer one.'
   if (code === 'same_password') return 'Use a password different from the current one.'
   if (code === 'email_address_not_authorized') return 'Emails can’t be sent to this address yet: the project’s email (SMTP) isn’t set up.'

@@ -66,7 +66,12 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 3. **Auth → URL Configuration.**
    - Site URL: `https://whatvibecodingcando.vercel.app/`.
    - Redirect URLs: `https://whatvibecodingcando.vercel.app/**` and `http://localhost:5174/**` for development.
-4. **Auth → Sign In / Providers → allow anonymous sign-ins.** Reviewers on customers' sites need it (they have no account). Turning on CAPTCHA protection (Turnstile) as well is recommended before opening to the public.
+4. **Auth → Sign In / Providers → allow anonymous sign-ins.** Reviewers on customers' sites need it (they have no account). Also set **Auth → Rate Limits** for anonymous sign-ins (for example 30 an hour per IP).
+   - **CAPTCHA (Cloudflare Turnstile), when you are ready.** It works for both the panel and reviewers, because reviewers sign in through our session frame (`/embed/session.html`) on our own domain, never on customers' sites. In this order:
+     1. Cloudflare dashboard → Turnstile → Add widget. Hostname: `whatvibecodingcando.vercel.app` (and `localhost` for development). Mode: Managed. You get a **site key** (public) and a **secret key** (private).
+     2. Vercel → the project → Settings → Environment Variables: `VITE_TURNSTILE_SITE_KEY` = the site key. Redeploy, and check the build log says `[captcha] Turnstile site key set`.
+     3. Only then: Supabase → Authentication → Attack Protection → CAPTCHA protection → Turnstile, and paste the **secret key** there (only there: never in Vercel, the repository or a chat).
+     - The other way round (CAPTCHA on in Supabase before the deployment sends tokens) locks out every sign-up, login and reviewer.
 5. **Database → Extensions → pg_cron** (optional, before running the third migration): enables the hourly cleanup.
 6. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
 7. **Auth → Email Templates.** So links work on any device (the default links only work in the browser that asked), set the link in two templates. Keep the rest of the text as you like.
@@ -88,8 +93,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 ## Not done yet (before a public launch)
 
 - **Emails:** invite emails to reviewers and notifications of new comments. Today the owner copies the link and sends it.
-- **CAPTCHA** on anonymous sign-ins and sign-up.
-- **Reviewer sessions** are kept in the customer site's storage. Move them into an iframe on our domain before "everyone" mode is used widely.
+- **CAPTCHA:** ready in the code, off until the Turnstile keys are set (step 4 above).
 - **CI** running these tests on every push.
 
 ## Rules for later migrations

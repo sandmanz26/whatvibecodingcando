@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, CheckCircle2 } from 'lucide-react'
 import { parseProducts } from '../../saas/products'
 import { isOnboarded, isSignedIn, passwordProblem, refreshCloud, useSaas, useSaasReady, validEmail } from '../../saas/account'
-import { authMessage, authReturnUrl, supabase } from '../../saas/supabase'
+import { authMessage, authReturnUrl, captcha, supabase } from '../../saas/supabase'
 import { PasswordField, Shell, Strength, safeNext } from './Auth'
 import '../../saas/saas.css'
 
@@ -56,7 +56,7 @@ export function CloudRegister() {
     if (!name.trim() || !emailOk || pwProblem || !match || busy) return
     setBusy(true); setError('')
     try { sessionStorage.setItem('vibe.onboarding.products', products.join(',')) } catch { /* ignore */ }
-    const { data, error: e } = await sb().auth.signUp({ email: email.trim(), password: pw, options: { data: { name: name.trim().slice(0, 40), onboarded: false }, emailRedirectTo: authReturnUrl('signup') } })
+    const { data, error: e } = await sb().auth.signUp({ email: email.trim(), password: pw, options: { data: { name: name.trim().slice(0, 40), onboarded: false }, emailRedirectTo: authReturnUrl('signup'), captchaToken: await captcha() } })
     setBusy(false)
     if (e) { setError(authMessage(e)); return }
     // With email confirmation off, the account is signed in at once; otherwise it waits for the link.
@@ -66,7 +66,7 @@ export function CloudRegister() {
   if (sent) return (
     <Shell title="Confirm your email" foot={<>Wrong address? <button className="up-linkbtn" onClick={() => setSent(false)}>Go back</button></>}>
       <CheckEmail email={email.trim()} what="confirm it and finish creating your account" onResend={async () => {
-        const { error: e } = await sb().auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: authReturnUrl('signup') } })
+        const { error: e } = await sb().auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: authReturnUrl('signup'), captchaToken: await captcha() } })
         return e ? authMessage(e) : 'Sent again.'
       }} />
     </Shell>
@@ -111,7 +111,7 @@ export function CloudLogin() {
     if (busy) return
     if (!validEmail(email) || !pw) { setError('Enter your email and password.'); return }
     setBusy(true); setError(''); setResent('')
-    const { error: e } = await sb().auth.signInWithPassword({ email: email.trim(), password: pw })
+    const { error: e } = await sb().auth.signInWithPassword({ email: email.trim(), password: pw, options: { captchaToken: await captcha() } })
     if (e) { setBusy(false); setPw(''); setError(authMessage(e)); return }
     await refreshCloud()
     nav(next, { replace: true })
@@ -129,7 +129,7 @@ export function CloudLogin() {
           hint={<Link to={`/app/forgot${validEmail(email) ? `?email=${encodeURIComponent(email.trim())}` : ''}`} className="lp-auth-link">Forgot password?</Link>} />
         {error === 'confirm-first' ? (
           <p className="lp-error" role="alert">Confirm your email first: open the link we sent. <button type="button" className="up-linkbtn" onClick={async () => {
-            const { error: e } = await sb().auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: authReturnUrl('signup') } })
+            const { error: e } = await sb().auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: authReturnUrl('signup'), captchaToken: await captcha() } })
             setResent(e ? authMessage(e) : 'Sent again. Check your inbox.')
           }}>Send it again</button></p>
         ) : error && <p className="lp-error" role="alert">{error}</p>}
@@ -150,7 +150,7 @@ export function CloudForgot() {
   const send = async () => {
     setTried(true)
     if (!emailOk) return
-    const { error: e } = await sb().auth.resetPasswordForEmail(email.trim(), { redirectTo: authReturnUrl('recovery') })
+    const { error: e } = await sb().auth.resetPasswordForEmail(email.trim(), { redirectTo: authReturnUrl('recovery'), captchaToken: await captcha() })
     // The same answer whether or not the address has an account; only real failures are shown.
     const m = e ? authMessage(e) : ''
     if (m && m !== 'Email or password is incorrect.') { setError(m); return }
@@ -160,7 +160,7 @@ export function CloudForgot() {
     <Shell title="Check your email" sub={<>If an account uses <b>{email.trim()}</b>, we’ve sent a link to set a new password. It works once and expires after an hour.</>}
       foot={<Link to="/app/login">Back to log in</Link>}>
       <CheckEmail email={email.trim()} what="reset your password" onResend={async () => {
-        const { error: e } = await sb().auth.resetPasswordForEmail(email.trim(), { redirectTo: authReturnUrl('recovery') })
+        const { error: e } = await sb().auth.resetPasswordForEmail(email.trim(), { redirectTo: authReturnUrl('recovery'), captchaToken: await captcha() })
         return e ? authMessage(e) : 'Sent again.'
       }} />
     </Shell>

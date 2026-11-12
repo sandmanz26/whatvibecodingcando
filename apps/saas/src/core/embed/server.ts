@@ -15,6 +15,8 @@ import { parseConfig, type Release, type WidgetConfig } from './config'
 const URL_ = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? ''
 const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? ''
 export const hasServer = !!(URL_ && KEY)
+export const serverUrl = URL_
+export const serverKey = KEY
 
 const ls = {
   get: (k: string) => { try { return localStorage.getItem(k) } catch { return null } },
@@ -59,31 +61,105 @@ function readFile(body: unknown): ServedFile {
 
 /* ---------- the reviewer's session ---------- */
 
-interface Session { access_token: string; refresh_token: string; expires_at: number }
+/**
+ * Where the session lives. Preferably in our session frame (frame.ts, /embed/session.html beside the
+ * script): it signs up (with CAPTCHA when that is on), keeps the refresh token on our domain, and
+ * gives this page only the short-lived access token. When the frame can't load (a site's
+ * Content-Security-Policy without our domain in frame-src, an old browser), this page keeps the
+ * session itself, as before.
+ */
+interface Session { access_token: string; refresh_token?: string; expires_at: number }
 const AUTH_KEY = `${NS}auth`
+const HINT_KEY = `${NS}auth-frame`
 let session: Session | null = (() => { try { return JSON.parse(ls.get(AUTH_KEY) ?? 'null') } catch { return null } })()
+let hinted = ls.get(HINT_KEY) === '1'
 const saveSession = (s: Session | null) => { session = s; if (s) ls.set(AUTH_KEY, JSON.stringify(s)); else ls.del(AUTH_KEY) }
+
+let frameUrl = ''
+/** The session frame sits beside the script: https://<where vibe.js is served>/embed/session.html. */
+export function useFrame(scriptSrc: string) { try { frameUrl = new URL('session.html', scriptSrc).href } catch { frameUrl = '' } }
+
+type FrameReply = { id: number; ok: boolean; access_token?: string; expires_at?: number; refresh_token?: string; error?: string }
+let frame: Promise<{ win: Window; origin: string } | null> | null = null
+const pending = new Map<number, (d: FrameReply) => void>()
+let seq = 0
+function openFrame() {
+  if (!frameUrl) return Promise.resolve(null)
+  frame ??= new Promise((resolve) => {
+    const origin = new URL(frameUrl).origin
+    const holder = document.createElement('vibe-collab-session')
+    holder.style.setProperty('all', 'initial', 'important')
+    const root = holder.attachShadow({ mode: 'closed' })
+    const style = document.createElement('style')
+    style.textContent = `iframe{position:fixed;width:1px;height:1px;opacity:0;border:0;pointer-events:none;left:0;top:0}
+      iframe.show{opacity:1;pointer-events:auto;width:340px;height:150px;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483647;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);background:#fff}`
+    const f = document.createElement('iframe')
+    f.src = frameUrl
+    f.title = 'Vibe Collab sign-in'
+    f.setAttribute('aria-hidden', 'true')
+    f.setAttribute('tabindex', '-1')
+    const fail = window.setTimeout(() => resolve(null), 6000)
+    window.addEventListener('message', (e) => {
+      if (e.source !== f.contentWindow || e.origin !== origin || !e.data || e.data.vc !== 1) return
+      const d = e.data as FrameReply & { op?: string }
+      if (d.op === 'ready') { window.clearTimeout(fail); resolve({ win: f.contentWindow!, origin }) }
+      else if (d.op === 'show') { f.classList.add('show'); f.removeAttribute('aria-hidden'); f.removeAttribute('tabindex') }
+      else if (d.op === 'hide') { f.classList.remove('show'); f.setAttribute('aria-hidden', 'true'); f.setAttribute('tabindex', '-1') }
+      else if (typeof d.id === 'number') pending.get(d.id)?.(d)
+    })
+    root.append(style, f)
+    document.documentElement.appendChild(holder)
+  })
+  return frame
+}
+/** The session from the frame: a session, null (none, and none made), or 'none' when there is no frame. */
+async function fromFrame(create: boolean): Promise<Session | null | 'none'> {
+  const fr = await openFrame()
+  if (!fr) return 'none'
+  const id = ++seq
+  const d = await new Promise<FrameReply>((res) => {
+    pending.set(id, res)
+    // A session this page kept before moves into the frame, and leaves this page.
+    fr.win.postMessage({ vc: 1, op: 'session', id, create, migrate: session?.refresh_token }, fr.origin)
+    window.setTimeout(() => res({ id, ok: false, error: 'timeout' }), create ? 150_000 : 20_000)
+  })
+  pending.delete(id)
+  if (!d.ok) throw new ServerError(d.error ?? 'sign_in_failed')
+  if (!d.access_token) return null
+  return { access_token: d.access_token, expires_at: d.expires_at ?? Math.floor(Date.now() / 1000) + 3600, refresh_token: d.refresh_token }
+}
 
 async function auth(path: string, body: unknown): Promise<Session> {
   const r = await fetch(`${URL_}/auth/v1/${path}`, { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) {
     const msg = String(j.msg ?? j.message ?? j.error_description ?? r.status)
-    throw new ServerError(/anonymous/i.test(msg) ? 'anonymous_disabled' : msg)
+    throw new ServerError(/anonymous/i.test(msg) ? 'anonymous_disabled' : /captcha/i.test(msg) ? 'captcha_blocked' : msg)
   }
   return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at ?? Math.floor(Date.now() / 1000) + (j.expires_in ?? 3600) }
 }
 /** A session for this browser: the saved one (refreshed when near expiry), or a new anonymous one. */
 async function ensureSession(create: boolean): Promise<Session | null> {
   if (session && session.expires_at * 1000 - Date.now() > 60_000) return session
-  if (session) {
+  if (!create && !session && !hinted) return null
+  const got = await fromFrame(create)
+  if (got !== 'none') {
+    session = got
+    hinted = !!got
+    if (got) ls.set(HINT_KEY, '1'); else ls.del(HINT_KEY)
+    // Kept by this page only when the frame can't keep it (no storage there).
+    if (got?.refresh_token) ls.set(AUTH_KEY, JSON.stringify(got)); else ls.del(AUTH_KEY)
+    return session
+  }
+  // No frame: this page keeps the session.
+  if (session?.refresh_token) {
     try { saveSession(await auth('token?grant_type=refresh_token', { refresh_token: session.refresh_token })); return session } catch { saveSession(null) }
   }
   if (!create) return null
   saveSession(await auth('signup', { data: {} }))
   return session
 }
-export const hasSession = () => !!session
+export const hasSession = () => !!session || hinted
 
 export class ServerError extends Error {}
 /** Calls a database function as this browser's reviewer (or anonymously, for the installation check). */
@@ -106,7 +182,7 @@ export async function rpc<T>(fn: string, args: Record<string, unknown>, opts: { 
 export interface ReviewStart { name: string; preview: boolean; draft: unknown }
 const rvKey = (p: string) => `${NS}reviewer:${p}`
 /** Does this browser review the project? (Checked against the server when the widget starts.) */
-export const isReviewer = (project: string) => !!session && ls.get(rvKey(project)) !== null
+export const isReviewer = (project: string) => (!!session || hinted) && ls.get(rvKey(project)) !== null
 export const reviewerName = (project: string) => ls.get(rvKey(project)) ?? ''
 
 /** Becomes a reviewer: with a review link's token, or without one to check that this browser still is. */

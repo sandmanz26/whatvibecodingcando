@@ -25,5 +25,9 @@ export function supabaseEnv(mode: string) {
   if (env.VERCEL_ENV === 'production' && !(url && key)) throw new Error('Refusing to build for production: the Supabase project URL and anon key are not set (see apps/saas/supabase/README.md).')
   // Shown in the build log (Vercel → Deployments → the build → Logs), never the key itself.
   console.log(url && key ? `[supabase] connected: ${url} (public key, ${key.length} characters)` : `[supabase] not configured${url ? ' (URL set, key missing)' : key ? ' (key set, URL missing)' : ''}: the app keeps using this browser's storage`)
-  return { url: url.replace(/\/$/, ''), key }
+  // Cloudflare Turnstile's site key (public; the secret key goes into Supabase → Auth → Attack Protection only).
+  const turnstile = (env.VITE_TURNSTILE_SITE_KEY || '').trim()
+  if (turnstile && !/^[0-9A-Za-z_-]{10,100}$/.test(turnstile)) throw new Error('Refusing to build: VITE_TURNSTILE_SITE_KEY doesn’t look like a Turnstile site key.')
+  console.log(turnstile ? '[captcha] Turnstile site key set' : '[captcha] off (no VITE_TURNSTILE_SITE_KEY)')
+  return { url: url.replace(/\/$/, ''), key, turnstile }
 }
