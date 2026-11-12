@@ -22,7 +22,7 @@
 import { Component, useEffect, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Widget, OPEN_EVENT, type Config, type OpenWhat } from './Widget'
-import { TOOL_IDS } from './Tools'
+import { TOOL_IDS, type ToolId } from './Tools'
 import { LocalBackend, NS, type Backend } from './store'
 import { CSS } from './styles'
 import { LocalConfigSource, anyModule, envFor, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
@@ -74,12 +74,12 @@ function isHostedDemo(script: HTMLScriptElement | null) {
   try { return !!script && new URL(script.src).origin === window.location.origin && /\/embed-demo\.html$/.test(window.location.pathname) } catch { return false }
 }
 
-type Decision = { show: true; config: WidgetConfig; preview: boolean } | { show: false; why: string }
+type Decision = { show: true; config: WidgetConfig; preview: boolean; comments: boolean; tools: ToolId[] } | { show: false; why: string }
 /**
  * Whether the widget shows here, and with which settings. Order matters: the off switch first, then
  * where (environment), then what (modules), then who (audience).
  */
-function decide(o: { project: string; config: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; host: string; hostname: string; demo: boolean; reviewer: boolean }): Decision {
+function decide(o: { project: string; config: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; host: string; hostname: string; demo: boolean; reviewer: boolean; invited: boolean }): Decision {
   const preview = o.preview && o.reviewer && !!o.draft
   const c = preview ? o.draft : o.config
   if (!c) return { show: false, why: 'This project has no published widget settings yet.' }
@@ -90,8 +90,13 @@ function decide(o: { project: string; config: WidgetConfig | null; draft: Widget
     if (!env.on) return { show: false, why: env.name ? `The widget is off in the ${env.name} environment.` : `The widget is off for ${o.hostname} (Widget → Where).` }
   }
   if (!anyModule(c.modules)) return { show: false, why: 'No module is turned on.' }
-  if (c.audience === 'reviewers' && !o.reviewer) return { show: false, why: 'Only reviewers see it; open the site through a review link.' }
-  return { show: true, config: c, preview }
+  // Who sees what: "Who sees it" (audience) is for Comments. The design tools are for people opened
+  // in with a review link only, whatever the audience: they are the team's tools, not the visitors'.
+  const comments = c.modules.comments && (c.audience === 'everyone' || o.reviewer)
+  // With the widget for reviewers only, every reviewer came in through a link (or the panel's preview).
+  const tools = o.invited || (o.reviewer && c.audience === 'reviewers') ? TOOL_IDS.filter((id) => c.modules[id]) : []
+  if (!comments && !tools.length) return { show: false, why: 'Only reviewers see it; open the site through a review link.' }
+  return { show: true, config: c, preview, comments, tools }
 }
 
 /**
@@ -116,7 +121,8 @@ function addStyles(root: ShadowRoot, css: string) {
  *   local   this browser's stand-in (the browser-only demo, and installs that never published)
  */
 /** skipEnvs: installs that never published (0.1 snippet options) run wherever the snippet is. */
-interface Snapshot { live: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; reviewer: boolean; gone: boolean; skipEnvs: boolean }
+/** reviewer: may read and post comments; invited: came in through a review link (not only joined an open widget). */
+interface Snapshot { live: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; reviewer: boolean; invited: boolean; gone: boolean; skipEnvs: boolean }
 interface Mode {
   /** true on the server: reading and posting need a reviewer session for this browser */
   readonly sessions: boolean
@@ -139,7 +145,8 @@ function localMode(project: string, legacy: WidgetConfig | null): Mode {
     sessions: false,
     snapshot() {
       const s = source.get(project)
-      return { live: s.live?.config ?? legacy, draft: s.draft, preview: ss.get(previewKey(project)) === '1', reviewer: !!readSession(project) || !!token, gone: !!s.gone, skipEnvs: !s.live && !!legacy }
+      const reviewer = !!readSession(project) || !!token
+      return { live: s.live?.config ?? legacy, draft: s.draft, preview: ss.get(previewKey(project)) === '1', reviewer, invited: reviewer, gone: !!s.gone, skipEnvs: !s.live && !!legacy }
     },
     subscribe(cb) { subs.add(cb); const off = source.subscribe(project, cb); return () => { subs.delete(cb); off() } },
     async useToken(t) {
@@ -160,6 +167,16 @@ function localMode(project: string, legacy: WidgetConfig | null): Mode {
 }
 
 const draftKey = (p: string) => `${NS}draft:${p}`
+/**
+ * Came in through a review link (kept in this browser). Only decides whether the design tools show:
+ * they read the page's own styles in this browser and reach no data, so a visitor who sets it by hand
+ * gains nothing. Comments are checked by the server either way.
+ */
+const invitedKey = (p: string) => `${NS}invited:${p}`
+const invitedStore = {
+  get: (p: string) => { try { return localStorage.getItem(invitedKey(p)) === '1' } catch { return false } },
+  set: (p: string, v: boolean) => { try { if (v) localStorage.setItem(invitedKey(p), '1'); else localStorage.removeItem(invitedKey(p)) } catch { /* ignore */ } },
+}
 function serverMode(project: string, first: server.ServedFile): Mode {
   let live = first.live?.config ?? null
   let gone = first.gone
@@ -168,8 +185,10 @@ function serverMode(project: string, first: server.ServedFile): Mode {
   let draft = readDraft()
   const subs = new Set<() => void>()
   const notify = () => subs.forEach((f) => f())
-  const setReview = (r: server.ReviewStart | null) => {
+  const setReview = (r: server.ReviewStart | null, viaLink = false) => {
     reviewer = !!r
+    if (!r) invitedStore.set(project, false)
+    else if (viaLink) invitedStore.set(project, true)
     if (r?.preview) { ss.set(previewKey(project), '1'); ss.set(draftKey(project), JSON.stringify(r.draft ?? null)); draft = parseConfig(r.draft) }
     if (r?.name) { try { if (!localStorage.getItem(`${NS}name`)) localStorage.setItem(`${NS}name`, r.name) } catch { /* ignore */ } }
     notify()
@@ -195,12 +214,12 @@ function serverMode(project: string, first: server.ServedFile): Mode {
   poll()
   return {
     sessions: true,
-    snapshot: () => ({ live, draft, preview: ss.get(previewKey(project)) === '1', reviewer, gone, skipEnvs: false }),
+    snapshot: () => ({ live, draft, preview: ss.get(previewKey(project)) === '1', reviewer, invited: reviewer && invitedStore.get(project), gone, skipEnvs: false }),
     subscribe(cb) { subs.add(cb); return () => subs.delete(cb) },
     async useToken(t) {
       // A fresh link decides whether this tab previews: a tab opened from the panel can inherit an old flag.
       ss.del(previewKey(project)); ss.del(draftKey(project)); draft = null
-      setReview(await server.startReview(project, t, (() => { try { return localStorage.getItem(`${NS}name`) ?? undefined } catch { return undefined } })()))
+      setReview(await server.startReview(project, t, (() => { try { return localStorage.getItem(`${NS}name`) ?? undefined } catch { return undefined } })()), true)
     },
     async join() { if (!reviewer) setReview(await server.startReview(project, null, undefined, true)) },
     exitPreview() { ss.del(previewKey(project)); ss.del(draftKey(project)); draft = null; notify() },
@@ -285,7 +304,7 @@ async function boot() {
       return decide({
         project, config: s.live, draft: s.draft, preview: s.preview,
         host: window.location.host, hostname: window.location.hostname,
-        demo: demo || s.skipEnvs, reviewer: s.reviewer,
+        demo: demo || s.skipEnvs, reviewer: s.reviewer, invited: s.invited,
       })
     }
     const [decision, setDecision] = useState(read)
@@ -298,7 +317,7 @@ async function boot() {
       return () => host.removeEventListener(SESSION_EVENT, on)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
     // Open to everyone: this browser needs a reviewer session before it can read or post.
-    const needsJoin = m.sessions && decision.show && decision.config.audience === 'everyone' && !m.snapshot().reviewer
+    const needsJoin = m.sessions && decision.show && decision.comments && decision.config.audience === 'everyone' && !m.snapshot().reviewer
     useEffect(() => {
       if (!needsJoin || joining) return
       setJoining(true)
@@ -320,7 +339,7 @@ async function boot() {
     const config: Config = {
       project, position: c.launcher.position, shortcut: c.launcher.shortcut, launcher: c.launcher.kind, label: c.launcher.label,
       accent: c.theme.accent, mode: c.theme.mode,
-      comments: c.modules.comments, tools: TOOL_IDS.filter((id) => c.modules[id]),
+      comments: decision.comments, tools: decision.tools,
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
     }
     return <>{notice}<Widget backend={backend} config={config} host={host} /></>

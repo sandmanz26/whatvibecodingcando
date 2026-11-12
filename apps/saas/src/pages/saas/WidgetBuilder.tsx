@@ -32,7 +32,7 @@ export function WidgetBuilder() {
   if (!draft.envs.some((e) => e.on)) warnings.push('No environment is on, so it shows only on the hosted demo site.')
   if (!anyModule(out.modules)) warnings.push('No module is on, so there is nothing to show.')
   if (draft.launcher.kind === 'hidden' && !draft.launcher.shortcut) warnings.push('No launcher and no C key: people can open it only with your own data-vibe buttons.')
-  if (draft.audience === 'everyone') warnings.push('Every visitor can post comments. Until the server is live there is no spam protection.')
+  if (draft.audience === 'everyone') warnings.push(cloud ? 'Every visitor can post comments. Each person is rate limited, but there is no CAPTCHA yet: watch for spam.' : 'Every visitor can post comments. Until the server is live there is no spam protection.')
 
   return (
     <div className="up-page">
@@ -58,12 +58,13 @@ export function WidgetBuilder() {
 
           <section className="up-card">
             <h2>Who sees it</h2>
-            <div className="wb-choices" role="radiogroup" aria-label="Who sees it">
+            <p className="up-muted">Who sees Comments. The design tools (Inspect, Design system check, Design tokens) are always for reviewers only.</p>
+            <div className="wb-choices" role="radiogroup" aria-label="Who sees Comments">
               <button role="radio" aria-checked={draft.audience === 'reviewers'} className={draft.audience === 'reviewers' ? 'on' : ''} onClick={() => edit((c) => ({ ...c, audience: 'reviewers' }))}>
                 <Lock size={16} /><span><span><b>Reviewers only</b> <em>Recommended</em></span><small>People you open the site for with a review link (your team, your client). Visitors never see it or load it.</small></span>
               </button>
               <button role="radio" aria-checked={draft.audience === 'everyone'} className={draft.audience === 'everyone' ? 'on' : ''} onClick={() => edit((c) => ({ ...c, audience: 'everyone' }))}>
-                <Users size={16} /><span><b>Everyone visiting</b><small>For open betas. Every visitor can comment.</small></span>
+                <Users size={16} /><span><b>Everyone visiting</b><small>For open betas. Every visitor can comment; the design tools stay with reviewers.</small></span>
               </button>
             </div>
           </section>
@@ -80,7 +81,7 @@ export function WidgetBuilder() {
               }
               return (
                 <div className="up-row" key={p.id}>
-                  <span className="lp-grow"><b>{p.name}</b>{p.id === 'comments' && !on ? <small className="up-muted"> · turned off in <Link to="/app/products">Products</Link></small> : p.id !== 'comments' ? <small className="up-muted"> · for reviewers, in their browser only</small> : null}</span>
+                  <span className="lp-grow"><b>{p.name}</b>{p.id === 'comments' && !on ? <small className="up-muted"> · turned off in <Link to="/app/products">Products</Link></small> : p.id !== 'comments' ? <small className="up-muted"> · reviewers only, in their browser</small> : null}</span>
                   <Switch checked={!!out.modules[p.id as ModuleId]} onChange={toggle} label={p.name} />
                 </div>
               )
