@@ -26,6 +26,20 @@ export const supabase: SupabaseClient | null = URL_ && KEY
 export const cloud = !!supabase
 export const supabaseUrl = URL_ ?? ''
 
+/**
+ * Whether the Supabase project lets reviewers get a session (Auth → anonymous sign-ins). Reviewers on
+ * customers' sites need it; null when unknown (demo mode, or the check failed).
+ */
+let anonCheck: Promise<boolean | null> | null = null
+export function anonymousSignInsOn(): Promise<boolean | null> {
+  if (!URL_ || !KEY) return Promise.resolve(null)
+  anonCheck ??= fetch(`${URL_}/auth/v1/settings`, { headers: { apikey: KEY } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => (j && typeof j.external?.anonymous_users === 'boolean' ? j.external.anonymous_users as boolean : null))
+    .catch(() => null)
+  return anonCheck
+}
+
 /** Where links in emails come back to: this site's root, with what the link was for. */
 export const authReturnUrl = (what: 'signup' | 'recovery' | 'email_change') =>
   `${window.location.origin}${window.location.pathname}?auth=${what}`

@@ -8,7 +8,7 @@ import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snipp
 import { liveOf, openAsReviewer, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
-import { cloud, supabase, authMessage } from '../../saas/supabase'
+import { cloud, supabase, authMessage, anonymousSignInsOn } from '../../saas/supabase'
 import { PanelBackend, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
@@ -533,6 +533,14 @@ function PasswordCard() {
  * site's address with a token valid seven days, on up to five devices. The link is copied and sent
  * by you (email, chat); no email is sent from here yet.
  */
+/** Server mode only: reviewers can't get in while the Supabase project has anonymous sign-ins off. */
+export function AnonWarning() {
+  const [off, setOff] = useState(false)
+  useEffect(() => { if (cloud) void anonymousSignInsOn().then((on) => setOff(on === false)) }, [])
+  if (!off) return null
+  return <p className="up-warn"><TriangleAlert size={13} /> Reviewers can’t comment yet: anonymous sign-ins are off on the server. In Supabase, open Authentication → Sign In / Providers, turn on “Allow anonymous sign-ins” and save. Review links work right after.</p>
+}
+
 function Reviewers() {
   const { project } = usePanel()
   const { toast } = useStore()
@@ -554,6 +562,7 @@ function Reviewers() {
   return (
     <section className="up-card">
       <h2>Reviewers</h2>
+      <AnonWarning />
       <p className="up-muted">People who comment on your site, like your client. Make a link for each person and send it to them yourself (email, WhatsApp). It works for 7 days, on up to 5 of their devices; after that they stay a reviewer in that browser.</p>
       <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); void make(site || demoUrl(project.id)) }}>
         <input className="up-search grow" value={name} onChange={(ev) => setName(ev.target.value)} maxLength={80} placeholder="Their name, e.g. Pak Budi" aria-label="Reviewer name" />

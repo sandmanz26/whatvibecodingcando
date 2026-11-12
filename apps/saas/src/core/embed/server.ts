@@ -110,13 +110,19 @@ export const isReviewer = (project: string) => !!session && ls.get(rvKey(project
 export const reviewerName = (project: string) => ls.get(rvKey(project)) ?? ''
 
 /** Becomes a reviewer: with a review link's token, or without one to check that this browser still is. */
+/** Why the last review link didn't work (shown to that reviewer), or null. */
+let linkError: string | null = null
+export const reviewLinkError = () => linkError
+
 export async function startReview(project: string, token: string | null, name?: string, signIn = false): Promise<ReviewStart | null> {
   try {
     const r = await rpc<ReviewStart>('start_review', { p_public_id: project, p_token: token, p_name: name ?? null }, { signIn: signIn || !!token })
     ls.set(rvKey(project), r.name)
+    if (token) linkError = null
     return r
   } catch (e) {
     const m = (e as Error).message
+    if (token) linkError = m
     if (m === 'not_invited' || m === 'link_expired' || m === 'no_project') ls.del(rvKey(project))
     if (m === 'anonymous_disabled') console.warn('[Vibe Collab] the project’s server doesn’t allow reviewer sessions yet (Supabase → Authentication → Sign In / Providers → allow anonymous sign-ins).')
     else if (token) console.warn(`[Vibe Collab] the review link didn’t work: ${m}.`)

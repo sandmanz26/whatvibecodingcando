@@ -7,7 +7,7 @@ import { PRODUCTS } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, publish, reviewerUrl } from '../../saas/widget'
 import { MAX_ENVS, MAX_LABEL, hostProblem, sameConfig, type Env, type WidgetConfig } from '../../core/embed/config'
-import { ago, openDemo, usePanel } from './Panel'
+import { AnonWarning, ago, openDemo, usePanel } from './Panel'
 import { cloud } from '../../saas/supabase'
 
 /**
@@ -46,6 +46,7 @@ export function WidgetBuilder() {
         {dirty && live && <button className="lp-btn sm ghost" onClick={() => setConfirm('discard')}>Discard changes</button>}
         <button className="lp-btn sm primary" disabled={!dirty} onClick={() => setConfirm('publish')}><Rocket size={13} /> Publish v{(live?.version ?? 0) + 1}</button>
       </div>
+      <AnonWarning />
 
       <div className="wb-grid">
         <div className="wb-form">

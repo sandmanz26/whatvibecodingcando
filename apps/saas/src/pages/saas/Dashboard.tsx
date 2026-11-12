@@ -10,7 +10,7 @@ import { liveOf, setLiveOn } from '../../saas/widget'
 import { cloud } from '../../saas/supabase'
 import { projectStats } from '../../saas/cloud'
 import { statsOf, type Stats } from '../../saas/stats'
-import { ago, openDemo, usePanel, useThreads } from './Panel'
+import { AnonWarning, ago, openDemo, usePanel, useThreads } from './Panel'
 
 /**
  * The project's dashboard: is the widget on, what has come in, from where, and what to do next.
@@ -69,6 +69,7 @@ export function Dashboard() {
         <div><h1>{project.name}</h1><p>Project id <code>{project.id}</code>{project.siteUrl && <> · <a href={project.siteUrl} target="_blank" rel="noopener">{project.siteUrl.replace(/^https?:\/\//, '')} <ExternalLink size={12} /></a></>}</p></div>
       </div>
 
+      <AnonWarning />
       {failed && !server && <p className="up-warn">Couldn’t load the numbers: {failed}. If this is a new setup, run the latest migrations in Supabase (see supabase/README.md).</p>}
       <section className={`up-card db-status ${on ? 'on' : 'off'}`}>
         <Power size={18} />

@@ -29,7 +29,7 @@ import * as server from './server'
 
 /** The public API: window.VibeCollab.open('comment' | 'list'). Calls made before the script loaded are queued in q. */
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
-declare global { interface Window { __vibeCollab?: { version: string; project: string }; VibeCollab?: Api | { q?: unknown[][] } } }
+declare global { interface Window { __vibeCollab?: { version: string; project: string; server?: boolean }; VibeCollab?: Api | { q?: unknown[][] } } }
 
 const VERSION = '0.3.0'
 
@@ -208,6 +208,23 @@ function serverMode(project: string, first: server.ServedFile): Mode {
   }
 }
 
+/** Shown only to the person who opened a review link that didn't work, so they aren't left guessing. */
+const LINK_PROBLEMS: Record<string, string> = {
+  anonymous_disabled: 'This review link can’t open yet: the site’s comment server doesn’t allow reviewer sessions. Ask the site owner to turn on anonymous sign-ins.',
+  link_expired: 'This review link has expired or was already used. Ask the site owner for a new one.',
+  origin_not_allowed: 'This review link doesn’t work on this address: the site owner hasn’t switched it on (Widget → Where), or the widget is off.',
+  no_project: 'This review link is for a project that no longer exists.',
+  rate_limited: 'Too many tries. Wait a minute and open the link again.',
+}
+function LinkNotice({ why, onClose }: { why: string; onClose: () => void }) {
+  return (
+    <div className="vc-toast error" role="alert" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', bottom: 20, maxWidth: 'min(460px, calc(100vw - 32px))', lineHeight: 1.4 }}>
+      <span>{LINK_PROBLEMS[why] ?? 'This review link didn’t work. Open it again, or ask the site owner for a new one.'}</span>
+      <button type="button" onClick={onClose} aria-label="Close" style={{ border: 0, background: 'transparent', color: '#fff', fontSize: 16, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
+    </div>
+  )
+}
+
 async function boot() {
   if (window.__vibeCollab) { console.warn('[Vibe Collab] the script is on this page twice; the second copy does nothing.'); return }
   const script = (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
@@ -251,6 +268,7 @@ async function boot() {
     mode = localMode(project, legacy)
   }
   const m = mode
+  window.__vibeCollab.server = m.sessions
   if (token) await m.useToken(token)
 
   const host = document.createElement('vibe-collab')
@@ -289,14 +307,21 @@ async function boot() {
       m.reportSeen(decision.show, decision.show ? '' : decision.why)
       if (!decision.show) console.info(`[Vibe Collab] not shown: ${decision.why}`)
     }, [decision])
-    if (!decision.show || needsJoin) return null
+    const [problem, setProblem] = useState<string | null>(() => (m.sessions ? server.reviewLinkError() : null))
+    useEffect(() => {
+      const on = () => setProblem(m.sessions ? server.reviewLinkError() : null)
+      host.addEventListener(SESSION_EVENT, on)
+      return () => host.removeEventListener(SESSION_EVENT, on)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const notice = problem ? <LinkNotice why={problem} onClose={() => setProblem(null)} /> : null
+    if (!decision.show || needsJoin) return notice
     const c = decision.config
     const config: Config = {
       project, position: c.launcher.position, shortcut: c.launcher.shortcut, launcher: c.launcher.kind, label: c.launcher.label,
       accent: c.theme.accent, mode: c.theme.mode,
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
     }
-    return <Widget backend={backend} config={config} host={host} />
+    return <>{notice}<Widget backend={backend} config={config} host={host} /></>
   }
 
   const open = (what: OpenWhat = 'comment') => host.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: what === 'list' ? 'list' : 'comment' }))

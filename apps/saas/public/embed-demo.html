@@ -50,7 +50,7 @@
           <input placeholder="Type here: the C key doesn't start a comment while you type" aria-label="Email" />
           <button type="submit">Subscribe</button>
         </form>
-        <p class="note">Comments on this demo are saved in your browser only (no backend yet). Project: <b id="proj"></b></p>`,
+        <p class="note"><span id="where">Comments on this demo are saved in your browser only.</span> Project: <b id="proj"></b></p>`,
       '/pricing': `
         <h1>Pricing</h1>
         <section class="cards">
@@ -62,8 +62,12 @@
     const render = () => { const r = location.hash.slice(1) || '/'; document.getElementById('app').innerHTML = pages[r] || pages['/'] }
     addEventListener('hashchange', render)
     render()
-    const showProject = () => { const el = document.getElementById('proj'); if (el) el.textContent = (window.__vibeCollab && window.__vibeCollab.project) || '…' }
-    addEventListener('load', showProject); addEventListener('hashchange', () => setTimeout(showProject))
+    const showProject = () => {
+      const v = window.__vibeCollab, el = document.getElementById('proj'), w = document.getElementById('where')
+      if (el) el.textContent = (v && v.project) || '…'
+      if (w && v && v.server) w.textContent = 'Comments on this demo are saved on the project’s server; only reviewers with a review link see the widget.'
+    }
+    addEventListener('load', () => { showProject(); setTimeout(showProject, 1500); setTimeout(showProject, 4000) }); addEventListener('hashchange', () => setTimeout(showProject))
   </script>
 
   <!-- The whole installation: -->
