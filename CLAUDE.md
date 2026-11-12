@@ -29,7 +29,7 @@
     - Comments: through the database functions in `supabase/migrations/…_reviewers.sql`, which check origin, reviewer and rate limits.
   - Keep both modes working; text that says "no server" must depend on the mode.
   - Every table has row level security and no anon access.
-  - The script's traffic goes through Edge Functions; widget configuration is a CDN file, never a database read per page view.
+  - The script's traffic goes through Edge Functions; widget configuration is a CDN file, never a database read per page view. That file is public: no site names (hashed by `publicConfig`), no people's names.
   - Keep `supabase/tests/run.sh` passing.
   - Never put the service role key or database password in the app, the repository or chat.
   - Dashboard (`#/app`, `Dashboard.tsx`): numbers from `project_stats` on the server, from this browser in the demo.

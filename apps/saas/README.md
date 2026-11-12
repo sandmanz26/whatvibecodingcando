@@ -384,6 +384,7 @@ Everything else is the project's **published configuration**, built in the panel
 - **Modules.** Each product that runs in the script is a module of the published settings (`SCRIPT_MODULES` in `src/core/embed/config.ts`): today Comments, Inspect, Design system check and Design tokens.
   - A module is on in a release only when its product is on for the project (Products, or the Modules switches in Widget). Publishing applies it; the snippet never changes.
   - The script drops modules it doesn't know, so an older cached script stays safe.
+- **The public settings file** (`widget-config/<project>.json` on the CDN) is written by `publicConfig()`: exact site names are SHA-256 hashes keyed by the project (`hostKey`), environment names and the publisher's name are left out; `*` patterns stay. The script hashes the page's host to match. The database keeps the full settings for the panel and the server's checks.
 - **Reviewer tools** (`src/core/embed/Tools.tsx`, `design.ts`): buttons in the dock beside Comments, for reviewers only (same audience rules as Comments).
   - **Inspect:** hover an element to see its font, size, colours, radius and padding, and whether each is one of the page's tokens. While it is on, clicks pick elements and never press the page's buttons or follow links.
   - **Design system check:** scans the page (up to 5,000 elements) for colours, radii, font sizes and fonts that aren't tokens; click a finding to show it on the page.

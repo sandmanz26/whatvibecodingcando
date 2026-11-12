@@ -52,6 +52,9 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
   - **`project_stats`** returns the dashboard's numbers in one call: status counts, replies, reviewers, 14 days of activity, top pages, sites.
   - **Clearing data:** members may delete installation reports; `revoke_review_links` revokes the project's review links.
   - **Share links (`shares`):** `create_share` is for members; only a SHA-256 of the token is stored, with a filter (all, open, completed), an expiry and a revoke date. `get_share` works without an account, is read-only and rate limited, and counts views.
+- **`migrations/20261112000000_install_reports.sql`**: installation reports only from a project's own sites.
+  - `report_seen` records a site only when the request comes from one of the project's environments (on or off) or the hosted demo site; made-up origins are dropped.
+  - At most 20 sites per project, and 120 reports a minute per project. Reports already recorded from other places are deleted.
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.
@@ -79,7 +82,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 
 ## Tests
 
-- `tests/run.sh` runs `rls_test.sql` (row level security) and `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account) on a fresh database.
+- `tests/run.sh` runs every `*_test.sql` on a fresh database: `rls_test.sql` (row level security), `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account), `share_test.sql` (dashboard, clearing data, share links) and `install_test.sql` (installation reports).
 - The full path (panel → invite link → reviewer on another domain → comment in the database → panel inbox, plus kill switch, preview and delete account) was checked in a browser against these migrations on Postgres 16. It is not in CI yet.
 
 ## Not done yet (before a public launch)

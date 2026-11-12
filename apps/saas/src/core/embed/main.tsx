@@ -79,15 +79,15 @@ type Decision = { show: true; config: WidgetConfig; preview: boolean } | { show:
  * Whether the widget shows here, and with which settings. Order matters: the off switch first, then
  * where (environment), then what (modules), then who (audience).
  */
-function decide(o: { config: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; host: string; hostname: string; demo: boolean; reviewer: boolean }): Decision {
+function decide(o: { project: string; config: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; host: string; hostname: string; demo: boolean; reviewer: boolean }): Decision {
   const preview = o.preview && o.reviewer && !!o.draft
   const c = preview ? o.draft : o.config
   if (!c) return { show: false, why: 'This project has no published widget settings yet.' }
   if (!c.on) return { show: false, why: 'The widget is switched off for this project.' }
   if (!o.demo) {
-    const env = envFor(c, o.host) ?? envFor(c, o.hostname)
-    if (!env) return { show: false, why: `${o.hostname} isn’t one of this project’s environments.` }
-    if (!env.on) return { show: false, why: `The widget is off in the ${env.name} environment.` }
+    const env = envFor(c, o.host, o.project) ?? envFor(c, o.hostname, o.project)
+    if (!env) return { show: false, why: `${o.hostname} isn’t one of this project’s environments (Widget → Where).` }
+    if (!env.on) return { show: false, why: env.name ? `The widget is off in the ${env.name} environment.` : `The widget is off for ${o.hostname} (Widget → Where).` }
   }
   if (!anyModule(c.modules)) return { show: false, why: 'No module is turned on.' }
   if (c.audience === 'reviewers' && !o.reviewer) return { show: false, why: 'Only reviewers see it; open the site through a review link.' }
@@ -283,7 +283,7 @@ async function boot() {
       const s = m.snapshot()
       if (s.gone) return { show: false, why: 'The project was deleted.' }
       return decide({
-        config: s.live, draft: s.draft, preview: s.preview,
+        project, config: s.live, draft: s.draft, preview: s.preview,
         host: window.location.host, hostname: window.location.hostname,
         demo: demo || s.skipEnvs, reviewer: s.reviewer,
       })

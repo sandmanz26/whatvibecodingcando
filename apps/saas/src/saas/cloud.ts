@@ -12,7 +12,7 @@
  * Row level security on the server decides what is allowed; nothing here is trusted by it.
  */
 import { supabase } from './supabase'
-import { parseConfig, type Release, type Seen } from '../core/embed/config'
+import { parseConfig, publicConfig, type Release, type Seen } from '../core/embed/config'
 import type { Backend, Thread } from '../core/embed/store'
 import type { Stats, SharedList, ShareRow } from './stats'
 import type { Invite, Project, SaasState } from './account'
@@ -118,7 +118,8 @@ export async function pushCloud(prev: SaasState, next: SaasState): Promise<void>
       const { error } = await supabase.from('releases').insert({ project_id: dbIds.get(p.id)!, version: r.version, config: r.config, created_by: user.id })
       if (error) throw error
     }
-    if (fresh.length) await writeFile(p.id, { v: 1, release: fresh[fresh.length - 1] })
+    // The public file: the settings without site names (hashed) and without who published them.
+    if (fresh.length) { const r = fresh[fresh.length - 1]; await writeFile(p.id, { v: 1, release: { version: r.version, at: r.at, config: publicConfig(p.id, r.config) } }) }
   }
   for (const p of prev.projects) {
     if (after.has(p.id) || !dbIds.get(p.id)) continue
