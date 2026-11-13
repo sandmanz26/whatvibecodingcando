@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Check, ArrowLeft, ArrowRight, MousePointer2, Copy, ExternalLink, LogOut } from 'lucide-react'
-import { BRAND, PRODUCTS, inScript, parseProducts, productOf, statusLabel } from '../../saas/products'
+import { BRAND, PRODUCTS, inScript, parseProducts, productOf, statusLabel, CATEGORIES, CAT_HELP } from '../../saas/products'
 import { SAAS_ERROR, settled, freeId, isOnboarded, isSignedIn, newProject, originOf, slug, useSaas, useSaasReady } from '../../saas/account'
 import { copyText, demoUrl, installSnippet } from '../../saas/snippet'
 import { publish } from '../../saas/widget'
@@ -99,19 +99,22 @@ export default function Onboarding() {
               <span className="lp-eyebrow">Welcome, {first}</span>
               <h1>What do you want to use?</h1>
               <p className="lp-muted">Pick any. You can change this later, per project.</p>
+              {CATEGORIES.map((cat) => <div key={cat} className="lp-checkgroup">
+              <h2 className="lp-checkhead">{cat}<small> · {CAT_HELP[cat]}</small></h2>
               <div className="lp-checks">
-                {PRODUCTS.map((p) => {
+                {PRODUCTS.filter((p) => p.category === cat).map((p) => {
                   const Icon = p.icon
                   const on = products.includes(p.id)
                   return (
                     <button type="button" key={p.id} className={`lp-check ${on ? 'on' : ''}`} onClick={() => toggle(p.id)} aria-pressed={on}>
                       <span className="lp-icon sm" style={{ background: p.hue }}><Icon size={15} /></span>
-                      <span className="lp-grow"><b>{p.name}</b><small>{statusLabel(p.status)}</small></span>
+                      <span className="lp-grow"><b>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</b><small>{statusLabel(p.status)}</small></span>
                       <span className="lp-tick">{on && <Check size={13} />}</span>
                     </button>
                   )
                 })}
               </div>
+              </div>)}
               {tried && !products.length && <p className="lp-error">Pick at least one tool.</p>}
             </>
           )}

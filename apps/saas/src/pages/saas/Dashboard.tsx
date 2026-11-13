@@ -60,7 +60,7 @@ export function Dashboard() {
     { done: !!live, label: 'Put your widget settings on your site', to: '/app/widget' },
     { done: !!project.copiedSnippet, label: 'Copy your snippet into your site', to: '/app/install' },
     { done: !!st?.sites.length, label: 'See the script running on a site', to: '/app/install' },
-    { done: cloud ? (st?.reviewers ?? 0) > 0 : total > 0, label: cloud ? 'Invite a reviewer' : 'Leave the first comment', to: cloud ? '/app/team' : '/app/install' },
+    { done: cloud ? (st?.reviewers ?? 0) > 0 : total > 0, label: cloud ? 'Invite a reviewer' : 'Leave the first comment', to: cloud ? '/app/reviewers' : '/app/install' },
     { done: total > 0, label: 'Get the first comment', to: '/app/comments' },
     ...(cloud && research ? [{ done: !!studies?.some((x) => x.runs > 0), label: 'Run a first study with participants', to: '/app/research' }] : []),
   ]
@@ -96,7 +96,7 @@ export function Dashboard() {
           <Link key={k} to={`/app/comments?status=${k}`} className={`db-kpi st-${k}`}><span>{STATUS_LABEL[k]}</span><b>{st ? st[k] : '–'}</b></Link>
         ))}
         <div className="db-kpi"><span><MessagesSquare size={13} /> Replies</span><b>{st ? st.replies : '–'}</b></div>
-        <Link to="/app/team" className="db-kpi"><span><Users size={13} /> {cloud ? 'Reviewers' : 'People'}</span><b>{st ? st.reviewers : '–'}</b>{cloud && st ? <small>{st.active_reviewers} active this week</small> : null}</Link>
+        <Link to="/app/reviewers" className="db-kpi"><span><Users size={13} /> {cloud ? 'Reviewers' : 'People'}</span><b>{st ? st.reviewers : '–'}</b>{cloud && st ? <small>{st.active_reviewers} active this week</small> : null}</Link>
       </div>
 
       <div className="up-cols">

@@ -80,10 +80,10 @@ export function WidgetBuilder() {
             </section>
           )}
 
-          {project.products.includes('versions') && (
+          {project.products.includes('comments') && (
             <section className="up-card">
-              <h2>Version</h2>
-              <p className="up-muted">Your site’s current version. Comments made after you update your site carry it, so feedback stays with the release it was about. Change it, and update your site, when you deploy a new one.</p>
+              <h2>Site version <span className="up-muted">(optional)</span></h2>
+              <p className="up-muted">Which release of your site is live. Comments carry it, so you can filter feedback by release. Change it when you deploy.</p>
               <input className="up-search" value={draft.version ?? ''} maxLength={20} placeholder="e.g. 1.4 or 2026-11-13" aria-label="Current version"
                 onChange={(e) => { const v = e.target.value.replace(/[^\w. -]/g, '').slice(0, 20); edit((c) => { const { version: _drop, ...rest } = c; void _drop; return v.trim() ? { ...rest, version: v } : rest }) }} />
             </section>

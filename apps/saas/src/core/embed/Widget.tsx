@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff, Columns2, Mic, Square, Play } from 'lucide-react'
 import { audioUrl, uploadAudio } from './server'
 import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
-import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
+import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, deviceNow, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
 import { takeHint } from './hints'
 
 export interface Config {
@@ -184,7 +184,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const post = () => {
     if (!draft || (!draft.text.trim() && draft.kind !== 'compare')) return
     const text = draft.kind === 'compare' ? `${draft.verdict ?? VERDICTS[0]}${draft.text.trim() ? ` — ${draft.text.trim()}` : ''}` : draft.text.trim()
-    const t: Thread = { id: uid(), page: draft.page, anchor: draft.anchor, author: me, text: text.slice(0, MAX_TEXT), createdAt: new Date().toISOString(), replies: [], ...(draft.kind && draft.kind !== 'comment' ? { kind: draft.kind } : {}) }
+    const t: Thread = { id: uid(), page: draft.page, anchor: { ...draft.anchor, device: deviceNow() }, author: me, text: text.slice(0, MAX_TEXT), createdAt: new Date().toISOString(), replies: [], ...(draft.kind && draft.kind !== 'comment' ? { kind: draft.kind } : {}) }
     setDraft(null)
     setOpenId(t.id)
     void save(t, 'Comment posted')
@@ -195,7 +195,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     const id = uid()
     try {
       const audio = await uploadAudio(config.project, id, blob)
-      const t: Thread = { id, page: draft.page, anchor: draft.anchor, author: me, text: (note.trim() || 'Voice note').slice(0, MAX_TEXT), createdAt: new Date().toISOString(), replies: [], kind: 'voice', audio }
+      const t: Thread = { id, page: draft.page, anchor: { ...draft.anchor, device: deviceNow() }, author: me, text: (note.trim() || 'Voice note').slice(0, MAX_TEXT), createdAt: new Date().toISOString(), replies: [], kind: 'voice', audio }
       setDraft(null); setOpenId(t.id)
       await save(t, 'Voice note posted')
     } catch { say('The voice note couldn’t be saved. Try again.', true) }

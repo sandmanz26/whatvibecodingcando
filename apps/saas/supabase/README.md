@@ -65,6 +65,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
   - A private bucket `narrations` (5 MB, audio only): only the project's reviewers upload, under `<public id>/<uuid>.<ext>`; members and reviewers listen; members and the author delete.
   - `post_thread` takes a kind and a voice note's audio (which must be the caller's own upload in the project); `versions_of` counts comments per version.
 - **`migrations/20261115000000_heatmap_quality.sql`**: `heatmap_points` also returns, per point, a participant number (within the answer, no ids), the time in their run, their device and eye-tracking accuracy, for a better heatmap.
+- **`migrations/20261116000000_comment_context.sql`**: `post_thread` records the site version whenever the published settings have one (no Versions module needed), and refuses an anchor that isn't a JSON object or is over 4,000 characters (it now carries the reviewer's browser and window size).
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.

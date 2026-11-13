@@ -92,10 +92,10 @@ export function Research() {
   return (
     <div className="up-page">
       <div className="up-head">
-        <div><h1>{tab === 'sessions' ? 'Sessions' : filter?.title ?? 'Research'}</h1><p>{filter ? <>{filter.help} <Link to="/app/research">All studies</Link></> : 'Studies on your own site, with people who agree to take part. Visitors who didn’t open a study’s link are never recorded.'}</p></div>
+        <div><h1>{tab === 'sessions' ? 'Participant paths' : filter?.title ?? 'Research'}</h1><p>{filter ? <>{filter.help} <Link to="/app/research">All studies</Link></> : 'Studies on your own site, with people who agree to take part. Visitors who didn’t open a study’s link are never recorded.'}</p></div>
         {cloud && <button className="lp-btn primary" onClick={() => setEditing('new')}><Plus size={14} /> New study</button>}
       </div>
-      {cloud && <div className="seg rs-tabs" role="tablist"><button role="tab" aria-selected={tab === 'studies'} aria-pressed={tab === 'studies'} onClick={() => setTab('studies')}>Studies</button><button role="tab" aria-selected={tab === 'sessions'} aria-pressed={tab === 'sessions'} onClick={() => setTab('sessions')}>Session insights</button></div>}
+      {cloud && <div className="seg rs-tabs" role="tablist"><button role="tab" aria-selected={tab === 'studies'} aria-pressed={tab === 'studies'} onClick={() => setTab('studies')}>Studies</button><button role="tab" aria-selected={tab === 'sessions'} aria-pressed={tab === 'sessions'} onClick={() => setTab('sessions')}>Participant paths</button></div>}
       {tab === 'sessions' ? <Sessions studies={rows ?? []} /> : <>
       {!cloud && <p className="up-warn"><TriangleAlert size={13} /> Studies on your site need the server: this demo panel has none. Try the research tools in the demo console instead.</p>}
       {cloud && rows && !rows.length && (
@@ -437,7 +437,7 @@ function Sessions({ studies }: { studies: StudyRow[] }) {
   return (
     <>
       <div className="up-row wrap rs-actions">
-        <button className="lp-btn sm" onClick={() => download('sessions.csv', runsCsv(data.runs, (r) => studyName((r as RunRow & { study_id: string }).study_id)))}><Download size={13} /> Sessions (CSV)</button>
+        <button className="lp-btn sm" onClick={() => download('participants.csv', runsCsv(data.runs, (r) => studyName((r as RunRow & { study_id: string }).study_id)))}><Download size={13} /> Participants (CSV)</button>
         <button className="lp-btn sm" onClick={() => download('sessions-clicks-and-pages.csv', eventsCsv(data.runs, data.events))}><Download size={13} /> Clicks and pages (CSV)</button>
       </div>
       <div className="db-kpis">

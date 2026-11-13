@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, ArrowRight, Plus, ExternalLink, Code2, MousePointer2, Users, ShieldCheck, Sparkles } from 'lucide-react'
-import { BRAND, CATEGORIES, PRODUCTS, inScript, statusLabel, type Category } from '../../saas/products'
+import { BRAND, CATEGORIES, PRODUCTS, statusLabel, type Category } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
 import { isSignedIn, loadSaas } from '../../saas/account'
 import '../../saas/saas.css'
+import { cloud } from '../../saas/supabase'
 
 const PICK_KEY = 'vibe.landing.pick'
 const readPick = (): string[] => { try { return JSON.parse(sessionStorage.getItem(PICK_KEY) ?? '["comments"]') } catch { return ['comments'] } }
 
 const FAQ = [
-  { q: 'Where are comments saved?', a: 'During the beta, in each person’s own browser, so teammates don’t see each other’s comments yet. Shared projects with a database are the next step. The script already stores data through one small interface, so that switch doesn’t change what you install.' },
+  { q: 'Where are comments saved?', a: cloud ? 'On our server (Supabase, in Singapore), per project, behind row level security: only your project’s owner and its reviewers can read them. You can download them as CSV or delete them any time.' : 'In this demo, in each person’s own browser. The hosted version saves them on our server, per project.' },
   { q: 'Does it work with my framework?', a: 'Yes. It’s one script tag, so it works with React, Next.js, Vue, Svelte, Webflow, WordPress or plain HTML. Single-page apps with normal or hash routes are followed page by page.' },
   { q: 'Can it break my site?', a: 'The widget lives in a shadow root: your CSS can’t reach it and its CSS can’t reach your site. A click used to place a comment never reaches your page. It never reads what people type into your forms.' },
-  { q: 'Which products work on my site today?', a: `${inScript()} are in the script now. The other tools are built and you can use them in the live demo; they move into the script one by one. Pick them now and they switch on for your project as they arrive.` },
-  { q: 'What will it cost?', a: 'Everything is free during the beta. The plan after that: you pay only for the products you turn on, each with a free tier. Prices will be announced before the beta ends.' },
+  { q: 'Who sees the widget?', a: 'By default only reviewers: people you send a review link to. Your visitors see nothing and load almost nothing (a 5 kB check). You can open comments to everyone, for an open beta.' },
+  { q: 'What will it cost?', a: 'Free for one site with comments and the design tools. Pro is $2 a site a month (Rp 29.000 in Indonesia) with every tool. During the beta everyone gets Pro free, and we’ll tell you before billing starts.' },
 ]
 
 export default function Landing() {
@@ -110,7 +111,7 @@ export default function Landing() {
                     <span className="lp-icon" style={{ background: p.hue }}><Icon size={18} /></span>
                     <span className={`lp-status ${p.status}`}>{statusLabel(p.status)}</span>
                   </div>
-                  <h3>{p.name}</h3>
+                  <h3>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</h3>
                   <p>{p.tagline}</p>
                   <ul>{p.points.map((x) => <li key={x}><Check size={13} /> {x}</li>)}</ul>
                   <div className="lp-card-foot">
@@ -134,7 +135,7 @@ export default function Landing() {
                 ))}
               </ul>
             )}
-            <div className="lp-stack-price"><span>During the beta</span><b>Free</b></div>
+            <div className="lp-stack-price"><span>Free in the beta, then</span><b>$2 / site</b></div>
             <button className="lp-btn primary full" disabled={!picked.length} onClick={start}>{signedIn ? 'Turn these on' : `Start with ${picked.length || ''} tool${picked.length === 1 ? '' : 's'}`} <ArrowRight size={15} /></button>
             {picked.some((p) => p.status === 'console') && <p className="lp-muted lp-small">Early-access tools switch on for your project as they move into the script.</p>}
           </aside>
@@ -160,22 +161,24 @@ export default function Landing() {
       </section>
 
       <section id="pricing" className="lp-wrap lp-section">
-        <div className="lp-head"><h2>Simple pricing</h2><p>Pay for the products you turn on. Nothing else.</p></div>
+        <div className="lp-head"><h2>Every tool, $2 a site</h2><p>One price per website or app. No seats, no tiers to compare. Free while we’re in beta.</p></div>
         <div className="lp-prices">
           <div className="lp-price">
-            <h3>Beta</h3>
-            <b className="lp-big">Free</b>
-            <p>Every product, every project, while we build the shared workspace.</p>
-            <ul><li><Check size={14} /> All tools you pick</li><li><Check size={14} /> Unlimited projects</li><li><Check size={14} /> Prompts to build tools into your own code</li></ul>
-            <Link to={signedIn ? '/app' : hasAccount ? '/app/login' : '/app/register'} className="lp-btn dark full">{signedIn ? 'Open your panel' : 'Get started'}</Link>
+            <h3>Free</h3>
+            <b className="lp-big">$0</b>
+            <p>For one site and a few reviewers.</p>
+            <ul><li><Check size={14} /> 1 site</li><li><Check size={14} /> Comments, voice notes, A vs B</li><li><Check size={14} /> Inspect, design system check, design tokens</li><li><Check size={14} /> Up to 3 reviewers</li></ul>
+            <Link to={signedIn ? '/app' : hasAccount ? '/app/login' : '/app/register'} className="lp-btn full">{signedIn ? 'Open your panel' : 'Start free'}</Link>
           </div>
-          <div className="lp-price muted">
-            <h3>After the beta</h3>
-            <b className="lp-big">Per product</b>
-            <p>Each product you turn on has a free tier; you pay only past it. No seats, no bundles.</p>
-            <ul><li><Check size={14} /> Free tier on every product</li><li><Check size={14} /> Turn products off any time</li><li><Check size={14} /> Prices announced before the beta ends</li></ul>
+          <div className="lp-price">
+            <h3>Pro</h3>
+            <b className="lp-big">$2<small> / site / month</small></b>
+            <p>Everything, for every site you add. Rp 29.000 in Indonesia.</p>
+            <ul><li><Check size={14} /> Usability tests, 5-second tests, heatmaps</li><li><Check size={14} /> Eye tracking (Labs), fake doors, participant paths</li><li><Check size={14} /> Reports, CSV downloads, share links</li><li><Check size={14} /> Unlimited reviewers · 100 participants a month</li></ul>
+            <Link to={signedIn ? '/app' : hasAccount ? '/app/login' : '/app/register'} className="lp-btn dark full">{signedIn ? 'Open your panel' : 'Get Pro free during the beta'}</Link>
           </div>
         </div>
+        <p className="lp-muted lp-center">During the beta every account gets Pro for free. We’ll tell you before billing starts; nothing is charged without you choosing to.</p>
       </section>
 
       <section className="lp-wrap lp-section">
@@ -197,7 +200,6 @@ export default function Landing() {
         <span className="lp-muted">Beta · a working name</span>
         <span className="lp-grow" />
         <a href={demoUrl()} target="_blank" rel="noopener">Demo site</a>
-        <Link to="/console/prompts">Prompts</Link>
         <Link to="/app">Your panel</Link>
         <Link to="/guide">User guide</Link>
         <Link to="/privacy">Privacy</Link>

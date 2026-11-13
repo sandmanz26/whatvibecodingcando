@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BarChart3, Boxes, ChevronRight, Code2, LayoutDashboard, LifeBuoy, Settings, SlidersHorizontal, Sparkles, Users, Wrench, type LucideIcon } from 'lucide-react'
+import { BarChart3, Boxes, ChevronRight, Code2, LayoutDashboard, LifeBuoy, Settings, SlidersHorizontal, Users, Wrench, type LucideIcon } from 'lucide-react'
 import type { Project } from '../../saas/account'
 
 /**
@@ -21,7 +21,7 @@ const RESULTS: { product: string; label: string; to: string }[] = [
   { product: 'heatmap', label: 'Heatmaps', to: '/app/research?kind=browse' },
   { product: 'gaze', label: 'Eye tracking', to: '/app/research?kind=eyes' },
   { product: 'doors', label: 'Fake doors', to: '/app/research?kind=doors' },
-  { product: 'insights', label: 'Sessions', to: '/app/research?tab=sessions' },
+  { product: 'insights', label: 'Participant paths', to: '/app/research?tab=sessions' },
   { product: 'report', label: 'Report', to: '/app/report' },
 ]
 const STUDY_TOOLS = ['usability', 'fivesec', 'heatmap', 'gaze', 'doors', 'insights']
@@ -37,7 +37,6 @@ export function groupsFor(project: Project | null): Group[] {
       { to: '/app/products', label: 'Products', icon: Boxes },
       { to: '/app/install', label: 'Install', icon: Code2 },
       { to: '/app/widget', label: 'Widget', icon: SlidersHorizontal },
-      ...(on('prompts') ? [{ to: '/app/prompts', label: 'Build-it prompts', icon: Sparkles }] : []),
     ] },
     { id: 'results', label: 'Results', icon: BarChart3, items: results },
   ]
@@ -88,7 +87,7 @@ export function PanelNav({ project }: { project: Project | null }) {
           </div>
         )
       })}
-      {link({ to: '/app/team', label: 'Team', icon: Users })}
+      {link({ to: '/app/reviewers', label: 'Reviewers', icon: Users })}
       {link({ to: '/app/settings', label: 'Settings', icon: Settings })}
       {link({ to: '/guide', label: 'User guide', icon: LifeBuoy })}
     </nav>

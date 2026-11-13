@@ -6,7 +6,6 @@ import { copyText } from '../../saas/snippet'
 import { download } from '../../saas/stats'
 import { listStudies, projectSessions, type EventRow, type RunRow, type StudyRow } from '../../saas/cloud'
 import { statusOf } from '../../core/embed/store'
-import { FRAMEWORKS, PROMPTS, ROUTINGS, allMarkdown, promptFor, type Framework, type PromptContext, type Routing } from '../../tools/prompts/catalog'
 import { usePanel, useThreads } from './Panel'
 
 /**
@@ -102,39 +101,6 @@ export function Report() {
       {r.stuck.length > 0 && <section className="up-card"><h2>Where people got stuck</h2><ul className="rp-list">{r.stuck.slice(0, 10).map(([k, n]) => <li key={k}>{k}: <b>{n}</b> {n === 1 ? 'person' : 'people'}</li>)}</ul></section>}
       {r.answers.length > 0 && <section className="up-card"><h2>What people remembered</h2><ul className="rp-list">{r.answers.map((a, i) => <li key={i}>“{a}”</li>)}</ul></section>}
       <p className="up-muted"><FileText size={13} /> Built in your browser from the project’s comments and studies; nothing is sent anywhere else.</p>
-    </div>
-  )
-}
-
-/** Build-it prompts (#/app/prompts): build any of these tools into your own codebase, with an AI coding assistant. */
-export function Prompts() {
-  const { toast } = useStore()
-  const [c, setC] = useState<PromptContext>({ framework: 'react', routing: 'history' })
-  const [open, setOpen] = useState<string | null>(null)
-  const copy = (text: string, what: string) => void copyText(text).then((ok) => toast(ok ? `${what} copied` : 'Copy failed', ok ? undefined : 'error'))
-  return (
-    <div className="up-page">
-      <div className="up-head">
-        <div><h1>Build-it prompts</h1><p>Prefer the tools inside your own code? Paste a prompt into your AI coding assistant, opened in your project, and it builds the tool with the same privacy rules.</p></div>
-        <button className="lp-btn" onClick={() => download('vibe-collab-prompts.md', allMarkdown(c), 'text/markdown')}><Download size={14} /> All as .md</button>
-      </div>
-      <section className="up-card">
-        <div className="up-grid2">
-          <label className="lp-field">Your framework<select className="up-select" value={c.framework} onChange={(e) => setC({ ...c, framework: e.target.value as Framework })}>{Object.entries(FRAMEWORKS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-          <label className="lp-field">Your URLs<select className="up-select" value={c.routing} onChange={(e) => setC({ ...c, routing: e.target.value as Routing })}>{Object.entries(ROUTINGS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        </div>
-      </section>
-      <ul className="rs-list">
-        {PROMPTS.map((p) => (
-          <li key={p.id} className="up-card">
-            <div className="up-row"><span className="lp-grow"><b>{p.title}</b><small className="up-muted"> · {p.group}</small></span>
-              <button className="lp-btn sm ghost" onClick={() => setOpen(open === p.id ? null : p.id)}>{open === p.id ? 'Hide' : 'Show'}</button>
-              <button className="lp-btn sm primary" onClick={() => copy(promptFor(p, c), 'Prompt')}><Copy size={13} /> Copy prompt</button></div>
-            <p className="up-muted">{p.summary}</p>
-            {open === p.id && <pre className="up-code rp-prompt">{promptFor(p, c)}</pre>}
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }

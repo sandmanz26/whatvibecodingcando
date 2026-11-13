@@ -79,11 +79,11 @@ export function Guide() {
             <h2>Invite reviewers</h2>
             <p>Reviewers are the people whose feedback you want: clients, teammates, testers. They don’t need an account.</p>
             <ol className="gd-steps">
-              <li>Make a review link in <i>Team → Reviewers</i> (or <i>Widget → Share with a reviewer</i>).</li>
+              <li>Make a review link in <i>Reviewers</i> (or <i>Widget → Share with a reviewer</i>).</li>
               <li>Send it however you like: email, chat, a ticket.</li>
               <li>When they open it, the widget appears on your site for them, and they stay a reviewer in that browser.</li>
             </ol>
-            <p>Links can be revoked from <i>Team</i>. {cloud ? '' : 'In this browser-only beta, review links work on the demo site; on your own domain they need the server.'}</p>
+            <p>Links can be revoked from <i>Reviewers</i>. {cloud ? '' : 'In this browser-only beta, review links work on the demo site; on your own domain they need the server.'}</p>
           </section>
 
           <section id="comments">
@@ -93,7 +93,9 @@ export function Guide() {
               <li><b>Status:</b> a comment is <i>Open</i>, <i>Ongoing</i> once someone replies, and <i>Completed</i> when resolved.</li>
               <li><b>Component review (A vs B):</b> pick two elements and say which should change.</li>
               <li><b>Voice notes:</b> record a spoken comment on a screen instead of typing.</li>
-              <li><b>Versions:</b> every comment records the site version it was made on, so you can filter by release.</li>
+              <li><b>Site version:</b> set it in <i>Widget</i> when you deploy; every comment records it, so you can filter by release.</li>
+              <li><b>Device:</b> each comment records the reviewer’s browser, system and window size (for example <i>Chrome 131 · macOS · 1280×800</i>), so you can reproduce what they saw.</li>
+              <li><b>Fix it with AI:</b> <i>Copy fix prompt</i> on a comment, or <i>Copy open as AI prompt</i> for the list, gives your AI coding tool the feedback, page, element, device and version, ready to paste. Reviewers’ names stay out.</li>
               <li><b>Share and export:</b> in <i>Results → Comments</i>, share a read-only list with a link (no account needed, revocable) or download a CSV for a spreadsheet.</li>
             </ul>
           </section>
@@ -146,7 +148,7 @@ export function Guide() {
             <ul>
               <li><b>Comments</b>, <b>Component reviews</b>, <b>Voice notes</b>: what reviewers left.</li>
               <li><b>Usability tests</b>, <b>5-second tests</b>, <b>Heatmaps</b>, <b>Eye tracking</b>, <b>Fake doors</b>: the studies of that kind, each with its results.</li>
-              <li><b>Sessions</b>: participants’ paths through the site, step by step.</li>
+              <li><b>Participant paths</b>: each participant’s way through the site, step by step.</li>
               <li><b>Report</b>: comments and studies turned into ranked findings you can copy or download.</li>
             </ul>
             <p><i>Overview</i> sums it up: open comments, reviewers, studies and participants, and what’s left to set up.</p>
@@ -154,7 +156,7 @@ export function Guide() {
             <ul>
               <li><b>Comments:</b> <i>CSV</i> on the comment list (page, kind, version, status, author, text, replies).</li>
               <li><b>A study:</b> on its results, <i>Participants (CSV)</i> (one row per person: device, accuracy, each task’s outcome, time and clicks, answers) and <i>Clicks, pages and gaze (CSV)</i> (every recorded event, which is what the heatmap is made of).</li>
-              <li><b>Sessions:</b> the same two files for every participant of every study.</li>
+              <li><b>Participant paths:</b> the same two files for every participant of every study.</li>
               <li><b>Report:</b> copy it as Markdown, download it, or print it to PDF.</li>
             </ul>
             <h3>Delete results</h3>

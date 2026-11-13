@@ -31,12 +31,12 @@ import { CloudForgot, CloudLogin, CloudRegister, CloudReset, Confirm } from './p
 import { cloud } from './saas/supabase'
 import { WidgetBuilder } from './pages/saas/WidgetBuilder'
 import { Research, StudyResults } from './pages/saas/Research'
-import { Prompts as PanelPrompts, Report as PanelReport } from './pages/saas/Report'
+import { Report as PanelReport } from './pages/saas/Report'
 import { Dashboard } from './pages/saas/Dashboard'
 import SharePage from './pages/saas/SharePage'
 import { Privacy, Terms } from './pages/saas/Legal'
 import { Guide } from './pages/saas/Guide'
-import { PanelLayout, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
+import { PanelLayout, Products, Install as PanelInstall, Comments, ReviewersPage, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { Inspector } from './tools/inspect/Inspector'
 import { CompareDock } from './tools/compare/CompareDock'
@@ -77,8 +77,9 @@ export default function App() {
             <Route path="research" element={<Research />} />
             <Route path="research/:id" element={<StudyResults />} />
             <Route path="report" element={<PanelReport />} />
-            <Route path="prompts" element={<PanelPrompts />} />
-            <Route path="team" element={<Team />} />
+            <Route path="prompts" element={<Navigate to="/app" replace />} />
+            <Route path="reviewers" element={<ReviewersPage />} />
+            <Route path="team" element={<Navigate to="/app/reviewers" replace />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           <Route element={<Layout />}>

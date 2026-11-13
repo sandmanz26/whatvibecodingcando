@@ -26,6 +26,9 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000d0b1', true);
 select pg_temp.check((public.post_thread('teh-shop-v001', '/', '{"sel":"h1"}', 'Title too small') ->> 'version') = '2.3', 'a comment carries the published version (set by the server)');
 select pg_temp.check(pg_temp.fails($$select public.post_thread('teh-shop-v001', '/', '{"sel":"h1"}', 'A vs ?', null, 'compare')$$) = 'bad_anchor', 'a comparison needs two elements');
 select pg_temp.check((public.post_thread('teh-shop-v001', '/', '{"sel":"#a","b":{"sel":"#b"}}', 'B reads better', null, 'compare') ->> 'kind') = 'compare', 'a reviewer posts a comparison (A vs B)');
+select pg_temp.check(pg_temp.fails($$select public.post_thread('teh-shop-v001', '/', ('{"sel":"h1","pad":"' || repeat('x', 5000) || '"}')::jsonb, 'Huge anchor')$$) = 'bad_anchor', 'an oversized anchor is refused');
+select pg_temp.check(pg_temp.fails($$select public.post_thread('teh-shop-v001', '/', '"just text"', 'Not an object')$$) = 'bad_anchor', 'an anchor must be an object');
+select pg_temp.check((public.post_thread('teh-shop-v001', '/', '{"sel":"h1","env":{"browser":"Chrome","os":"macOS","w":1280,"h":800}}', 'With context') -> 'anchor' -> 'env' ->> 'browser') = 'Chrome', 'browser context is kept with the comment');
 select pg_temp.check(pg_temp.fails($$select public.post_thread('teh-shop-v001', '/', '{"sel":"h1"}', 'x', null, 'shout')$$) = 'bad_kind', 'unknown kinds are refused');
 -- voice: the product is off
 select pg_temp.check(pg_temp.fails($$select public.post_thread('teh-shop-v001', '/', '{"sel":"h1"}', '', '11111111-1111-4111-8111-111111111111', 'voice', 'teh-shop-v001/11111111-1111-4111-8111-111111111111.webm')$$) = 'origin_not_allowed', 'voice notes refused while Narration is off');
@@ -47,7 +50,7 @@ select pg_temp.as_user('00000000-0000-0000-0000-00000000d0a1');
 select pg_temp.check((select count(*) from storage.objects where bucket_id = 'narrations') = 1, 'members can play voice notes');
 select pg_temp.check(json_array_length(public.versions_of((select id from projects where public_id = 'teh-shop-v001'))) = 1 and (public.versions_of((select id from projects where public_id = 'teh-shop-v001')) -> 0 ->> 'version') = '2.3', 'comments by version');
 reset role;
-select pg_temp.check((select count(*) from threads t join projects p on p.id = t.project_id where p.public_id = 'teh-shop-v001') = 3, 'three threads stored');
+select pg_temp.check((select count(*) from threads t join projects p on p.id = t.project_id where p.public_id = 'teh-shop-v001') = 4, 'four threads stored');
 delete from storage.objects where bucket_id = 'narrations';
 delete from workspaces where name = 'Teh';
 delete from auth.users where id in ('00000000-0000-0000-0000-00000000d0a1', '00000000-0000-0000-0000-00000000d0b1', '00000000-0000-0000-0000-00000000d0c1');

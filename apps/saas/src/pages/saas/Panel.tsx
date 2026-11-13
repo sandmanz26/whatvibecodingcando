@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown } from 'lucide-react'
+import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown, Sparkles } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
-import { BRAND, PRODUCTS, productOf, statusLabel } from '../../saas/products'
+import { BRAND, CATEGORIES, CAT_HELP, PRODUCTS, productOf, statusLabel } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
@@ -13,8 +13,8 @@ import { PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, latestInstall, 
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
 import { PanelNav } from './Nav'
-import { download, threadsCsv, toShared } from '../../saas/stats'
-import { LocalBackend, NS, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
+import { download, fixPrompt, threadsCsv, toShared } from '../../saas/stats'
+import { LocalBackend, NS, STATUS_LABEL, deviceLine, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 
 export interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
@@ -205,15 +205,17 @@ export function Products() {
         if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) toast('Site updated: it follows on its next page load')
         else toast('Not published: this browser’s storage is full or blocked.', 'error')
       }}>Update site</button> Only the tools change; other edits in <Link to="/app/widget">Widget</Link> wait until you update from there. The snippet stays the same.</p>}
+      {CATEGORIES.map((cat) => <div key={cat}>
+      <h2 className="up-sub">{cat}<small className="up-muted"> · {CAT_HELP[cat]}</small></h2>
       <div className="up-products">
-        {PRODUCTS.map((p) => {
+        {PRODUCTS.filter((p) => p.category === cat).map((p) => {
           const on = project.products.includes(p.id)
           const Icon = p.icon
           return (
             <article key={p.id} className={`up-product ${on ? 'on' : ''}`}>
               <span className="lp-icon" style={{ background: p.hue }}><Icon size={17} /></span>
               <div className="lp-grow">
-                <h3>{p.name} <span className={`lp-status ${p.status}`}>{statusLabel(p.status, 'panel')}</span></h3>
+                <h3>{p.name}{p.labs && <span className="lp-labs">Labs</span>} <span className={`lp-status ${p.status}`}>{statusLabel(p.status, 'panel')}</span></h3>
                 <p>{p.tagline}</p>
                 {p.demo.startsWith('#') ? <a href={p.demo} target="_blank" rel="noopener" className="up-link">Try it <ExternalLink size={11} /></a> : <button className="up-link up-linkbtn" onClick={() => openDemo(project.id, toast)}>Try it <ExternalLink size={11} /></button>}
               </div>
@@ -225,6 +227,7 @@ export function Products() {
           )
         })}
       </div>
+      </div>)}
     </div>
   )
 }
@@ -348,6 +351,7 @@ export function Comments() {
     .filter((t) => !q.trim() || `${t.text} ${t.author} ${t.page} ${t.replies.map((r) => r.text).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const count = (v: Status | 'all') => ofKind.filter((t) => v === 'all' || statusOf(t) === v).length
+  const copyPrompt = async (list: Thread[]) => { const ok = await copyText(fixPrompt(list, project.siteUrl)); toast(ok ? `Copied: paste it into your AI coding tool (${list.length} ${list.length === 1 ? 'comment' : 'comments'})` : 'Copy failed', ok ? undefined : 'error') }
   const save = async (t: Thread, msg: string) => { try { await backend.upsert(t); reload(); toast(msg) } catch { toast('Not saved: storage is blocked.', 'error') } }
   // Comments made on the demo site live on this domain; others on the project's own site.
   // Only ever a page of the project's own site (or the demo): a page key that would lead elsewhere gets no link.
@@ -360,7 +364,7 @@ export function Comments() {
           <button className="lp-btn primary" onClick={() => setSharing(true)}><Share2 size={14} /> Share list</button>
         </span></div>
       {cloud
-        ? <p className="up-note">Comments from every site with your snippet arrive here (checked every 10 seconds). Invite reviewers in <Link to="/app/team">Team</Link>.</p>
+        ? <p className="up-note">Comments from every site with your snippet arrive here (checked every 10 seconds). Invite reviewers in <Link to="/app/reviewers">Reviewers</Link>.</p>
         : <p className="up-note">Demo mode: this inbox shows the comments saved in this browser on this domain, for example from the <button className="up-linkbtn" onClick={() => openDemo(project.id, toast)}>demo site</button> opened with this project.</p>}
       {sharing && <ShareList project={project} threads={threads} onClose={() => setSharing(false)} />}
       <div className="up-row wrap">
@@ -369,6 +373,7 @@ export function Comments() {
         </div>
         {versions.length > 1 && <select className="up-select" value={ver} onChange={(e) => setVer(e.target.value)} aria-label="Version"><option value="">All versions</option>{versions.map((v) => <option key={v} value={v}>v{v}</option>)}</select>}
         <input className="up-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search comments" aria-label="Search comments" />
+        {shown.some((t) => !t.resolved) && <button className="lp-btn sm" onClick={() => void copyPrompt(shown.filter((t) => !t.resolved))} title="The open comments shown, as one prompt for your AI coding tool"><Sparkles size={13} /> Copy open as AI prompt</button>}
         {shown.length > 0 && <button className="lp-btn sm ghost danger" onClick={() => setBulk(true)}><Trash2 size={13} /> Delete {shown.length === ofKind.length && !q.trim() && !ver && status === 'all' ? 'all' : 'these'} ({shown.length})</button>}
       </div>
       {shown.length === 0 ? <div className="up-card up-muted">{ofKind.length === 0 ? (kind === 'compare' ? 'No component reviews yet. Reviewers start one with the A vs B button in the widget.' : kind === 'voice' ? 'No voice notes yet. Reviewers record one with the microphone button in the widget.' : 'No comments yet.') : 'Nothing matches.'}</div> : (
@@ -379,6 +384,7 @@ export function Comments() {
               <li key={t.id} className="up-card">
                 <div className="up-row"><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span>{t.kind === 'compare' && <span className="up-badge">A vs B</span>}{t.kind === 'voice' && <span className="up-badge">Voice</span>}{t.version && <span className="up-badge">v{t.version}</span>}<b>{t.author}</b><span className="up-muted">· {ago(t.createdAt)} · <code>{t.page}</code></span></div>
                 <p className="up-text">{t.text}</p>
+                {deviceLine(t.anchor) && <p className="up-device">{deviceLine(t.anchor)}</p>}
                 {t.kind === 'compare' && t.anchor.b && <p className="up-muted">A: <code>{t.anchor.sel}</code> · B: <code>{t.anchor.b.sel}</code></p>}
                 {t.kind === 'voice' && t.audio && cloud && <VoiceNote path={t.audio} />}
                 {t.replies.length > 0 && <ul className="up-replies">{t.replies.map((r) => <li key={r.id}><b>{r.author}</b> {r.text}</li>)}</ul>}
@@ -390,6 +396,7 @@ export function Comments() {
                     ? <button className="lp-btn sm ghost" onClick={() => void openAsReviewer(project.id, url).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })} title="Opens the page as a reviewer">Open on site <ExternalLink size={12} /></button>
                     // In the browser-only demo, review links work on the demo site only: this opens the page as it is.
                     : <a className="lp-btn sm ghost" href={url} target="_blank" rel="noopener" title="Opens the page. Signing in as a reviewer there needs the server.">Open on site <ExternalLink size={12} /></a>) : <span className="up-muted" title="Add the site address in Settings">No site address</span>}
+                  <button className="lp-btn sm ghost" onClick={() => void copyPrompt([t])} title="A prompt for your AI coding tool: the feedback, page, element and device"><Sparkles size={12} /> Copy fix prompt</button>
                   <span className="lp-grow" />
                   <button className="lp-btn sm ghost danger" onClick={() => setDeleting(t)} aria-label="Delete comment"><Trash2 size={13} /></button>
                 </div>
@@ -411,42 +418,24 @@ export function Comments() {
 
 /* ---------- team ---------- */
 
-export function Team() {
-  const { s, update, project } = usePanel()
+/**
+ * Reviewers (#/app/reviewers): the people who comment on the project's site, and their links.
+ * Panel access for teammates comes with shared workspaces; until then it isn't offered.
+ */
+export function ReviewersPage() {
+  const { project } = usePanel()
   const { toast } = useStore()
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'member' | 'admin'>('member')
-  const [tried, setTried] = useState(false)
   if (!project) return null
-  const mine = s.invites.filter((i) => i.projectId === project.id)
-  const e = email.trim().toLowerCase()
-  const problem = !validEmail(e) ? 'Enter an email like name@company.com.' : e === s.account!.email.toLowerCase() ? 'That’s you; you’re already the owner.' : mine.some((i) => i.email === e) ? 'Already invited.' : ''
-  const invite = () => {
-    setTried(true)
-    if (problem) return
-    if (update((x) => ({ ...x, invites: [...x.invites, { email: e, role, projectId: project.id, at: new Date().toISOString() }] }))) { setEmail(''); setTried(false); toast(`Invite saved for ${e}`) }
-  }
   return (
     <div className="up-page">
-      <div className="up-head"><div><h1>Team</h1><p>People who review “{project.name}”.</p></div></div>
-      {cloud && <Reviewers />}
-      <h2 className="up-sub">Panel access</h2>
-      <p className="up-note">Teammates who manage the project in this panel. No emails are sent yet: these invites are {cloud ? 'saved on the server and ' : ''}kept as pending until shared workspaces arrive.{cloud ? ' To let someone comment on your site, use a review link above.' : ' Until then, teammates can comment on your site with the snippet, under their own name.'}</p>
-      <section className="up-card">
-        <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); invite() }} noValidate>
-          <input className="up-search grow" type="email" value={email} onChange={(ev) => setEmail(ev.target.value)} placeholder="teammate@company.com" aria-label="Email" aria-invalid={tried && !!problem} />
-          <select className="up-select" value={role} onChange={(ev) => setRole(ev.target.value as 'member' | 'admin')} aria-label="Role"><option value="member">Member</option><option value="admin">Admin</option></select>
-          <button className="lp-btn primary" type="submit"><Plus size={14} /> Invite</button>
-        </form>
-        {tried && problem && <p className="lp-error">{problem}</p>}
-      </section>
-      <ul className="up-people">
-        <li className="up-card"><span className="up-avatar">{s.account!.name[0]?.toUpperCase()}</span><span className="lp-grow"><b>{s.account!.name}</b><small>{s.account!.email}</small></span><span className="up-badge">Owner</span></li>
-        {mine.map((i) => (
-          <li key={i.email} className="up-card"><span className="up-avatar muted">{i.email[0].toUpperCase()}</span><span className="lp-grow"><b>{i.email}</b><small>{i.role === 'admin' ? 'Admin' : 'Member'} · invited {ago(i.at)}</small></span><span className="up-badge pending">Pending</span>
-            <button className="lp-btn sm ghost" onClick={() => update((x) => ({ ...x, invites: x.invites.filter((y) => !(y.email === i.email && y.projectId === project.id)) }))} aria-label={`Remove ${i.email}`}><X size={14} /></button></li>
-        ))}
-      </ul>
+      <div className="up-head"><div><h1>Reviewers</h1><p>People who see the widget on “{project.name}” and comment on it: your client, teammates, testers. They don’t need an account.</p></div></div>
+      {cloud ? <Reviewers /> : (
+        <section className="up-card">
+          <h2>Reviewers</h2>
+          <p className="up-muted">Review links for your own site need the server, which this browser-only beta doesn’t have. You can still try it as a reviewer on the demo site.</p>
+          <div className="up-row"><button className="lp-btn primary" onClick={() => openDemo(project.id, toast)}>Open the demo site as a reviewer <ExternalLink size={13} /></button></div>
+        </section>
+      )}
     </div>
   )
 }

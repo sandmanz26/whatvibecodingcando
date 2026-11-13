@@ -2,7 +2,7 @@
  * The project dashboard's numbers and the shared comment list, the same shape whether they come
  * from the server (project_stats / get_share, counted in the database) or from this browser (demo).
  */
-import { statusOf, type Thread } from '../core/embed/store'
+import { deviceLine, statusOf, type Thread } from '../core/embed/store'
 
 export interface Stats {
   open: number
@@ -53,7 +53,7 @@ export function statsOf(threads: Thread[], sites: Stats['sites'] = []): Stats {
 
 /* ---------- the shared comment list ---------- */
 
-export interface SharedThread { page: string; kind?: string | null; version?: string | null; author: string; text: string; createdAt: string; editedAt?: string | null; resolved: { by: string; at: string } | null; replies: { author: string; text: string; at: string }[] }
+export interface SharedThread { page: string; kind?: string | null; version?: string | null; device?: string | null; author: string; text: string; createdAt: string; editedAt?: string | null; resolved: { by: string; at: string } | null; replies: { author: string; text: string; at: string }[] }
 export interface SharedList { project: string; site: string; label: string | null; filter: 'all' | 'open' | 'completed'; created_at: string; expires_at: string | null; threads: SharedThread[] }
 export interface ShareRow { id: string; label: string | null; status_filter: 'all' | 'open' | 'completed'; created_at: string; expires_at: string | null; revoked_at: string | null; views: number; last_viewed: string | null }
 
@@ -73,7 +73,7 @@ export function decodeLocalShare(token: string): SharedList | null {
     return v && typeof v.project === 'string' && Array.isArray(v.threads) ? v : null
   } catch { return null }
 }
-export const toShared = (t: Thread): SharedThread => ({ page: t.page, kind: t.kind ?? 'comment', version: t.version ?? null, author: t.author, text: t.text, createdAt: t.createdAt, editedAt: t.editedAt ?? null, resolved: t.resolved ?? null, replies: t.replies.map((r) => ({ author: r.author, text: r.text, at: r.at })) })
+export const toShared = (t: Thread): SharedThread => ({ page: t.page, kind: t.kind ?? 'comment', version: t.version ?? null, device: deviceLine(t.anchor), author: t.author, text: t.text, createdAt: t.createdAt, editedAt: t.editedAt ?? null, resolved: t.resolved ?? null, replies: t.replies.map((r) => ({ author: r.author, text: r.text, at: r.at })) })
 export const keepFor = (filter: SharedList['filter']) => (t: { resolved?: unknown }) => filter === 'all' || (filter === 'open' ? !t.resolved : !!t.resolved)
 
 /** Rows as CSV. Cells that would run as a spreadsheet formula (= + - @, tab, return) stay text. */
@@ -81,9 +81,34 @@ export function toCsv(head: string[], rows: (string | number | boolean | null | 
   const esc = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`
   return [head.join(','), ...rows.map((r) => r.map((v) => esc(v == null ? '' : String(v))).join(','))].join('\n')
 }
+/**
+ * Comments as a prompt for an AI coding tool: each one with its page, the element (CSS selector),
+ * the device it was seen on, the site version and the replies, then a request to fix them one by
+ * one and keep changes small. Reviewers' names are left out: the tool doesn't need them.
+ */
+export function fixPrompt(list: Thread[], siteUrl: string): string {
+  const one = (t: Thread, i: number) => {
+    const where = siteUrl ? `${siteUrl.replace(/\/$/, '')}${t.page.startsWith('/') ? t.page : `/${t.page}`}` : t.page
+    const lines = [`${list.length > 1 ? `${i + 1}. ` : ''}${t.kind === 'compare' ? 'Compare these two elements' : 'Feedback'}: "${t.text.replace(/\s+/g, ' ').trim()}"`,
+      `   Page: ${where}`,
+      t.kind === 'compare' && t.anchor.b ? `   Element A: ${t.anchor.sel}\n   Element B: ${t.anchor.b.sel}` : `   Element: ${t.anchor.sel}`,
+      ...(deviceLine(t.anchor) ? [`   Seen on: ${deviceLine(t.anchor)}`] : []),
+      ...(t.version ? [`   Site version: ${t.version}`] : []),
+      ...t.replies.map((r) => `   Reply: "${r.text.replace(/\s+/g, ' ').trim()}"`)]
+    return lines.join('\n')
+  }
+  return [
+    list.length > 1 ? `Fix these ${list.length} pieces of feedback on my site.` : 'Fix this feedback on my site.',
+    'Each one names the page and the element (a CSS selector) it is about.',
+    '',
+    ...list.map(one).flatMap((x) => [x, '']),
+    'Find each element in the code, make the smallest change that addresses the feedback, and don’t change anything else. If a piece of feedback is unclear or is a question, tell me instead of guessing. When you are done, list what you changed per item.',
+  ].join('\n')
+}
+
 /** The comment list as CSV (for a spreadsheet). */
-export const threadsCsv = (rows: SharedThread[]) => toCsv(['page', 'kind', 'version', 'status', 'author', 'comment', 'created', 'replies'],
-  rows.map((t) => [t.page, t.kind ?? 'comment', t.version ?? '', t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')]))
+export const threadsCsv = (rows: SharedThread[]) => toCsv(['page', 'kind', 'version', 'device', 'status', 'author', 'comment', 'created', 'replies'],
+  rows.map((t) => [t.page, t.kind ?? 'comment', t.version ?? '', t.device ?? '', t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')]))
 export function download(name: string, text: string, type = 'text/csv') {
   const url = URL.createObjectURL(new Blob([text], { type }))
   Object.assign(document.createElement('a'), { href: url, download: name }).click()

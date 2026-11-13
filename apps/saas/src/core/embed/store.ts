@@ -19,7 +19,30 @@ export interface Anchor {
   y: number
   vw: number
   /** the second element of a comparison (A vs B) */
-  b?: Omit<Anchor, 'b'>
+  b?: Omit<Anchor, 'b' | 'device'>
+  /** the reviewer's browser, system and window size when they commented (for bug reports; nothing personal) */
+  device?: DeviceInfo
+}
+export interface DeviceInfo { browser: string; os: string; w: number; h: number; dpr: number }
+
+/** This browser, read from its user agent: names and major versions only. */
+export function deviceNow(): DeviceInfo {
+  const ua = navigator.userAgent
+  const v = (re: RegExp) => ua.match(re)?.[1] ?? ''
+  const browser = /Edg\//.test(ua) ? `Edge ${v(/Edg\/(\d+)/)}` : /OPR\//.test(ua) ? `Opera ${v(/OPR\/(\d+)/)}` : /SamsungBrowser/.test(ua) ? `Samsung Internet ${v(/SamsungBrowser\/(\d+)/)}`
+    : /Firefox\//.test(ua) ? `Firefox ${v(/Firefox\/(\d+)/)}` : /(Chrome|CriOS)\//.test(ua) ? `Chrome ${v(/(?:Chrome|CriOS)\/(\d+)/)}` : /Safari\//.test(ua) ? `Safari ${v(/Version\/(\d+)/)}` : 'Other'
+  const os = /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? `Android ${v(/Android (\d+)/)}` : /iPad/.test(ua) ? 'iPadOS' : /iPhone|iPod/.test(ua) ? `iOS ${v(/OS (\d+)_/)}`
+    : /CrOS/.test(ua) ? 'ChromeOS' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Other'
+  return { browser: browser.trim(), os: os.trim(), w: window.innerWidth, h: window.innerHeight, dpr: Math.round((window.devicePixelRatio || 1) * 100) / 100 }
+}
+/** A comment's device, checked (it comes from the server or storage), as one line: "Chrome 131 · macOS · 1280×800". */
+export function deviceLine(a: Anchor): string | null {
+  const d = a.device
+  if (!d || typeof d !== 'object') return null
+  const s = (x: unknown) => (typeof x === 'string' ? x.replace(/[^\w .()-]/g, '').slice(0, 40) : '')
+  const n = (x: unknown) => (typeof x === 'number' && isFinite(x) ? Math.round(x) : null)
+  const parts = [s(d.browser), s(d.os), n(d.w) && n(d.h) ? `${n(d.w)}×${n(d.h)}` : ''].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
 }
 /** `mine`: set by the server (it knows who wrote what); without one, the widget compares names. */
 export interface Reply { id: string; author: string; text: string; at: string; mine?: boolean }
