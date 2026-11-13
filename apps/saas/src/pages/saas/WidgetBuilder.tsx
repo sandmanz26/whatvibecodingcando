@@ -283,7 +283,11 @@ function Releases({ releases, live, onRollback }: { releases: { version: number;
   )
 }
 
-/** The demo site in a frame, opened as a reviewer in preview mode: it shows the draft, live, as you edit. */
+/**
+ * The demo site in a frame, opened as a reviewer in preview mode: it shows the draft, live, as you
+ * edit. The frame uses the demo's wireframe look (grey blocks, no copy), so the widget is what you see.
+ */
+const wireUrl = (projectId: string) => { const u = new URL(demoUrl(projectId)); u.searchParams.set('look', 'wire'); return u.href }
 function Preview({ projectId, siteUrl }: { projectId: string; siteUrl: string }) {
   const { toast } = useStore()
   const [n, setN] = useState(0)
@@ -293,7 +297,7 @@ function Preview({ projectId, siteUrl }: { projectId: string; siteUrl: string })
   useEffect(() => {
     let live = true
     setSrc(null)
-    void reviewerUrl(projectId, demoUrl(projectId), true).then((u) => { if (!live) return; setSrc(u); if (!u) toast('Preview unavailable: couldn’t make a review link.', 'error') })
+    void reviewerUrl(projectId, wireUrl(projectId), true).then((u) => { if (!live) return; setSrc(u); if (!u) toast('Preview unavailable: couldn’t make a review link.', 'error') })
     return () => { live = false }
   }, [projectId, n]) // eslint-disable-line react-hooks/exhaustive-deps
   const open = (url: string) => void openAsReviewer(projectId, url, true).then((ok) => { if (!ok) toast('Couldn’t open the preview.', 'error') })
@@ -302,16 +306,14 @@ function Preview({ projectId, siteUrl }: { projectId: string; siteUrl: string })
       <div className="up-row"><h2 className="lp-grow">Preview · draft</h2>
         <button className="lp-btn sm ghost" onClick={() => setN((x) => x + 1)} aria-label="Reload preview" title="Reload"><RefreshCw size={13} /></button>
       </div>
-      {src && <iframe ref={frame} key={n} src={src} title="Preview of the widget on the demo site" />}
+      {src && <iframe ref={frame} key={n} src={src} title="Preview of the widget on a wireframe page" />}
       <div className="up-row">
         <button className="lp-btn sm" onClick={() => open(demoUrl(projectId))}>Open preview <ExternalLink size={12} /></button>
         {cloud && siteUrl
           ? <button className="lp-btn sm ghost" onClick={() => open(siteUrl)}>Preview on your site <ExternalLink size={12} /></button>
           : <button className="lp-btn sm ghost" onClick={() => openDemo(projectId, toast)}>Open as a reviewer <ExternalLink size={12} /></button>}
       </div>
-      <p className="up-muted">The preview shows your draft only to you{cloud ? '' : ', in this browser'}. Visitors keep what your site shows now.</p>
-      {siteUrl && !cloud && <p className="up-note">Previewing on <code>{siteUrl.replace(/^https?:\/\//, '')}</code> itself needs the server: review links are checked by it. Until then they work on the demo site only.</p>}
-      {cloud && <p className="up-note">On your own site the preview needs the snippet installed and an environment switched on in Where. Press Update site first if your site has no settings yet.</p>}
+      <p className="up-muted">Only you see this draft{cloud ? '' : ' (in this browser)'}.{siteUrl && !cloud ? ' Previewing on your own site needs the server.' : cloud && siteUrl ? ' On your own site it needs the snippet installed.' : ''}</p>
     </section>
   )
 }

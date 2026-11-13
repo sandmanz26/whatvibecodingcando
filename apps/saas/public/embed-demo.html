@@ -20,6 +20,21 @@
     input { flex: 1 1 200px; min-width: 0; padding: 10px 12px; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
     .note { margin-top: 40px; padding: 14px 16px; background: #fff7e6; border: 1px solid #f3d9a4; border-radius: 8px; font: 14px/1.5 system-ui, sans-serif; }
     @media (max-width: 720px) { .hero, .cards { grid-template-columns: 1fr; } header { flex-wrap: wrap; } }
+    /* ?look=wire: a lo-fi wireframe (grey blocks, no copy), used by the panel's draft preview so the widget stands out. */
+    html.wire body { background: #f4f4f2; font: 14px/1.4 system-ui, sans-serif; color: #9a9a96; }
+    html.wire header { background: #fff; border-color: #e3e3df; }
+    .wire .bar { display: block; height: 12px; border-radius: 6px; background: #dcdcd8; }
+    .wire .bar.h1 { height: 28px; width: 80%; background: #c9c9c4; margin-bottom: 10px; }
+    .wire .bar.h1.short { width: 55%; }
+    .wire .bar.h3 { height: 14px; width: 45%; background: #c9c9c4; margin-bottom: 12px; }
+    .wire .lines { display: grid; gap: 8px; margin: 18px 0 22px; }
+    .wire .lines .bar:last-child { width: 70%; }
+    .wire .btn { display: inline-block; width: 140px; height: 40px; border-radius: 8px; background: #bdbdb8; }
+    .wire .art { background: #e3e3df; border: 2px dashed #cfcfca; }
+    .wire .card { border-color: #e3e3df; min-height: 120px; }
+    .wire .logo { width: 90px; height: 18px; border-radius: 5px; background: #c9c9c4; }
+    .wire .pill { width: 54px; height: 10px; border-radius: 5px; background: #dcdcd8; display: inline-block; margin-right: 14px; }
+    .wire .field { flex: 1 1 200px; height: 40px; border-radius: 8px; background: #fff; border: 1.5px solid #dcdcd8; }
   </style>
 </head>
 <body>
@@ -58,6 +73,22 @@
           <div class="card" id="plan-team"><h3>Team</h3><p>For a product team.</p></div>
           <div class="card" id="plan-org"><h3>Organisation</h3><p>For many teams.</p></div>
         </section>`,
+    }
+    // The wireframe look: the same layout as grey blocks.
+    const wire = new URLSearchParams(location.search).get('look') === 'wire'
+    if (wire) {
+      document.documentElement.classList.add('wire')
+      document.querySelector('header').innerHTML = '<span class="logo" aria-label="Logo"></span><nav><a href="#/" class="pill" aria-label="Home"></a><a href="#/pricing" class="pill" aria-label="Pricing"></a></nav>'
+      const lines = (n) => `<div class="lines">${'<span class="bar"></span>'.repeat(n)}</div>`
+      const card = (id) => `<div class="card" id="${id}"><span class="bar h3"></span>${lines(3)}</div>`
+      pages['/'] = `
+        <section class="hero">
+          <div><span class="bar h1" id="headline"></span><span class="bar h1 short"></span>${lines(3)}<span class="btn" id="cta" role="button" aria-label="Main button"></span></div>
+          <div class="art" role="img" aria-label="Image"></div>
+        </section>
+        <section class="cards">${card('card-fast')}${card('card-shared')}${card('card-safe')}</section>
+        <form onsubmit="event.preventDefault()"><span class="field"></span><span class="btn"></span></form>`
+      pages['/pricing'] = `<span class="bar h1 short"></span><section class="cards">${card('plan-free')}${card('plan-team')}${card('plan-org')}</section>`
     }
     const render = () => { const r = location.hash.slice(1) || '/'; document.getElementById('app').innerHTML = pages[r] || pages['/'] }
     addEventListener('hashchange', render)
