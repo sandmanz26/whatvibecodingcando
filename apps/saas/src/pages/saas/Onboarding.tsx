@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Check, ArrowLeft, ArrowRight, MousePointer2, Copy, ExternalLink, LogOut } from 'lucide-react'
-import { BRAND, PRODUCTS, inScript, parseProducts, productOf } from '../../saas/products'
+import { BRAND, PRODUCTS, inScript, parseProducts, productOf, statusLabel } from '../../saas/products'
 import { SAAS_ERROR, settled, freeId, isOnboarded, isSignedIn, newProject, originOf, slug, useSaas, useSaasReady } from '../../saas/account'
 import { copyText, demoUrl, installSnippet } from '../../saas/snippet'
 import { publish } from '../../saas/widget'
@@ -106,7 +106,7 @@ export default function Onboarding() {
                   return (
                     <button type="button" key={p.id} className={`lp-check ${on ? 'on' : ''}`} onClick={() => toggle(p.id)} aria-pressed={on}>
                       <span className="lp-icon sm" style={{ background: p.hue }}><Icon size={15} /></span>
-                      <span className="lp-grow"><b>{p.name}</b><small>{p.status === 'script' ? 'On your site today' : 'Early access'}</small></span>
+                      <span className="lp-grow"><b>{p.name}</b><small>{statusLabel(p.status)}</small></span>
                       <span className="lp-tick">{on && <Check size={13} />}</span>
                     </button>
                   )
@@ -139,7 +139,7 @@ export default function Onboarding() {
                 <a className="lp-btn ghost" href={demoUrl(draft.id)} target="_blank" rel="noopener">Try it on the demo site <ExternalLink size={14} /></a>
               </div>
               <p className="lp-hint">It starts for <b>reviewers only</b>{originOf(site) ? <> on <code>{new URL(originOf(site)!).host}</code></> : ''}: visitors don’t see it. Invite reviewers, add staging or preview sites, and change the look in Widget.</p>
-              {products.some((id) => productOf(id)?.status !== 'script') && <p className="lp-hint">In the script today: {inScript()}. The other tools you picked are marked early access.</p>}
+              {products.some((id) => productOf(id)?.status === 'console') && <p className="lp-hint">In the script today: {inScript()}. The other tools you picked are marked early access.</p>}
             </>
           )}
           {error && <p className="lp-error" role="alert">{error}</p>}

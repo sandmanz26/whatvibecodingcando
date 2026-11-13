@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, ArrowRight, Plus, ExternalLink, Code2, MousePointer2, Users, ShieldCheck, Sparkles } from 'lucide-react'
-import { BRAND, CATEGORIES, PRODUCTS, inScript, type Category } from '../../saas/products'
+import { BRAND, CATEGORIES, PRODUCTS, inScript, statusLabel, type Category } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
 import { isSignedIn, loadSaas } from '../../saas/account'
 import '../../saas/saas.css'
@@ -107,7 +107,7 @@ export default function Landing() {
                 <article key={p.id} className={`lp-card ${on ? 'on' : ''}`}>
                   <div className="lp-card-top">
                     <span className="lp-icon" style={{ background: p.hue }}><Icon size={18} /></span>
-                    <span className={`lp-status ${p.status}`}>{p.status === 'script' ? 'On your site today' : 'Early access'}</span>
+                    <span className={`lp-status ${p.status}`}>{statusLabel(p.status)}</span>
                   </div>
                   <h3>{p.name}</h3>
                   <p>{p.tagline}</p>

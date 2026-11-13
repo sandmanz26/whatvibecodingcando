@@ -31,6 +31,7 @@ import { CloudForgot, CloudLogin, CloudRegister, CloudReset, Confirm } from './p
 import { cloud } from './saas/supabase'
 import { WidgetBuilder } from './pages/saas/WidgetBuilder'
 import { Research, StudyResults } from './pages/saas/Research'
+import { Prompts as PanelPrompts, Report as PanelReport } from './pages/saas/Report'
 import { Dashboard } from './pages/saas/Dashboard'
 import SharePage from './pages/saas/SharePage'
 import { Privacy, Terms } from './pages/saas/Legal'
@@ -73,6 +74,8 @@ export default function App() {
             <Route path="comments" element={<Comments />} />
             <Route path="research" element={<Research />} />
             <Route path="research/:id" element={<StudyResults />} />
+            <Route path="report" element={<PanelReport />} />
+            <Route path="prompts" element={<PanelPrompts />} />
             <Route path="team" element={<Team />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

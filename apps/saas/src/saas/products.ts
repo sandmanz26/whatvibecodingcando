@@ -19,7 +19,8 @@ export interface Product {
   tagline: string
   points: string[]
   category: Category
-  status: 'script' | 'console'
+  /** script: runs on the customer's site; panel: in the user panel; console: early access, in the demo console */
+  status: 'script' | 'panel' | 'console'
   demo: string
   icon: LucideIcon
   hue: string
@@ -39,8 +40,8 @@ export const PRODUCTS: Product[] = [
   { id: 'dscheck', name: 'Design system check', tagline: 'Find colours, radii and fonts that aren’t design tokens.', points: ['Scans real screens', 'Suggests the nearest token', 'Per page'], category: 'Design', status: 'script', demo: 'embed-demo.html', icon: ScanSearch, hue: '#364fc7' },
   { id: 'versions', name: 'Versions', tagline: 'Switch the product between releases and see what each one added; feedback stays with its version.', points: ['What changed, outlined', 'Comments per version', 'Compare releases'], category: 'Feedback', status: 'script', demo: 'embed-demo.html', icon: GitBranch, hue: '#2b8a3e' },
   { id: 'narration', name: 'Narration', tagline: 'Walk through the product talking; each screen becomes a chapter.', points: ['Voice per screen', 'Play from the screen', 'Audio stays local'], category: 'Feedback', status: 'script', demo: 'embed-demo.html', icon: Mic, hue: '#d6336c' },
-  { id: 'report', name: 'Reports & insights', tagline: 'Turn all the research into ranked findings you can keep.', points: ['Generated report', 'Insight repository', 'Evidence links'], category: 'Reporting', status: 'console', demo: '#/console/report', icon: FileText, hue: '#495057' },
-  { id: 'prompts', name: 'Prompts for Claude', tagline: 'Build any of these tools into your own codebase with Claude.', points: ['One prompt per tool', 'Fits your framework', 'Free'], category: 'Reporting', status: 'console', demo: '#/console/prompts', icon: Sparkles, hue: '#e67700' },
+  { id: 'report', name: 'Reports & insights', tagline: 'Turn all the research into ranked findings you can keep.', points: ['Generated report', 'Insight repository', 'Evidence links'], category: 'Reporting', status: 'panel', demo: '#/app/report', icon: FileText, hue: '#495057' },
+  { id: 'prompts', name: 'Prompts for Claude', tagline: 'Build any of these tools into your own codebase with Claude.', points: ['One prompt per tool', 'Fits your framework', 'Free'], category: 'Reporting', status: 'panel', demo: '#/app/prompts', icon: Sparkles, hue: '#e67700' },
 ]
 
 export const CATEGORIES: Category[] = ['Feedback', 'Research', 'Design', 'Reporting']
@@ -56,3 +57,6 @@ export const inScript = () => {
   const n = PRODUCTS.filter((p) => p.status === 'script').map((p) => p.name)
   return n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n[0] ?? ''
 }
+
+/** How a product's status reads to people. */
+export const statusLabel = (s: Product['status'], where: 'site' | 'panel' = 'site') => (s === 'script' ? (where === 'site' ? 'On your site today' : 'In the script') : s === 'panel' ? 'In your panel' : 'Early access')

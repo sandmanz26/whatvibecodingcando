@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2, ChevronsUpDown, FlaskConical } from 'lucide-react'
+import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2, ChevronsUpDown, FlaskConical, FileText, Sparkles } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
-import { BRAND, PRODUCTS, productOf } from '../../saas/products'
+import { BRAND, PRODUCTS, productOf, statusLabel } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
@@ -95,6 +95,8 @@ export function PanelLayout() {
     { to: '/app/widget', icon: SlidersHorizontal, label: 'Widget' },
     { to: '/app/comments', icon: MessagesSquare, label: 'Comments' },
     { to: '/app/research', icon: FlaskConical, label: 'Research' },
+    ...(project?.products.includes('report') ? [{ to: '/app/report', icon: FileText, label: 'Report' }] : []),
+    ...(project?.products.includes('prompts') ? [{ to: '/app/prompts', icon: Sparkles, label: 'Prompts' }] : []),
     { to: '/app/team', icon: Users, label: 'Team' },
     { to: '/app/settings', icon: Settings, label: 'Settings' },
   ]
@@ -194,7 +196,7 @@ export function Products() {
     const on = project.products.includes(id)
     const p = productOf(id)!
     if (setProject((x) => ({ ...x, products: on ? x.products.filter((y) => y !== id) : [...x.products, id] })))
-      toast(on ? `${p.name} turned off` : p.status === 'script' ? `${p.name} turned on` : `${p.name}: early access requested`)
+      toast(on ? `${p.name} turned off` : p.status !== 'console' ? `${p.name} turned on` : `${p.name}: early access requested`)
   }
   const live = liveOf(project)
   const pending = !!live && JSON.stringify(live.config.modules) !== JSON.stringify(releasable(project, live.config).modules)
@@ -210,13 +212,13 @@ export function Products() {
             <article key={p.id} className={`up-product ${on ? 'on' : ''}`}>
               <span className="lp-icon" style={{ background: p.hue }}><Icon size={17} /></span>
               <div className="lp-grow">
-                <h3>{p.name} <span className={`lp-status ${p.status}`}>{p.status === 'script' ? 'In the script' : 'Early access'}</span></h3>
+                <h3>{p.name} <span className={`lp-status ${p.status}`}>{statusLabel(p.status, 'panel')}</span></h3>
                 <p>{p.tagline}</p>
                 {p.demo.startsWith('#') ? <a href={p.demo} target="_blank" rel="noopener" className="up-link">Try it <ExternalLink size={11} /></a> : <button className="up-link up-linkbtn" onClick={() => openDemo(project.id, toast)}>Try it <ExternalLink size={11} /></button>}
               </div>
               <span className="up-toggle">
                 <Switch checked={on} onChange={() => toggle(p.id)} label={`${p.name} for ${project.name}`} />
-                <small>{on ? (p.status === 'script' ? 'On' : 'Requested') : 'Off'}</small>
+                <small>{on ? (p.status !== 'console' ? 'On' : 'Requested') : 'Off'}</small>
               </span>
             </article>
           )
