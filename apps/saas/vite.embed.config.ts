@@ -41,7 +41,7 @@ function asciiOnly(): Plugin {
       outDir: '../../dist/embed',
       emptyOutDir: false,
       copyPublicDir: false,
-      lib: { entry: fileURLToPath(new URL('./src/core/embed/main.tsx', import.meta.url)), formats: ['iife'], name: '__vibeCollabBundle', fileName: () => 'vibe.js' },
+      lib: { entry: fileURLToPath(new URL('./src/core/embed/main.ts', import.meta.url)), formats: ['iife'], name: '__vibeCollabBundle', fileName: () => 'vibe.js' },
     },
   }
 })

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && vite build -c vite.embed.config.ts && vite build -c vite.gaze.config.ts",
+    "build": "tsc -b && vite build && vite build -c vite.embed.config.ts && vite build -c vite.embed-app.config.ts && vite build -c vite.gaze.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc -b"
   },

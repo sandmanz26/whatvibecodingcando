@@ -35,7 +35,7 @@ import { loadRun, saveRun, studyInfo, takeStudyToken, type RunState } from './re
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
 declare global { interface Window { __vibeCollab?: { version: string; project: string; server?: boolean }; VibeCollab?: Api | { q?: unknown[][] } } }
 
-const VERSION = '0.3.0'
+import { VERSION } from './version'
 
 /**
  * The host element's own box, set inline with !important: that beats even !important rules in the
@@ -254,12 +254,13 @@ function LinkNotice({ why, onClose }: { why: string; onClose: () => void }) {
   )
 }
 
-async function boot() {
-  const me = (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
+/** Starts the widget (or the session frame) for the script tag `given`: called by the loader (main.ts). */
+export async function boot(given?: HTMLScriptElement | null) {
+  const me = given ?? (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
   // Loaded by our own session.html: this is the session frame, not a widget.
   if (me?.dataset.frame !== undefined) { if (server.hasServer) frameMain(server.serverUrl, server.serverKey); return }
   if (window.__vibeCollab) { console.warn('[Vibe Collab] the script is on this page twice; the second copy does nothing.'); return }
-  const script = (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
+  const script = me
   const d = script?.dataset ?? {}
   if (script?.src) server.useFrame(script.src)
   // data-disabled: for test runs and local builds that shouldn't load it.
@@ -440,4 +441,3 @@ function mountAlone(node: ReactNode) {
   else document.addEventListener('DOMContentLoaded', go, { once: true })
 }
 
-boot().catch((e) => console.warn('[Vibe Collab] could not start; the page is unaffected.', e))
