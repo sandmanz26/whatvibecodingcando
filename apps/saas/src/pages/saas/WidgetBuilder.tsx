@@ -7,7 +7,7 @@ import { PRODUCTS } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, publish, releasable, reviewerUrl } from '../../saas/widget'
 import { MAX_ENVS, MAX_LABEL, anyModule, hostProblem, sameConfig, type Env, type ModuleId, type WidgetConfig } from '../../core/embed/config'
-import { AnonWarning, ago, openDemo, usePanel } from './Panel'
+import { AnonWarning, ReviewLinkMaker, ago, openDemo, usePanel } from './Panel'
 import { cloud } from '../../saas/supabase'
 
 /**
@@ -70,6 +70,14 @@ export function WidgetBuilder() {
           </section>
 
           <Environments envs={draft.envs} onChange={(envs) => edit((c) => ({ ...c, envs }))} />
+
+          {cloud && (
+            <section className="up-card">
+              <h2>Share with a reviewer</h2>
+              <p className="up-muted">A link for one person (your client, a teammate) to one of the addresses above. They see the widget there; visitors don’t. See and remove reviewers in <Link to="/app/team">Team</Link>.</p>
+              <ReviewLinkMaker />
+            </section>
+          )}
 
           <section className="up-card">
             <h2>Modules</h2>

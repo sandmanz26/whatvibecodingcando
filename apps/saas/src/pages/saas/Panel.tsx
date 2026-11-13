@@ -5,7 +5,7 @@ import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
-import { liveOf, openAsReviewer, releasable, serveProject, unserveProject } from '../../saas/widget'
+import { draftOf, liveOf, openAsReviewer, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
@@ -541,43 +541,80 @@ export function AnonWarning() {
   return <p className="up-warn"><TriangleAlert size={13} /> Reviewers can’t comment yet: anonymous sign-ins are off on the server. In Supabase, open Authentication → Sign In / Providers, turn on “Allow anonymous sign-ins” and save. Review links work right after.</p>
 }
 
+/**
+ * Where a review link can open: the project's environments from Widget → Where (exact hosts; a
+ * pattern like shop-git-*.vercel.app names no single address), the site address from Settings,
+ * and the hosted demo site. `live`: the server already knows it (it is in the published settings,
+ * switched on), so the link works now.
+ */
+export function reviewTargets(project: Project): { key: string; label: string; url: string; live: boolean }[] {
+  const liveEnvs = liveOf(project)?.config.envs ?? []
+  const site = (() => { try { return project.siteUrl ? new URL(project.siteUrl) : null } catch { return null } })()
+  const urlFor = (host: string) => (site && site.host === host ? site.href : `${/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? 'http' : 'https'}://${host}/`)
+  const out: { key: string; label: string; url: string; live: boolean }[] = []
+  for (const e of draftOf(project).envs) {
+    if (e.host.includes('*') || out.some((x) => x.key === e.host)) continue
+    out.push({ key: e.host, label: `${e.name && e.name !== e.host ? `${e.name} · ` : ''}${e.host}`, url: urlFor(e.host), live: liveEnvs.some((x) => x.host === e.host && x.on) })
+  }
+  if (site && !out.some((x) => x.key === site.host)) out.push({ key: site.host, label: `${site.host} (site address)`, url: site.href, live: liveEnvs.some((x) => x.host === site.host && x.on) })
+  out.push({ key: 'demo', label: 'The hosted demo site', url: demoUrl(project.id), live: true })
+  return out
+}
+
+/** Makes a review link for one person, for one of the project's addresses. */
+export function ReviewLinkMaker({ onMade }: { onMade?: () => void }) {
+  const { project } = usePanel()
+  const { toast } = useStore()
+  const [name, setName] = useState('')
+  const [pick, setPick] = useState('')
+  const [link, setLink] = useState<{ name: string; url: string; where: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  if (!project) return null
+  const targets = reviewTargets(project)
+  const target = targets.find((t) => t.key === pick) ?? targets.find((t) => t.live) ?? targets[0]
+  const make = async () => {
+    if (!name.trim() || busy || !target.live) return
+    setBusy(true)
+    try { setLink({ name: name.trim(), url: await inviteLink(project.id, target.url, name.trim()), where: target.label }); setName(''); onMade?.() }
+    catch (e) { toast(`Couldn’t make the link: ${(e as Error).message}`, 'error') }
+    finally { setBusy(false) }
+  }
+  return (
+    <>
+      <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); void make() }}>
+        <input className="up-search grow" value={name} onChange={(ev) => setName(ev.target.value)} maxLength={80} placeholder="Their name, e.g. Pak Budi" aria-label="Reviewer name" />
+        <select className="up-select" value={target.key} onChange={(ev) => setPick(ev.target.value)} aria-label="Where the link opens">
+          {targets.map((t) => <option key={t.key} value={t.key}>{t.label}{t.live ? '' : ' (publish first)'}</option>)}
+        </select>
+        <button className="lp-btn primary" type="submit" disabled={!name.trim() || busy || !target.live}><Plus size={14} /> Make link</button>
+      </form>
+      {!target.live && <p className="up-hint">{target.key} isn’t in the published settings yet: publish the widget first (Widget → Publish), then make the link.</p>}
+      {targets.length === 1 && <p className="up-hint">Add your site in Widget → Where to make links for it.</p>}
+      {link && (
+        <div className="up-linkbox">
+          <p>Link for <b>{link.name}</b>, on {link.where}:</p>
+          <pre className="up-code">{link.url}</pre>
+          <button className="lp-btn sm" onClick={() => void copyText(link.url).then((ok) => toast(ok ? 'Link copied' : 'Copy failed. Select and copy it by hand.', ok ? undefined : 'error'))}><Copy size={13} /> Copy link</button>
+          <p className="up-hint">Works for 7 days, on up to 5 of their devices. The snippet must be on that page.</p>
+        </div>
+      )}
+    </>
+  )
+}
+
 function Reviewers() {
   const { project } = usePanel()
   const { toast } = useStore()
   const [rows, setRows] = useState<ReviewerRow[]>([])
-  const [name, setName] = useState('')
-  const [link, setLink] = useState<{ name: string; url: string } | null>(null)
-  const [busy, setBusy] = useState(false)
-  const site = project?.siteUrl ?? ''
   const load = () => { if (project) void listReviewers(project.id).then(setRows).catch(() => { /* retried on the next visit */ }) }
   useEffect(load, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!project) return null
-  const make = async (target: string) => {
-    if (!name.trim() || busy) return
-    setBusy(true)
-    try { setLink({ name: name.trim(), url: await inviteLink(project.id, target, name.trim()) }); setName('') }
-    catch (e) { toast(`Couldn’t make the link: ${(e as Error).message}`, 'error') }
-    finally { setBusy(false) }
-  }
   return (
     <section className="up-card">
       <h2>Reviewers</h2>
       <AnonWarning />
       <p className="up-muted">People who comment on your site, like your client. Make a link for each person and send it to them yourself (email, WhatsApp). It works for 7 days, on up to 5 of their devices; after that they stay a reviewer in that browser.</p>
-      <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); void make(site || demoUrl(project.id)) }}>
-        <input className="up-search grow" value={name} onChange={(ev) => setName(ev.target.value)} maxLength={80} placeholder="Their name, e.g. Pak Budi" aria-label="Reviewer name" />
-        <button className="lp-btn primary" type="submit" disabled={!name.trim() || busy}><Plus size={14} /> {site ? 'Make link for your site' : 'Make link (demo site)'}</button>
-        {site && <button className="lp-btn" type="button" disabled={!name.trim() || busy} onClick={() => void make(demoUrl(project.id))}>For the demo site</button>}
-      </form>
-      {!site && <p className="up-hint">Add your site address in Settings to make links for your own site.</p>}
-      {link && (
-        <div className="up-linkbox">
-          <p>Link for <b>{link.name}</b>:</p>
-          <pre className="up-code">{link.url}</pre>
-          <button className="lp-btn sm" onClick={() => void copyText(link.url).then((ok) => toast(ok ? 'Link copied' : 'Copy failed. Select and copy it by hand.', ok ? undefined : 'error'))}><Copy size={13} /> Copy link</button>
-          <p className="up-hint">The snippet must be on that page, and its environment switched on in Widget → Where.</p>
-        </div>
-      )}
+      <ReviewLinkMaker onMade={load} />
       <ul className="up-people">
         {rows.map((r) => (
           <li key={r.id} className="up-card"><span className="up-avatar muted">{r.name[0]?.toUpperCase()}</span><span className="lp-grow"><b>{r.name}</b><small>Reviewer · last seen {ago(r.last_seen)}</small></span>
