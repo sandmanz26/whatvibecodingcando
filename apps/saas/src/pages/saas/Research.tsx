@@ -7,7 +7,7 @@ import { copyText, demoUrl } from '../../saas/snippet'
 import { liveOf, openAsReviewer } from '../../saas/widget'
 import { productOf } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
-import { deleteRun, deleteStudy, listStudies, revokeStudyLink, saveStudy, studyLink, studyResults, type EventRow, type RunRow, type StudyKind, type StudyRow } from '../../saas/cloud'
+import { deleteRun, deleteStudy, listStudies, projectSessions, revokeStudyLink, saveStudy, studyLink, studyResults, type EventRow, type RunRow, type StudyKind, type StudyRow } from '../../saas/cloud'
 import { ago, usePanel } from './Panel'
 
 /**
@@ -41,6 +41,7 @@ export function Research() {
   const [editing, setEditing] = useState<StudyRow | 'new' | null>(null)
   const [link, setLink] = useState<{ id: string; url: string } | null>(null)
   const [confirm, setConfirm] = useState<StudyRow | null>(null)
+  const [tab, setTab] = useState<'studies' | 'sessions'>('studies')
   const moduleOn = useModuleOn()
   const load = () => { if (project && cloud) void listStudies(project.id).then(setRows).catch((e: Error) => { setRows([]); toast(`Couldn’t load studies: ${e.message}`, 'error') }) }
   useEffect(load, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -62,6 +63,8 @@ export function Research() {
         <div><h1>Research</h1><p>Studies on your own site, with people who agree to take part. Visitors who didn’t open a study’s link are never recorded.</p></div>
         {cloud && <button className="lp-btn primary" onClick={() => setEditing('new')}><Plus size={14} /> New study</button>}
       </div>
+      {cloud && <div className="seg rs-tabs" role="tablist"><button role="tab" aria-selected={tab === 'studies'} aria-pressed={tab === 'studies'} onClick={() => setTab('studies')}>Studies</button><button role="tab" aria-selected={tab === 'sessions'} aria-pressed={tab === 'sessions'} onClick={() => setTab('sessions')}>Session insights</button></div>}
+      {tab === 'sessions' ? <Sessions studies={rows ?? []} /> : <>
       {!cloud && <p className="up-warn"><TriangleAlert size={13} /> Studies on your site need the server: this demo panel has none. Try the research tools in the demo console instead.</p>}
       {cloud && rows && !rows.length && (
         <section className="up-card rs-empty">
@@ -99,6 +102,7 @@ export function Research() {
           </li>
         ))}
       </ul>
+      </>}
       {editing && <StudyEditor study={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
       {confirm && (
         <Modal title={`Delete “${confirm.name}”?`} description="Its participant link, every participant’s run and their clicks are deleted. This can’t be undone." onClose={() => setConfirm(null)}
@@ -125,6 +129,8 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
   const [minutes, setMinutes] = useState(Number(c.minutes ?? 3))
   const [questions, setQuestions] = useState<string[]>(((c.questions as string[] | undefined) ?? ['What was this page about?', 'What would you click first?']).concat(['', '', '']).slice(0, 3))
   const [maxRuns, setMaxRuns] = useState(study?.max_runs ?? 200)
+  const [doors, setDoors] = useState<{ page: string; sel: string; mode: 'add' | 'existing'; label: string; message: string }[]>(() => ((c.doors as Record<string, string>[] | undefined) ?? []).map((d) => ({ page: d.page ?? '', sel: d.sel ?? '', mode: d.mode === 'existing' ? 'existing' : 'add', label: d.label ?? '', message: d.message ?? '' })))
+  const doorsOn = !!project && !!liveOf(project)?.config.modules.doors
   const [busy, setBusy] = useState(false)
   const problem = !name.trim() ? 'Give the study a name.' : kind === 'usability' && (!tasks.length || tasks.some((t) => !t.prompt.trim())) ? 'Every task needs what to do.' : kind === 'usability' && tasks.some((t) => t.rule !== 'none' && !t.target.trim()) ? 'A success rule needs its page or element.' : ''
   const save = async () => {
@@ -133,6 +139,7 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
       ? { intro: intro.trim(), tasks: tasks.map((t, i) => ({ id: `t${i + 1}`, prompt: t.prompt.trim().slice(0, 300), startPage: cleanPath(t.startPage), limitSec: Math.min(1800, Math.max(15, t.limitSec)), success: t.rule === 'page' ? { kind: 'page', page: cleanPath(t.target) } : t.rule === 'element' ? { kind: 'element', sel: t.target.trim().slice(0, 400) } : { kind: 'none' } })) }
       : kind === 'fivesec' ? { intro: intro.trim(), page: cleanPath(page), prompt: prompt.trim(), seconds: Math.min(30, Math.max(3, seconds)), questions: questions.map((q) => q.trim()).filter(Boolean).slice(0, 3) }
         : { intro: intro.trim(), page: cleanPath(page), prompt: prompt.trim(), minutes: Math.min(30, Math.max(1, minutes)) }
+    config.doors = doors.filter((d) => d.sel.trim()).slice(0, 5).map((d, i) => ({ id: `d${i + 1}`, page: d.page.trim() ? cleanPath(d.page) : '', sel: d.sel.trim().slice(0, 400), mode: d.mode, label: d.label.trim().slice(0, 60) || 'New', message: d.message.trim().slice(0, 300) }))
     setBusy(true)
     try { await saveStudy(project.id, { id: study?.id, kind, name, config, status: study?.status, max_runs: Math.min(1000, Math.max(1, maxRuns)) }); toast(study ? 'Study saved' : 'Study created'); onSaved() }
     catch (e) { toast(`Not saved: ${(e as Error).message}`, 'error') }
@@ -189,6 +196,23 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
             {questions.map((q, i) => <label key={i} className="lp-field">Question {i + 1}{i > 0 ? ' (optional)' : ''}<input value={q} maxLength={200} onChange={(e) => setQuestions(questions.map((x, j) => (j === i ? e.target.value : x)))} /></label>)}
           </>
         )}
+        <details className="wb-more" open={doors.length > 0}>
+          <summary>Fake doors (optional)</summary>
+          <p className="up-muted">Offer a feature that doesn’t exist yet, to see who wants it. Participants who click it see that it’s coming soon. Only this study’s participants see the doors.{!doorsOn && ' Turn on Fake doors in Products and publish for them to show.'}</p>
+          {doors.map((d, i) => (
+            <div key={i} className="rs-task">
+              <div className="up-row"><b>Door {i + 1}</b><span className="lp-grow" /><button className="lp-btn sm ghost" onClick={() => setDoors(doors.filter((_, j) => j !== i))} aria-label={`Remove door ${i + 1}`}><X size={13} /></button></div>
+              <div className="up-grid2">
+                <label className="lp-field">Shown as<select className="up-select" value={d.mode} onChange={(e) => setDoors(doors.map((x, j) => (j === i ? { ...x, mode: e.target.value as 'add' | 'existing' } : x)))}><option value="add">A new button beside an element</option><option value="existing">An element already on the page</option></select></label>
+                <label className="lp-field">Element (CSS selector)<input value={d.sel} onChange={(e) => setDoors(doors.map((x, j) => (j === i ? { ...x, sel: e.target.value } : x)))} placeholder="#search" /></label>
+                <label className="lp-field">Label<input value={d.label} maxLength={60} onChange={(e) => setDoors(doors.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} placeholder="AI search" /></label>
+                <label className="lp-field">Only on page (optional)<input value={d.page} onChange={(e) => setDoors(doors.map((x, j) => (j === i ? { ...x, page: e.target.value } : x)))} placeholder="/ or /shop/*" /></label>
+              </div>
+              <label className="lp-field">After a click, tell them<input value={d.message} maxLength={300} onChange={(e) => setDoors(doors.map((x, j) => (j === i ? { ...x, message: e.target.value } : x)))} placeholder="AI search is coming soon. Thanks for your interest!" /></label>
+            </div>
+          ))}
+          {doors.length < 5 && <button className="lp-btn sm" onClick={() => setDoors([...doors, { page: '', sel: '', mode: 'add', label: '', message: '' }])}><Plus size={13} /> Add a fake door</button>}
+        </details>
         <label className="lp-field">Participants at most<input type="number" min={1} max={1000} value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))} /></label>
         <p className="up-muted">Participants first see what is recorded (clicks, pages, time) and what never is (what they type into your site, video), and choose to agree.</p>
         {problem && <p className="lp-error">{problem}</p>}
@@ -255,6 +279,19 @@ export function StudyResults() {
               <ul className="rs-answers">{done.flatMap((r) => (r.result.answers ?? []).map((a, i) => a && <li key={`${r.id}${i}`}>“{a}”<small className="up-muted"> · {ago(r.finished_at!)}</small></li>))}</ul>
             </section>
           )}
+          {(() => {
+            const dv = (data?.events ?? []).filter((e) => e.kind === 'door')
+            if (!dv.length) return null
+            const rows = [...dv.reduce((m, e) => { const k = e.label ?? e.sel ?? '?'; const v = m.get(k) ?? { saw: new Set<string>(), clicked: new Set<string>() }; (e.hit ? v.clicked : v.saw).add(e.run_id); return m.set(k, v) }, new Map<string, { saw: Set<string>; clicked: Set<string> }>())]
+            return (
+              <section className="up-card">
+                <h2>Fake doors</h2>
+                <table className="db-table"><thead><tr><th>Door</th><th>Saw it</th><th>Clicked</th><th>Interest</th></tr></thead>
+                  <tbody>{rows.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v.saw.size}</td><td>{v.clicked.size}</td><td>{pct(v.clicked.size, Math.max(v.saw.size, v.clicked.size))}</td></tr>)}</tbody></table>
+                <p className="up-muted">People, not clicks: someone who clicked three times counts once.</p>
+              </section>
+            )
+          })()}
           <section className="up-card">
             <h2><Flame size={16} /> Clicks by page</h2>
             {!heatOn && <p className="up-warn"><TriangleAlert size={13} /> To see the heatmap over your page, turn on Heatmaps in Products and publish.</p>}
@@ -278,11 +315,7 @@ export function StudyResults() {
                       <button className="lp-btn sm ghost" aria-label="Delete this participant’s data" onClick={() => void deleteRun(r.id).then(() => { toast('Participant’s data deleted'); load() })}><Trash2 size={13} /></button>
                     </div>
                     {(r.result.tasks ?? []).length > 0 && <p className="up-muted">{(r.result.tasks ?? []).map((t, i) => `${i + 1}: ${t.outcome.replace('_', ' ')} (${secs(t.ms)})`).join(' · ')}</p>}
-                    {open === r.id && (
-                      <ol className="rs-path">
-                        {ev.slice(0, 300).map((e, i) => <li key={i} className={e.rage ? 'rage' : e.dead ? 'dead' : ''}><span className="up-muted">{secs(e.t)}</span> {e.kind === 'page' ? <>opened <code>{e.page}</code></> : <>clicked {e.label ?? e.sel ?? 'something'}{e.rage ? ' (rage)' : e.dead ? ' (nothing clickable)' : ''}</>}</li>)}
-                      </ol>
-                    )}
+                    {open === r.id && <PathList ev={ev} />}
                   </li>
                 )
               })}
@@ -293,3 +326,81 @@ export function StudyResults() {
     </div>
   )
 }
+
+/* ---------- session insights: every participant, across studies ---------- */
+
+/** One participant's path: pages opened and clicks, in order. */
+function PathList({ ev }: { ev: EventRow[] }) {
+  return (
+    <ol className="rs-path">
+      {ev.slice(0, 300).map((e, i) => <li key={i} className={e.rage ? 'rage' : e.dead ? 'dead' : ''}><span className="up-muted">{secs(e.t)}</span> {e.kind === 'page' ? <>opened <code>{e.page}</code></> : e.kind === 'door' ? <>{e.hit ? 'clicked' : 'saw'} the fake door “{e.label}”</> : <>clicked {e.label ?? e.sel ?? 'something'}{e.rage ? ' (rage)' : e.dead ? ' (nothing clickable)' : ''}</>}</li>)}
+    </ol>
+  )
+}
+
+function Sessions({ studies }: { studies: StudyRow[] }) {
+  const { project } = usePanel()
+  const { toast } = useStore()
+  const [data, setData] = useState<{ runs: (RunRow & { study_id: string })[]; events: EventRow[] } | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
+  const [only, setOnly] = useState<'all' | 'frustrated'>('all')
+  useEffect(() => { if (project) void projectSessions(project.id).then(setData).catch((e: Error) => toast(`Couldn’t load sessions: ${e.message}`, 'error')) }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const byRun = useMemo(() => { const m = new Map<string, EventRow[]>(); for (const e of data?.events ?? []) m.set(e.run_id, [...(m.get(e.run_id) ?? []), e]); return m }, [data])
+  if (!data) return <p className="up-muted">Loading…</p>
+  if (!data.runs.length) return <section className="up-card"><h2>No sessions yet</h2><p className="up-muted">Each participant who takes part in a study is a session here: the pages they opened, what they clicked, and where they got stuck.</p></section>
+  const clicks = data.events.filter((e) => e.kind === 'click')
+  const rage = clicks.filter((e) => e.rage), dead = clicks.filter((e) => e.dead)
+  const pagesPer = data.runs.map((r) => new Set((byRun.get(r.id) ?? []).filter((e) => e.kind === 'page').map((e) => e.page)).size)
+  // Where people got stuck: rage clicks and clicks on nothing clickable, by page and element.
+  const spots = [...[...rage, ...dead].reduce((m, e) => {
+    const k = `${e.page}\u0000${e.label ?? e.sel ?? '?'}`
+    const v = m.get(k) ?? { page: e.page, what: e.label ?? e.sel ?? '?', rage: 0, dead: 0, people: new Set<string>() }
+    if (e.rage) v.rage++; else v.dead++
+    v.people.add(e.run_id)
+    return m.set(k, v)
+  }, new Map<string, { page: string; what: string; rage: number; dead: number; people: Set<string> }>()).values()].sort((a, b) => b.people.size - a.people.size || b.rage - a.rage).slice(0, 15)
+  const studyName = (id: string) => studies.find((s) => s.id === id)?.name ?? 'study'
+  const frustrated = (id: string) => (byRun.get(id) ?? []).some((e) => e.rage || e.dead)
+  const list = data.runs.filter((r) => only === 'all' || frustrated(r.id))
+  return (
+    <>
+      <div className="db-kpis">
+        <div className="db-kpi"><span>Sessions</span><b>{data.runs.length}</b></div>
+        <div className="db-kpi"><span>Pages per session</span><b>{pagesPer.length ? (pagesPer.reduce((a, b) => a + b, 0) / pagesPer.length).toFixed(1) : '–'}</b></div>
+        <div className="db-kpi"><span>Rage clicks</span><b>{rage.length}</b><small>{new Set(rage.map((e) => e.run_id)).size} sessions</small></div>
+        <div className="db-kpi"><span>On nothing clickable</span><b>{dead.length}</b><small>{new Set(dead.map((e) => e.run_id)).size} sessions</small></div>
+      </div>
+      <section className="up-card">
+        <h2>Where people got stuck</h2>
+        {!spots.length ? <p className="up-muted">No rage clicks or clicks on nothing clickable yet.</p> : (
+          <table className="db-table">
+            <thead><tr><th>Page</th><th>Element</th><th>People</th><th>Rage clicks</th><th>On nothing clickable</th></tr></thead>
+            <tbody>{spots.map((x) => <tr key={x.page + x.what}><td><code>{x.page}</code></td><td>{x.what}</td><td>{x.people.size}</td><td>{x.rage}</td><td>{x.dead}</td></tr>)}</tbody>
+          </table>
+        )}
+        <p className="up-muted">Rage clicks: three or more quick clicks in one spot. Clicks on nothing clickable: on text or images people expected to do something.</p>
+      </section>
+      <section className="up-card">
+        <div className="up-row"><h2 className="lp-grow">Sessions</h2>
+          <span className="seg"><button aria-pressed={only === 'all'} onClick={() => setOnly('all')}>All</button><button aria-pressed={only === 'frustrated'} onClick={() => setOnly('frustrated')}>With frustration</button></span></div>
+        <ul className="rs-runs">
+          {list.map((r) => {
+            const ev = byRun.get(r.id) ?? []
+            const pages = [...new Set(ev.filter((e) => e.kind === 'page').map((e) => e.page))]
+            return (
+              <li key={r.id} className="up-card">
+                <div className="up-row">
+                  <span className="lp-grow"><b>{studyName(r.study_id)}</b><small className="up-muted"> · {r.device ?? 'device'} · {ago(r.started_at)} · {ev.filter((e) => e.kind === 'click').length} clicks · {pages.length} page{pages.length === 1 ? '' : 's'}{frustrated(r.id) ? ' · frustration' : ''}</small></span>
+                  <button className="lp-btn sm ghost" onClick={() => setOpen(open === r.id ? null : r.id)}>{open === r.id ? 'Hide path' : 'Path'}</button>
+                </div>
+                <p className="up-muted rs-trail">{pages.map((p) => <code key={p}>{p}</code>)}</p>
+                {open === r.id && <PathList ev={ev} />}
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+    </>
+  )
+}
+

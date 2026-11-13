@@ -5,12 +5,13 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Check, Flag, Timer, X } from 'lucide-react'
-import { Recorder, cleanConfig, finishRun, pageMatches, saveRun, startRun, type Outcome, type RunState } from './research'
+import { Recorder, cleanConfig, finishRun, pageMatches, saveRun, startRun, type Door, type Outcome, type RunState } from './research'
 
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const KIND_LABEL = { usability: 'tasks on this site', fivesec: 'a 5-second test', browse: 'a short visit' } as const
 
-export function Participant({ project, initial, accent }: { project: string; initial: RunState; accent: string }) {
+export function Participant({ project, initial, accent, doorsOn = false }: { project: string; initial: RunState; accent: string; doorsOn?: boolean }) {
+  const recRef = useRef<Recorder | null>(null)
   const [st, setSt] = useState<RunState>(initial)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -61,11 +62,12 @@ export function Participant({ project, initial, accent }: { project: string; ini
         const rule = s.kind === 'usability' ? s.config?.tasks?.[s.index]?.success : undefined
         if (rule?.kind === 'page' && pageMatches(rule.page, page)) window.setTimeout(() => endTask('success'), 300)
       })
+    recRef.current = rec
     rec.start(() => (stRef.current.kind === 'usability' ? stRef.current.config?.tasks?.[stRef.current.index]?.id : stRef.current.kind), (el) => {
       const rule = stRef.current.config?.tasks?.[stRef.current.index]?.success
       return rule?.kind === 'element' ? !!el.closest(rule.sel) : undefined
     })
-    return () => { void rec.end() }
+    return () => { recRef.current = null; void rec.end() }
   }, [recording, st.run, st.index]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The clock: time limits, and the 5 seconds.
@@ -138,9 +140,11 @@ export function Participant({ project, initial, accent }: { project: string; ini
       </div>
     )
   }
+  const doors = doorsOn && recording && st.config?.doors?.length ? <Doors doors={st.config.doors} rec={recRef} task={task?.id ?? st.kind} /> : null
   if (st.phase === 'task') {
     return (
       <div className="vc" style={style}>
+        {doors}
         <div className="vc-taskbar" role="status">
           <span className="vc-kicker">{st.kind === 'usability' ? `${st.index + 1}/${tasks.length}` : 'Visit'}</span>
           <span className="vc-taskprompt" title={task?.prompt}>{st.kind === 'usability' ? task?.prompt : (st.config?.prompt || 'Use the site as you normally would')}</span>
@@ -151,7 +155,7 @@ export function Participant({ project, initial, accent }: { project: string; ini
       </div>
     )
   }
-  if (st.phase === 'showing') return <div className="vc" style={style}><div className="vc-taskbar small" role="status"><Timer size={13} /> {Math.ceil(Math.max(0, limitMs - elapsed) / 1000)}</div></div>
+  if (st.phase === 'showing') return <div className="vc" style={style}>{doors}<div className="vc-taskbar small" role="status"><Timer size={13} /> {Math.ceil(Math.max(0, limitMs - elapsed) / 1000)}</div></div>
   if (st.phase === 'questions') return <Questions st={st} style={style} onDone={(answers) => void finishAll({ ...st, answers })} />
   if (st.phase === 'done') {
     return (
@@ -185,3 +189,61 @@ function Questions({ st, style, onDone }: { st: RunState; style: React.CSSProper
     </div>
   )
 }
+
+/**
+ * Fake doors: a feature that doesn't exist yet, offered to the study's participants to measure
+ * interest. "add": a button of ours beside an element of the page; "existing": an element of the
+ * page itself. Seeing one and clicking it are recorded; clicking shows that it is coming soon.
+ */
+function Doors({ doors, rec, task }: { doors: Door[]; rec: React.MutableRefObject<Recorder | null>; task?: string }) {
+  const [, tick] = useState(0)
+  const [msg, setMsg] = useState<Door | null>(null)
+  const seen = useRef(new Set<string>())
+  const here = doors.filter((d) => !d.page || pageMatches(d.page, window.location.pathname))
+  const find = (d: Door) => { try { return document.querySelector(d.sel) } catch { return null } }
+  useEffect(() => {
+    const iv = window.setInterval(() => tick((n) => n + 1), 400)
+    const redraw = () => tick((n) => n + 1)
+    window.addEventListener('scroll', redraw, true); window.addEventListener('resize', redraw)
+    // An existing element as the door: its click is the door's, not the page's.
+    const click = (e: MouseEvent) => {
+      if (!(e.target instanceof Element)) return
+      const d = doors.find((x) => x.mode === 'existing' && (!x.page || pageMatches(x.page, window.location.pathname)) && (() => { try { return !!(e.target as Element).closest(x.sel) } catch { return false } })())
+      if (!d) return
+      e.preventDefault(); e.stopPropagation()
+      rec.current?.door(d, true, task); setMsg(d)
+    }
+    document.addEventListener('click', click, true)
+    return () => { window.clearInterval(iv); window.removeEventListener('scroll', redraw, true); window.removeEventListener('resize', redraw); document.removeEventListener('click', click, true) }
+  }, [doors, task]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Seen: once per page load, when its element is on the page.
+  useEffect(() => {
+    for (const d of here) {
+      const k = `${window.location.pathname}|${d.id}`
+      const el = find(d)
+      // Only once the recorder is there (it starts in the parent's effect, after this one's first run).
+      if (!seen.current.has(k) && rec.current && el && el.getBoundingClientRect().width > 0) { seen.current.add(k); rec.current.door(d, false, task) }
+    }
+  })
+  return (
+    <>
+      {here.filter((d) => d.mode === 'add').map((d) => {
+        const r = find(d)?.getBoundingClientRect()
+        if (!r || r.width === 0 || r.bottom < 0 || r.top > window.innerHeight) return null
+        const left = Math.min(window.innerWidth - 160, r.right + 8)
+        return <button key={d.id} className="vc-door" style={{ left, top: r.top + r.height / 2 - 15 }} onClick={() => { rec.current?.door(d, true, task); setMsg(d) }}>{d.label}<span>new</span></button>
+      })}
+      {msg && (
+        <div className="vc-scrim" onClick={() => setMsg(null)}>
+          <div className="vc-modal" role="dialog" aria-label="Coming soon" onClick={(e) => e.stopPropagation()}>
+            <span className="vc-kicker">Coming soon</span>
+            <h2>{msg.label}</h2>
+            <p>{msg.message}</p>
+            <div className="vc-row"><span className="vc-grow" /><button className="vc-btn primary" onClick={() => setMsg(null)}>OK</button></div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+

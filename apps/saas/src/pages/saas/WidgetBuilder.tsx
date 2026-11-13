@@ -6,7 +6,7 @@ import { Modal, Switch } from '../../components/ui'
 import { PRODUCTS } from '../../saas/products'
 import { demoUrl } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, publish, releasable, reviewerUrl } from '../../saas/widget'
-import { MAX_ENVS, MAX_LABEL, anyModule, hostProblem, sameConfig, type Env, type ModuleId, type WidgetConfig } from '../../core/embed/config'
+import { MAX_ENVS, MAX_LABEL, SCRIPT_MODULES, anyModule, hostProblem, sameConfig, type Env, type ModuleId, type WidgetConfig } from '../../core/embed/config'
 import { AnonWarning, ReviewLinkMaker, ago, openDemo, usePanel } from './Panel'
 import { cloud } from '../../saas/supabase'
 
@@ -81,7 +81,7 @@ export function WidgetBuilder() {
 
           <section className="up-card">
             <h2>Modules</h2>
-            {PRODUCTS.filter((p) => p.id === 'comments' || p.status === 'script').map((p) => {
+            {PRODUCTS.filter((p) => (SCRIPT_MODULES as readonly string[]).includes(p.id)).map((p) => {
               const on = project.products.includes(p.id)
               const toggle = () => {
                 if (p.id === 'comments') { if (on) edit((c) => ({ ...c, modules: { ...c.modules, comments: !c.modules.comments } })); return }
@@ -89,12 +89,12 @@ export function WidgetBuilder() {
               }
               return (
                 <div className="up-row" key={p.id}>
-                  <span className="lp-grow"><b>{p.name}</b>{p.id === 'comments' && !on ? <small className="up-muted"> · turned off in <Link to="/app/products">Products</Link></small> : p.id !== 'comments' ? <small className="up-muted"> · reviewers only, in their browser</small> : null}</span>
+                  <span className="lp-grow"><b>{p.name}</b>{p.id === 'comments' && !on ? <small className="up-muted"> · turned off in <Link to="/app/products">Products</Link></small> : p.id !== 'comments' ? <small className="up-muted"> · {['heatmap', 'usability', 'fivesec', 'doors'].includes(p.id) ? (p.id === 'heatmap' ? 'studies, and the heatmap for reviewers' : 'study participants only (Research)') : 'reviewers only, in their browser'}</small> : null}</span>
                   <Switch checked={!!out.modules[p.id as ModuleId]} onChange={toggle} label={p.name} />
                 </div>
               )
             })}
-            <p className="up-muted">Inspect, Design system check and Design tokens show as buttons beside Comments, for reviewers only. They read the page’s styles in the reviewer’s browser and send nothing. Turning one on or off here also changes it in Products; publish to apply.</p>
+            <p className="up-muted">Inspect, Design system check, Design tokens and Heatmap show as buttons beside Comments, for reviewers only. Usability tests, 5-second tests, heatmap visits and fake doors run for study participants who agreed (Research). Turning one on or off here also changes it in Products; publish to apply.</p>
           </section>
 
           <section className="up-card">

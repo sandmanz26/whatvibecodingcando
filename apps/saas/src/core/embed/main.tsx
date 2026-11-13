@@ -296,7 +296,7 @@ async function boot() {
     }
     if (study && study.phase !== 'declined') {
       const file = await server.fetchSettings(project)
-      mountAlone(<Participant project={project} initial={study as RunState} accent={file.live?.config.theme.accent ?? '#e8590c'} />)
+      mountAlone(<Participant project={project} initial={study as RunState} accent={file.live?.config.theme.accent ?? '#e8590c'} doorsOn={!!file.live?.config.modules.doors} />)
       return
     }
   }

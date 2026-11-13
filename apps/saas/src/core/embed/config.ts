@@ -19,7 +19,7 @@ export const CONFIG_VERSION = 1
 export interface Env { id: string; name: string; host: string; on: boolean }
 export type Audience = 'reviewers' | 'everyone'
 /** The products the script runs, one switch each. Comments is always present; the others only when on. */
-export const SCRIPT_MODULES = ['comments', 'inspect', 'dscheck', 'tokens', 'heatmap', 'usability', 'fivesec'] as const
+export const SCRIPT_MODULES = ['comments', 'inspect', 'dscheck', 'tokens', 'heatmap', 'usability', 'fivesec', 'doors'] as const
 export type ModuleId = typeof SCRIPT_MODULES[number]
 export type Modules = { comments: boolean } & Partial<Record<Exclude<ModuleId, 'comments'>, true>>
 /** Modules in one canonical form (extras listed only when on), so two configurations compare as data. */

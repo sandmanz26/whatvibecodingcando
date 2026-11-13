@@ -469,3 +469,7 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 .rs-path li.rage { color: #c92a2a; }
 .rs-path li.dead { color: #b35c00; }
 @media (max-width: 640px) { .rs-kinds { grid-template-columns: 1fr; } }
+.rs-tabs { align-self: flex-start; margin-bottom: 4px; }
+.rs-trail { display: flex; flex-wrap: wrap; gap: 4px; }
+.rs-trail code::after { content: ' →'; color: var(--lp-ink-2); }
+.rs-trail code:last-child::after { content: ''; }

@@ -16,8 +16,10 @@ import { NS, selectorFor } from './store'
 export type StudyKind = 'usability' | 'fivesec' | 'browse'
 export type Rule = { kind: 'page'; page: string } | { kind: 'element'; sel: string; label?: string } | { kind: 'none' }
 export interface Task { id: string; prompt: string; startPage: string; success: Rule; limitSec: number }
+export interface Door { id: string; page: string; sel: string; mode: 'add' | 'existing'; label: string; message: string }
 export interface StudyConfig {
   intro?: string
+  /** fake doors shown to this study's participants */ doors?: Door[]
   tasks?: Task[]
   /** fivesec */ page?: string; seconds?: number; prompt?: string; questions?: string[]
   /** browse */ minutes?: number
@@ -67,6 +69,12 @@ const path = (v: unknown) => { const p = str(v, 300).trim(); return /^\/(?!\/)/.
 export function cleanConfig(kind: StudyKind, c: unknown): StudyConfig {
   const o = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
   const out: StudyConfig = { intro: str(o.intro, 600) }
+  out.doors = (Array.isArray(o.doors) ? o.doors : []).slice(0, 5).map((d, i): Door | null => {
+    const x = (d && typeof d === 'object' ? d : {}) as Record<string, unknown>
+    const sel = str(x.sel, 400).trim()
+    if (!sel) return null
+    return { id: str(x.id, 40) || `d${i + 1}`, page: x.page ? path(x.page) : '', sel, mode: x.mode === 'existing' ? 'existing' : 'add', label: str(x.label, 60) || 'New', message: str(x.message, 300) || 'This is coming soon. Thanks for your interest!' }
+  }).filter((d): d is Door => !!d)
   if (kind === 'usability') {
     out.tasks = (Array.isArray(o.tasks) ? o.tasks : []).slice(0, 10).map((t, i): Task => {
       const x = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>
@@ -90,7 +98,7 @@ export const pageMatches = (rule: string, p: string) => (rule.endsWith('*') ? p.
 
 /* ---------- the click recorder ---------- */
 
-interface Ev { t: number; task?: string; kind: 'click' | 'page'; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
+interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door'; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [onclick], [contenteditable=""], [contenteditable=true]'
 /** A short label of what an element shows. A form field: its tag and its label only, never its value. */
@@ -166,6 +174,10 @@ export class Recorder {
     }
   }
   end() { this.stop?.(); this.stop = null; return this.flush() }
+  /** A fake door seen (hit false) or clicked (hit true). */
+  door(d: { page: string; sel: string; label: string }, hit: boolean, task?: string) {
+    this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'door', page: window.location.pathname, sel: d.sel.slice(0, 400), label: d.label.slice(0, 80), hit })
+  }
   private push(e: Ev) { if (this.queue.length < 1000) this.queue.push(e) }
   async flush(leaving = false) {
     if (!this.queue.length) return

@@ -353,3 +353,19 @@ export async function studyResults(id: string): Promise<{ runs: RunRow[]; events
   return { runs: runs as RunRow[], events }
 }
 export async function deleteRun(id: string) { const { error } = await supabase!.from('runs').delete().eq('id', id); if (error) throw error }
+
+/** Every participant's run in the project (the latest 300), with their events (the latest 20,000): session insights. */
+export async function projectSessions(publicId: string): Promise<{ runs: (RunRow & { study_id: string })[]; events: EventRow[] }> {
+  const pid = dbIds.get(publicId)
+  if (!pid) return { runs: [], events: [] }
+  const { data: runs, error } = await supabase!.from('runs').select('id, study_id, started_at, finished_at, device, vw, gaze_accuracy, result, events').eq('project_id', pid).order('started_at', { ascending: false }).limit(300)
+  if (error) throw error
+  const ids = (runs ?? []).map((r) => r.id as string)
+  const events: EventRow[] = []
+  for (let i = 0; i < ids.length && events.length < 20000; i += 100) {
+    const { data, error: e } = await supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit').in('run_id', ids.slice(i, i + 100)).order('t').limit(20000 - events.length)
+    if (e) throw e
+    events.push(...(data as EventRow[]))
+  }
+  return { runs: runs as (RunRow & { study_id: string })[], events }
+}

@@ -139,4 +139,6 @@ export const CSS = `
 .vc-heatpanel { top: auto; bottom: 74px; height: auto; max-height: 60vh; }
 .vc-legend { height: 8px; border-radius: 4px; }
 .vc-q select, .vc-q input[type=range] { font: inherit; }
+.vc-door { position: fixed; z-index: 2147482997; height: 30px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--vc-accent); color: #fff; font: 600 13px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.2); cursor: pointer; }
+.vc-door span { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; background: rgba(255,255,255,.25); padding: 2px 5px; border-radius: 4px; }
 `
