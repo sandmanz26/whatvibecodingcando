@@ -246,8 +246,8 @@ end $$;
 
 -- ---------- the script: the heatmap a reviewer sees over the page ----------
 
--- Clicks on one page (all studies, or one), for a reviewer of the project, at most 20,000.
-create or replace function public.heatmap_points(p_public_id text, p_page text, p_study uuid default null) returns json
+-- Clicks (or gaze points) on one page (all studies, or one), for a reviewer of the project, at most 20,000.
+create or replace function public.heatmap_points(p_public_id text, p_page text, p_study uuid default null, p_kind text default 'click') returns json
 language plpgsql security definer set search_path = public as $$
 declare pid uuid;
 begin
@@ -260,7 +260,7 @@ begin
     'studies', coalesce((select json_agg(json_build_object('id', s.id, 'name', s.name) order by s.created_at desc) from public.studies s where s.project_id = pid), '[]'::json),
     'points', coalesce((select json_agg(json_build_object('x', e.x, 'y', e.y, 'vw', e.vw, 'sel', e.sel, 'ex', e.ex, 'ey', e.ey, 'rage', e.rage, 'dead', e.dead))
       from (select e.* from public.run_events e join public.runs r on r.id = e.run_id
-            where e.project_id = pid and e.kind = 'click' and e.page = left(coalesce(p_page, '/'), 300)
+            where e.project_id = pid and e.kind = (case when p_kind = 'gaze' then 'gaze' else 'click' end) and e.page = left(coalesce(p_page, '/'), 300)
               and (p_study is null or r.study_id = p_study)
             order by e.id desc limit 20000) e), '[]'::json)
   );
@@ -270,9 +270,9 @@ end $$;
 
 revoke all on function public._origin_ok(uuid, text), public._module_of(text), public._study_for(text, text), public._run_for(uuid) from public, anon, authenticated;
 revoke all on function public.create_study_link(uuid, int), public.revoke_study_link(uuid), public.study_info(text, text), public.start_run(text, text, int, int),
-  public.log_events(uuid, jsonb), public.finish_run(uuid, jsonb, real), public.heatmap_points(text, text, uuid) from public, anon;
+  public.log_events(uuid, jsonb), public.finish_run(uuid, jsonb, real), public.heatmap_points(text, text, uuid, text) from public, anon;
 grant execute on function public.create_study_link(uuid, int), public.revoke_study_link(uuid), public.start_run(text, text, int, int),
-  public.log_events(uuid, jsonb), public.finish_run(uuid, jsonb, real), public.heatmap_points(text, text, uuid) to authenticated;
+  public.log_events(uuid, jsonb), public.finish_run(uuid, jsonb, real), public.heatmap_points(text, text, uuid, text) to authenticated;
 -- The consent screen shows before any session exists.
 grant execute on function public.study_info(text, text) to anon, authenticated;
 revoke all on all tables in schema public from anon;

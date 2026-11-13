@@ -28,7 +28,9 @@ export type Outcome = 'success' | 'timeout' | 'gave_up' | 'done'
 export interface TaskResult { id: string; outcome: Outcome; ms: number; pages: string[]; clicks: number; firstClickHit: boolean | null }
 export interface RunState {
   token: string
-  phase: 'consent' | 'intro' | 'task' | 'showing' | 'questions' | 'done' | 'declined'
+  phase: 'consent' | 'eyes' | 'intro' | 'task' | 'showing' | 'questions' | 'done' | 'declined'
+  /** eye tracking, when the study asks for it and the participant agreed and calibrated */
+  eye?: { on: boolean; model?: import('../gaze-model').Model; accuracy?: number }
   info?: { name: string; kind: StudyKind; eye: boolean; tasks: number }
   run?: string
   kind?: StudyKind
@@ -98,7 +100,7 @@ export const pageMatches = (rule: string, p: string) => (rule.endsWith('*') ? p.
 
 /* ---------- the click recorder ---------- */
 
-interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door'; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
+interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze'; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [onclick], [contenteditable=""], [contenteditable=true]'
 /** A short label of what an element shows. A form field: its tag and its label only, never its value. */
@@ -174,6 +176,10 @@ export class Recorder {
     }
   }
   end() { this.stop?.(); this.stop = null; return this.flush() }
+  /** Where the participant looks (page coordinates), from eye tracking. */
+  gaze(x: number, y: number, task?: string) {
+    this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'gaze', page: window.location.pathname, x: Math.round(x), y: Math.round(y), vw: window.innerWidth, doc_h: document.documentElement.scrollHeight })
+  }
   /** A fake door seen (hit false) or clicked (hit true). */
   door(d: { page: string; sel: string; label: string }, hit: boolean, task?: string) {
     this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'door', page: window.location.pathname, sel: d.sel.slice(0, 400), label: d.label.slice(0, 80), hit })
@@ -193,4 +199,4 @@ export const studyInfo = (project: string, token: string) =>
   server.rpc<{ name: string; kind: StudyKind; eye: boolean; tasks: number }>('study_info', { p_public_id: project, p_token: token }, { anon: true })
 export const startRun = (project: string, token: string) =>
   server.rpc<{ run: string; kind: StudyKind; name: string; config: unknown; eye: boolean }>('start_run', { p_public_id: project, p_token: token, p_vw: window.innerWidth, p_vh: window.innerHeight }, { signIn: true })
-export const finishRun = (run: string, result: Record<string, unknown>) => server.rpc('finish_run', { p_run: run, p_result: result })
+export const finishRun = (run: string, result: Record<string, unknown>, gaze?: number) => server.rpc('finish_run', { p_run: run, p_result: result, p_gaze: gaze ?? null })

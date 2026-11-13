@@ -275,16 +275,17 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
   const [study, setStudy] = useState('')
   const [error, setError] = useState('')
   const [opacity, setOpacity] = useState(0.75)
+  const [kind, setKind] = useState<'click' | 'gaze'>('click')
   const [page, setPage] = useState(window.location.pathname)
   const canvas = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     let live = true
     setData(null); setError('')
-    server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null })
+    server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null, p_kind: kind })
       .then((d) => { if (live) setData({ studies: d.studies ?? [], points: d.points ?? [] }) })
       .catch((e: Error) => { if (live) setError(HEAT_ERRORS[e.message] ?? `The heatmap couldn’t load (${e.message}).`) })
     return () => { live = false }
-  }, [project, page, study])
+  }, [project, page, study, kind])
   useEffect(() => {
     if (!data) return
     let raf = 0
@@ -324,7 +325,8 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
         <div className="vc-card-head"><b>Heatmap · {page}</b><span className="vc-grow" /><button className="vc-icon" onClick={onClose} aria-label="Close"><X size={14} /></button></div>
         {error ? <p className="vc-bad">{error}</p> : !data ? <p className="vc-empty">Loading…</p> : (
           <>
-            <p className={`vc-sum ${n ? '' : 'bad'}`}>{n ? `${n} click${n === 1 ? '' : 's'} on this page${n >= 20000 ? ' (the latest 20,000)' : ''}` : 'No clicks on this page yet'}{n ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
+            <div className="vc-seg"><button aria-pressed={kind === 'click'} onClick={() => setKind('click')}>Clicks</button><button aria-pressed={kind === 'gaze'} onClick={() => setKind('gaze')}>Where people looked</button></div>
+            <p className={`vc-sum ${n ? '' : 'bad'}`}>{n ? `${n} ${kind === 'gaze' ? 'gaze point' : 'click'}${n === 1 ? '' : 's'} on this page${n >= 20000 ? ' (the latest 20,000)' : ''}` : kind === 'gaze' ? 'No eye tracking on this page yet' : 'No clicks on this page yet'}{n && kind === 'click' ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
             {data.studies.length > 0 && (
               <label className="vc-q">Study
                 <select value={study} onChange={(e) => setStudy(e.target.value)}>
@@ -337,7 +339,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
             <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>fewer</span><span className="vc-grow" /><span>more clicks</span></div>
           </>
         )}
-        <p className="vc-where">Clicks of study participants who agreed to take part; never other visitors. Open another page and the map follows.</p>
+        <p className="vc-where">From study participants who agreed to take part (eye tracking only from those who also agreed to it, and estimated: about 100–200 px); never other visitors. Open another page and the map follows.</p>
       </div>
     </>
   )

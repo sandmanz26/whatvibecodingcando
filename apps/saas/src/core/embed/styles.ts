@@ -141,4 +141,12 @@ export const CSS = `
 .vc-q select, .vc-q input[type=range] { font: inherit; }
 .vc-door { position: fixed; z-index: 2147482997; height: 30px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--vc-accent); color: #fff; font: 600 13px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.2); cursor: pointer; }
 .vc-door span { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; background: rgba(255,255,255,.25); padding: 2px 5px; border-radius: 4px; }
+.vc-cambox { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; left: 0; top: 0; }
+.vc-cam { width: 320px; height: 240px; }
+.vc-calib { position: fixed; inset: 0; z-index: 2147483005; background: rgba(244,244,244,.96); }
+.vc-dot { position: fixed; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; border: 4px solid #fff; background: var(--vc-accent); box-shadow: 0 0 0 3px var(--vc-accent), 0 4px 14px rgba(0,0,0,.3); cursor: pointer; animation: vc-pulse 1.2s ease-in-out infinite; }
+@keyframes vc-pulse { 50% { transform: scale(.75); } }
+.vc-seg { display: flex; padding: 2px; border-radius: 8px; background: var(--vc-soft); }
+.vc-seg button { flex: 1; height: 26px; border: 0; border-radius: 6px; background: transparent; font-size: 12px; font-weight: 550; color: var(--vc-ink-2); }
+.vc-seg button[aria-pressed='true'] { background: var(--vc-field); color: var(--vc-ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 `

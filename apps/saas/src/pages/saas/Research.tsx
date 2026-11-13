@@ -129,6 +129,8 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
   const [minutes, setMinutes] = useState(Number(c.minutes ?? 3))
   const [questions, setQuestions] = useState<string[]>(((c.questions as string[] | undefined) ?? ['What was this page about?', 'What would you click first?']).concat(['', '', '']).slice(0, 3))
   const [maxRuns, setMaxRuns] = useState(study?.max_runs ?? 200)
+  const [eyes, setEyes] = useState(study?.eye_tracking ?? false)
+  const gazeOn = !!project && !!liveOf(project)?.config.modules.gaze
   const [doors, setDoors] = useState<{ page: string; sel: string; mode: 'add' | 'existing'; label: string; message: string }[]>(() => ((c.doors as Record<string, string>[] | undefined) ?? []).map((d) => ({ page: d.page ?? '', sel: d.sel ?? '', mode: d.mode === 'existing' ? 'existing' : 'add', label: d.label ?? '', message: d.message ?? '' })))
   const doorsOn = !!project && !!liveOf(project)?.config.modules.doors
   const [busy, setBusy] = useState(false)
@@ -141,7 +143,7 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
         : { intro: intro.trim(), page: cleanPath(page), prompt: prompt.trim(), minutes: Math.min(30, Math.max(1, minutes)) }
     config.doors = doors.filter((d) => d.sel.trim()).slice(0, 5).map((d, i) => ({ id: `d${i + 1}`, page: d.page.trim() ? cleanPath(d.page) : '', sel: d.sel.trim().slice(0, 400), mode: d.mode, label: d.label.trim().slice(0, 60) || 'New', message: d.message.trim().slice(0, 300) }))
     setBusy(true)
-    try { await saveStudy(project.id, { id: study?.id, kind, name, config, status: study?.status, max_runs: Math.min(1000, Math.max(1, maxRuns)) }); toast(study ? 'Study saved' : 'Study created'); onSaved() }
+    try { await saveStudy(project.id, { id: study?.id, kind, name, config, status: study?.status, eye_tracking: kind !== 'fivesec' && eyes, max_runs: Math.min(1000, Math.max(1, maxRuns)) }); toast(study ? 'Study saved' : 'Study created'); onSaved() }
     catch (e) { toast(`Not saved: ${(e as Error).message}`, 'error') }
     finally { setBusy(false) }
   }
@@ -195,6 +197,9 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
             <h3 className="up-sub">Questions afterwards</h3>
             {questions.map((q, i) => <label key={i} className="lp-field">Question {i + 1}{i > 0 ? ' (optional)' : ''}<input value={q} maxLength={200} onChange={(e) => setQuestions(questions.map((x, j) => (j === i ? e.target.value : x)))} /></label>)}
           </>
+        )}
+        {kind !== 'fivesec' && (
+          <label className="up-check"><input type="checkbox" checked={eyes} onChange={(e) => setEyes(e.target.checked)} /> Ask participants for webcam eye tracking (they can say no; video stays in their browser, only where they look is saved){!gazeOn && ' · turn on Eye tracking in Products and publish'}</label>
         )}
         <details className="wb-more" open={doors.length > 0}>
           <summary>Fake doors (optional)</summary>
@@ -254,7 +259,7 @@ export function StudyResults() {
   return (
     <div className="up-page">
       <button className="lp-btn sm ghost" onClick={() => nav('/app/research')}><ArrowLeft size={14} /> Research</button>
-      <div className="up-head"><div><h1>{study?.name ?? 'Study'}</h1><p>{study ? KIND[study.kind].label : ''} · {runs.length} participant{runs.length === 1 ? '' : 's'}, {done.length} finished</p></div></div>
+      <div className="up-head"><div><h1>{study?.name ?? 'Study'}</h1><p>{study ? KIND[study.kind].label : ''} · {runs.length} participant{runs.length === 1 ? '' : 's'}, {done.length} finished{runs.some((r) => r.gaze_accuracy) ? ` · eye tracking for ${runs.filter((r) => r.gaze_accuracy).length} (median accuracy ${Math.round(median(runs.filter((r) => r.gaze_accuracy).map((r) => r.gaze_accuracy!)))} px)` : ''}</p></div></div>
       {!data ? <p className="up-muted">Loading…</p> : !runs.length ? <p className="up-muted">No participants yet. Send the participant link from Research.</p> : (
         <>
           {study?.kind === 'usability' && (
