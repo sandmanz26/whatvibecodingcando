@@ -152,4 +152,5 @@ export const CSS = `
 .vc-ab { position: fixed; z-index: 2147482991; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 6px; background: #5f3dc4; color: #fff; font: 800 12px/24px system-ui, sans-serif; text-align: center; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .vc-ver { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: var(--vc-soft); color: var(--vc-ink-2); font-size: 11px; font-weight: 600; }
 .vc-audio { width: 100%; height: 36px; }
+.vc-lostface { color: #ffb38a; opacity: 1; font-weight: 700; }
 `

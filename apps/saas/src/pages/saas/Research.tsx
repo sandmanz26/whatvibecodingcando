@@ -251,9 +251,9 @@ export function StudyResults() {
   const clicks = (data?.events ?? []).filter((e) => e.kind === 'click')
   const pages = [...clicks.reduce((m, e) => m.set(e.page, [(m.get(e.page)?.[0] ?? 0) + 1, (m.get(e.page)?.[1] ?? 0) + (e.rage ? 1 : 0), (m.get(e.page)?.[2] ?? 0) + (e.dead ? 1 : 0)]), new Map<string, number[]>())].sort((a, b) => b[1][0] - a[1][0])
   const heatOn = !!liveOf(project)?.config.modules.heatmap
-  const openHeat = (page: string) => {
+  const openHeat = (page: string, gaze = false) => {
     const base = project.siteUrl ? new URL(page, project.siteUrl).href : demoUrl(project.id)
-    const u = new URL(base); u.hash = 'vibe_tool=heatmap'
+    const u = new URL(base); u.hash = gaze ? 'vibe_tool=heatmap&vibe_heat=gaze' : 'vibe_tool=heatmap'
     void openAsReviewer(project.id, u.href).then((ok) => { if (!ok) toast('Couldn’t open your site as a reviewer.', 'error') })
   }
   return (
@@ -294,6 +294,22 @@ export function StudyResults() {
                 <table className="db-table"><thead><tr><th>Door</th><th>Saw it</th><th>Clicked</th><th>Interest</th></tr></thead>
                   <tbody>{rows.map(([k, v]) => <tr key={k}><td>{k}</td><td>{v.saw.size}</td><td>{v.clicked.size}</td><td>{pct(v.clicked.size, Math.max(v.saw.size, v.clicked.size))}</td></tr>)}</tbody></table>
                 <p className="up-muted">People, not clicks: someone who clicked three times counts once.</p>
+              </section>
+            )
+          })()}
+          {(() => {
+            const gz = (data?.events ?? []).filter((e) => e.kind === 'gaze')
+            if (!gz.length) return null
+            // Each gaze point stands for about 200 ms of looking.
+            const rows = [...gz.reduce((m, e) => { const k = `${e.page}\u0000${e.label ?? e.sel ?? '?'}`; const v = m.get(k) ?? { page: e.page, what: e.label ?? e.sel ?? '?', n: 0, people: new Set<string>() }; v.n++; v.people.add(e.run_id); return m.set(k, v) }, new Map<string, { page: string; what: string; n: number; people: Set<string> }>()).values()].sort((a, b) => b.n - a.n).slice(0, 15)
+            const pagesG = [...new Set(gz.map((e) => e.page))]
+            return (
+              <section className="up-card">
+                <h2>Where people looked</h2>
+                <table className="db-table"><thead><tr><th>Page</th><th>Element</th><th>Looked at</th><th>People</th></tr></thead>
+                  <tbody>{rows.map((x) => <tr key={x.page + x.what}><td><code>{x.page}</code></td><td>{x.what}</td><td>{(x.n * 0.2).toFixed(1)} s</td><td>{x.people.size}</td></tr>)}</tbody></table>
+                <div className="up-row wrap">{pagesG.slice(0, 6).map((pg) => <button key={pg} className="lp-btn sm" onClick={() => openHeat(pg, true)}>Gaze heatmap of {pg} <ExternalLink size={12} /></button>)}</div>
+                <p className="up-muted">Webcam eye tracking is estimated (about 100–200 px), so read this as areas, not exact points. Only participants who agreed to it.</p>
               </section>
             )
           })()}

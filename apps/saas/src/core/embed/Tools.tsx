@@ -275,7 +275,14 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
   const [study, setStudy] = useState('')
   const [error, setError] = useState('')
   const [opacity, setOpacity] = useState(0.75)
-  const [kind, setKind] = useState<'click' | 'gaze'>('click')
+  const [kind, setKind] = useState<'click' | 'gaze'>(() => {
+    // The panel's "Gaze heatmap" opens it on where people looked (#vibe_heat=gaze); the hint leaves the address.
+    const h = window.location.hash
+    if (!/(?:^#|&)vibe_heat=gaze/.test(h)) return 'click'
+    const rest = h.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_heat=')).join('&')
+    try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
+    return 'gaze'
+  })
   const [page, setPage] = useState(window.location.pathname)
   const canvas = useRef<HTMLCanvasElement>(null)
   useEffect(() => {

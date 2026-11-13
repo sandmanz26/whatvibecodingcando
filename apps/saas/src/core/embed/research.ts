@@ -30,7 +30,7 @@ export interface RunState {
   token: string
   phase: 'consent' | 'eyes' | 'intro' | 'task' | 'showing' | 'questions' | 'done' | 'declined'
   /** eye tracking, when the study asks for it and the participant agreed and calibrated */
-  eye?: { on: boolean; model?: import('../gaze-model').Model; accuracy?: number }
+  eye?: { on: boolean; model?: import('../gaze-model').Model; accuracy?: number; calib?: { f: number[]; x: number; y: number }[] }
   info?: { name: string; kind: StudyKind; eye: boolean; tasks: number }
   run?: string
   kind?: StudyKind
@@ -104,7 +104,7 @@ interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [onclick], [contenteditable=""], [contenteditable=true]'
 /** A short label of what an element shows. A form field: its tag and its label only, never its value. */
-function labelOf(el: Element) {
+export function labelOf(el: Element) {
   const aria = el.getAttribute('aria-label')
   if (/^(input|select|textarea)$/i.test(el.tagName) || (el as HTMLElement).isContentEditable) return `${el.tagName.toLowerCase()}${aria ? ` “${aria.slice(0, 40)}”` : ''}`
   const text = (aria ?? el.textContent ?? '').replace(/\s+/g, ' ').trim()
@@ -177,8 +177,10 @@ export class Recorder {
   }
   end() { this.stop?.(); this.stop = null; return this.flush() }
   /** Where the participant looks (page coordinates), from eye tracking. */
-  gaze(x: number, y: number, task?: string) {
-    this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'gaze', page: window.location.pathname, x: Math.round(x), y: Math.round(y), vw: window.innerWidth, doc_h: document.documentElement.scrollHeight })
+  gaze(x: number, y: number, task?: string, el?: Element | null) {
+    this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'gaze', page: window.location.pathname, x: Math.round(x), y: Math.round(y), vw: window.innerWidth, doc_h: document.documentElement.scrollHeight,
+      // What was looked at: the element under the point (a field by its tag and label only).
+      ...(el ? { sel: selectorFor(el).slice(0, 400), label: labelOf(el).slice(0, 80) } : {}) })
   }
   /** A fake door seen (hit false) or clicked (hit true). */
   door(d: { page: string; sel: string; label: string }, hit: boolean, task?: string) {
