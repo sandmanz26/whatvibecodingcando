@@ -76,6 +76,8 @@ reset role;
 insert into reviewers (project_id, user_id, name) select id, '00000000-0000-0000-0000-00000000b0c1', 'Rev' from projects where public_id = 'kopi-shop-r001';
 set role authenticated; select pg_temp.as_user('00000000-0000-0000-0000-00000000b0c1', true);
 select pg_temp.check(json_array_length(public.heatmap_points('kopi-shop-r001', '/') -> 'points') = 1, 'a reviewer reads the clicks of a page');
+select pg_temp.check((public.heatmap_points('kopi-shop-r001', '/') -> 'points' -> 0 ->> 'p') = '1' and (public.heatmap_points('kopi-shop-r001', '/') -> 'points' -> 0 ->> 'dev') = 'desktop' and (public.heatmap_points('kopi-shop-r001', '/') -> 'points' -> 0 ->> 't') = '100', 'heatmap points carry participant number, device and time (no ids)');
+select pg_temp.check((public.heatmap_points('kopi-shop-r001', '/') -> 'points')::text !~ '[0-9a-f]{8}-[0-9a-f]{4}-', 'no participant or run ids in the heatmap points');
 -- closing the study stops new runs
 select pg_temp.as_user('00000000-0000-0000-0000-00000000b0a1');
 update studies set status = 'closed' where name = 'Checkout';

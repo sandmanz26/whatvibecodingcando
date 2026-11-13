@@ -252,6 +252,8 @@ export function StudyResults() {
   const pages = [...clicks.reduce((m, e) => m.set(e.page, [(m.get(e.page)?.[0] ?? 0) + 1, (m.get(e.page)?.[1] ?? 0) + (e.rage ? 1 : 0), (m.get(e.page)?.[2] ?? 0) + (e.dead ? 1 : 0)]), new Map<string, number[]>())].sort((a, b) => b[1][0] - a[1][0])
   const heatOn = !!liveOf(project)?.config.modules.heatmap
   const openHeat = (page: string, gaze = false) => {
+    // A page kind (/product/:id) has no single address: any page of that kind shows its map.
+    if (page.includes(':id')) { toast(`Open any ${page.replace(/:id/g, '…')} page of your site as a reviewer, then press Heatmap in the dock: the map covers every page of that kind.`); return }
     const base = project.siteUrl ? new URL(page, project.siteUrl).href : demoUrl(project.id)
     const u = new URL(base); u.hash = gaze ? 'vibe_tool=heatmap&vibe_heat=gaze' : 'vibe_tool=heatmap'
     void openAsReviewer(project.id, u.href).then((ok) => { if (!ok) toast('Couldn’t open your site as a reviewer.', 'error') })

@@ -98,6 +98,15 @@ export function cleanConfig(kind: StudyKind, c: unknown): StudyConfig {
 /** Does the page (path) meet a rule's page? "/thanks" is that page; "/order/*" any page below /order/. */
 export const pageMatches = (rule: string, p: string) => (rule.endsWith('*') ? p.startsWith(rule.slice(0, -1)) : p.replace(/\/$/, '') === rule.replace(/\/$/, '') || (rule === '/' && p === '/'))
 
+/**
+ * A page as studies keep it: its path, with ids folded into ":id" (/product/123 → /product/:id), so
+ * pages of one kind share a heatmap and ids (order numbers, user names in addresses) aren't kept.
+ */
+export function pageOf(path: string): string {
+  const out = path.split('/').map((seg) => (/^\d+$/.test(seg) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) || /^[0-9a-f]{12,}$/i.test(seg) || (seg.length >= 16 && /\d/.test(seg) && /^[\w-]+$/.test(seg)) ? ':id' : seg)).join('/')
+  return out.slice(0, 300) || '/'
+}
+
 /* ---------- the click recorder ---------- */
 
 interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze'; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
@@ -180,13 +189,15 @@ export class Recorder {
   gaze(x: number, y: number, task?: string, el?: Element | null) {
     this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'gaze', page: window.location.pathname, x: Math.round(x), y: Math.round(y), vw: window.innerWidth, doc_h: document.documentElement.scrollHeight,
       // What was looked at: the element under the point (a field by its tag and label only).
-      ...(el ? { sel: selectorFor(el).slice(0, 400), label: labelOf(el).slice(0, 80) } : {}) })
+      // Also where on that element, so the point follows the element on other screen widths.
+      ...(el ? (() => { const r = el.getBoundingClientRect(); const cx = x - window.scrollX, cy = y - window.scrollY
+        return { sel: selectorFor(el).slice(0, 400), label: labelOf(el).slice(0, 80), ex: r.width ? Math.min(1, Math.max(0, (cx - r.left) / r.width)) : 0.5, ey: r.height ? Math.min(1, Math.max(0, (cy - r.top) / r.height)) : 0.5 } })() : {}) })
   }
   /** A fake door seen (hit false) or clicked (hit true). */
   door(d: { page: string; sel: string; label: string }, hit: boolean, task?: string) {
     this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'door', page: window.location.pathname, sel: d.sel.slice(0, 400), label: d.label.slice(0, 80), hit })
   }
-  private push(e: Ev) { if (this.queue.length < 1000) this.queue.push(e) }
+  private push(e: Ev) { if (this.queue.length < 1000) this.queue.push({ ...e, page: pageOf(e.page) }) }
   async flush(leaving = false) {
     if (!this.queue.length) return
     if (leaving) { while (this.queue.length) server.rpcOnLeave('log_events', { p_run: this.run, p_events: this.queue.splice(0, 200) }); return }

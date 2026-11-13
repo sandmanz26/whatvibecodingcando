@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Eye, Flag, Timer, X } from 'lucide-react'
 import { OneEuro } from '../gaze-analysis'
-import { Recorder, cleanConfig, finishRun, pageMatches, saveRun, startRun, type Door, type Outcome, type RunState } from './research'
+import { Recorder, pageOf, cleanConfig, finishRun, pageMatches, saveRun, startRun, type Door, type Outcome, type RunState } from './research'
 
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const KIND_LABEL = { usability: 'tasks on this site', fivesec: 'a 5-second test', browse: 'a short visit' } as const
@@ -61,7 +61,8 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
       },
       (page) => {
         const s = stRef.current
-        const next = { ...s, pages: s.pages[s.pages.length - 1] === page ? s.pages : [...s.pages, page].slice(-30) }
+        const key = pageOf(page)
+        const next = { ...s, pages: s.pages[s.pages.length - 1] === key ? s.pages : [...s.pages, key].slice(-30) }
         setSt(next); saveRun(project, next)
         const rule = s.kind === 'usability' ? s.config?.tasks?.[s.index]?.success : undefined
         if (rule?.kind === 'page' && pageMatches(rule.page, page)) window.setTimeout(() => endTask('success'), 300)

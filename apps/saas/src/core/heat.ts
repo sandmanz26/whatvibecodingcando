@@ -4,7 +4,8 @@
  * always reaches red, so the colours read the same for 20 taps or 20,000.
  */
 
-export interface HeatPoint { x: number; y: number }
+/** w: how much the point counts (1 by default), e.g. a fixation's duration or one person's share. */
+export interface HeatPoint { x: number; y: number; w?: number }
 
 const STOPS: [number, [number, number, number]][] = [
   [0, [0, 0, 255]], [0.3, [0, 160, 255]], [0.5, [0, 220, 120]], [0.7, [190, 235, 0]], [0.85, [255, 170, 0]], [1, [240, 30, 20]],
@@ -24,17 +25,19 @@ const PALETTE = (() => {
 })()
 export const LEGEND = `linear-gradient(90deg, ${STOPS.map(([t, c]) => `rgb(${c.join(',')}) ${t * 100}%`).join(', ')})`
 
-/** The most taps that fall within one blob's reach of each other: the density that should read as red. */
+/**
+ * The density that should read as red: the weight within one blob's reach, at the 95th percentile of
+ * the busy cells rather than the very busiest, so one extreme spot doesn't wash out the rest.
+ */
 function peak(points: HeatPoint[], r: number) {
   const cells = new Map<string, number>()
-  let max = 1
   for (const p of points) {
     const k = `${Math.floor(p.x / r)},${Math.floor(p.y / r)}`
-    const n = (cells.get(k) ?? 0) + 1
-    cells.set(k, n)
-    if (n > max) max = n
+    cells.set(k, (cells.get(k) ?? 0) + (p.w ?? 1))
   }
-  return max
+  const v = [...cells.values()].sort((a, b) => a - b)
+  if (!v.length) return 1
+  return Math.max(1e-6, v.length >= 20 ? v[Math.floor(v.length * 0.95)] : v[v.length - 1])
 }
 
 /**
@@ -57,8 +60,12 @@ export function drawHeat(canvas: HTMLCanvasElement, points: HeatPoint[], scale: 
   b.fillStyle = g; b.fillRect(0, 0, r * 2, r * 2)
   // Each stamp's strength is set so that the densest cluster just saturates.
   const n = peak(points, radius)
-  ctx.globalAlpha = Math.min(1, Math.max(0.02, 1 - Math.pow(0.04, 1 / n)))
-  for (const p of points) ctx.drawImage(blob, p.x * scale * dpr - r, p.y * scale * dpr - r)
+  const base = Math.min(1, Math.max(0.02, 1 - Math.pow(0.04, 1 / Math.max(1, n))))
+  const unit = n < 1 ? 1 / n : 1
+  for (const p of points) {
+    ctx.globalAlpha = Math.min(1, base * (p.w ?? 1) * unit)
+    ctx.drawImage(blob, p.x * scale * dpr - r, p.y * scale * dpr - r)
+  }
   ctx.globalAlpha = 1
   // Colour the summed heat.
   const img = ctx.getImageData(0, 0, w, h)

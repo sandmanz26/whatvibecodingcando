@@ -9,6 +9,8 @@ import { HOST_TAG, MAX_FILE, RULE_LABEL, applyTokens, dropProbe, inspect, pageTo
 import { NS } from './store'
 import { drawHeat, LEGEND } from '../heat'
 import * as server from './server'
+import { deviceOf, prepare, type Device, type RawPt } from './heatmath'
+import { pageOf } from './research'
 
 export type ToolId = 'inspect' | 'dscheck' | 'tokens' | 'heatmap'
 export const TOOL_IDS: ToolId[] = ['inspect', 'dscheck', 'tokens', 'heatmap']
@@ -264,7 +266,7 @@ export const ToolIcon = ({ id }: { id: ToolId }) => { const I = TOOL_META[id].Ic
 
 /* ---------- Heatmap: study participants' clicks, drawn over this page ---------- */
 
-interface HeatPt { x: number; y: number; vw: number | null; sel: string | null; ex: number | null; ey: number | null; rage: boolean | null; dead: boolean | null }
+type HeatPt = RawPt
 const HEAT_ERRORS: Record<string, string> = {
   not_invited: 'Open the site through a review link to see its heatmap.',
   origin_not_allowed: 'The Heatmap product isn’t on for this address (Widget → Website, Products).',
@@ -283,8 +285,12 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
     try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
     return 'gaze'
   })
-  const [page, setPage] = useState(window.location.pathname)
+  const [page, setPage] = useState(pageOf(window.location.pathname))
+  const [device, setDevice] = useState<Device>(deviceOf(window.innerWidth))
+  const [equal, setEqual] = useState(true)
+  const [goodOnly, setGoodOnly] = useState(true)
   const canvas = useRef<HTMLCanvasElement>(null)
+  const prep = useMemo(() => (data ? prepare(data.points, { kind, device, equal, maxAcc: goodOnly ? 220 : null }) : null), [data, kind, device, equal, goodOnly])
   useEffect(() => {
     let live = true
     setData(null); setError('')
@@ -294,7 +300,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
     return () => { live = false }
   }, [project, page, study, kind])
   useEffect(() => {
-    if (!data) return
+    if (!prep) return
     let raf = 0
     const draw = () => {
       const c = canvas.current
@@ -302,26 +308,26 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
       const W = window.innerWidth, H = window.innerHeight
       const found = new Map<string, Element | null>()
       const at = (sel: string) => { if (!found.has(sel)) { let el: Element | null = null; try { el = document.querySelector(sel) } catch { el = null } found.set(sel, el) } return found.get(sel) }
-      const pts: { x: number; y: number }[] = []
-      for (const p of data.points) {
+      const pts: { x: number; y: number; w: number }[] = []
+      for (const p of prep.pts) {
         let x: number, y: number
         const el = p.sel ? at(p.sel) : null
         const r = el?.getBoundingClientRect()
         if (r && r.width > 0 && r.height > 0 && p.ex != null && p.ey != null) { x = r.left + p.ex * r.width; y = r.top + p.ey * r.height }
         else { x = p.x * (W / (p.vw || W)) - window.scrollX; y = p.y - window.scrollY }
-        if (x > -60 && x < W + 60 && y > -60 && y < H + 60) pts.push({ x, y })
+        if (x > -100 && x < W + 100 && y > -100 && y < H + 100) pts.push({ x, y, w: p.w })
       }
-      drawHeat(c, pts, 1, 28, opacity)
+      drawHeat(c, pts, 1, prep.radius, opacity)
     }
     const redraw = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw) }
     draw()
     window.addEventListener('scroll', redraw, true)
     window.addEventListener('resize', redraw)
-    const iv = window.setInterval(() => { if (window.location.pathname !== page) setPage(window.location.pathname) }, 500)
+    const iv = window.setInterval(() => { if (pageOf(window.location.pathname) !== page) setPage(pageOf(window.location.pathname)) }, 500)
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', key)
     return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', redraw, true); window.removeEventListener('resize', redraw); window.clearInterval(iv); window.removeEventListener('keydown', key) }
-  }, [data, opacity, page, onClose])
+  }, [prep, opacity, page, onClose])
   const n = data?.points.length ?? 0
   const rage = data?.points.filter((p) => p.rage).length ?? 0
   const dead = data?.points.filter((p) => p.dead).length ?? 0
@@ -333,7 +339,12 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
         {error ? <p className="vc-bad">{error}</p> : !data ? <p className="vc-empty">Loading…</p> : (
           <>
             <div className="vc-seg"><button aria-pressed={kind === 'click'} onClick={() => setKind('click')}>Clicks</button><button aria-pressed={kind === 'gaze'} onClick={() => setKind('gaze')}>Where people looked</button></div>
-            <p className={`vc-sum ${n ? '' : 'bad'}`}>{n ? `${n} ${kind === 'gaze' ? 'gaze point' : 'click'}${n === 1 ? '' : 's'} on this page${n >= 20000 ? ' (the latest 20,000)' : ''}` : kind === 'gaze' ? 'No eye tracking on this page yet' : 'No clicks on this page yet'}{n && kind === 'click' ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
+            <div className="vc-seg" role="group" aria-label="Device">{(['all', 'desktop', 'tablet', 'mobile'] as Device[]).map((d) => <button key={d} aria-pressed={device === d} onClick={() => setDevice(d)}>{d === 'all' ? 'All' : d[0].toUpperCase() + d.slice(1)}</button>)}</div>
+            <p className={`vc-sum ${prep?.units ? '' : 'bad'}`}>{prep?.units
+              ? `${prep.people} ${prep.people === 1 ? 'person' : 'people'} · ${kind === 'gaze' ? `${prep.units} fixation${prep.units === 1 ? '' : 's'}` : `${prep.units} click${prep.units === 1 ? '' : 's'}`}${prep.hidden ? ` · ${prep.hidden} with poor eye tracking left out` : ''}${n >= 20000 ? ' (the latest 20,000 points)' : ''}`
+              : n ? `Nothing on ${device === 'all' ? 'any device' : device} for this page${prep?.hidden ? ` (${prep.hidden} left out for poor eye tracking)` : ''}` : kind === 'gaze' ? 'No eye tracking on this page yet' : 'No clicks on this page yet'}{prep?.units && kind === 'click' ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
+            <label className="vc-check"><input type="checkbox" checked={equal} onChange={(e) => setEqual(e.target.checked)} /> Each person counts the same</label>
+            {kind === 'gaze' && <label className="vc-check"><input type="checkbox" checked={goodOnly} onChange={(e) => setGoodOnly(e.target.checked)} /> Leave out eye tracking calibrated worse than 220 px</label>}
             {data.studies.length > 0 && (
               <label className="vc-q">Study
                 <select value={study} onChange={(e) => setStudy(e.target.value)}>
@@ -343,10 +354,10 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
               </label>
             )}
             <label className="vc-q">Opacity <input type="range" min={0.2} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label>
-            <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>fewer</span><span className="vc-grow" /><span>more clicks</span></div>
+            <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>less</span><span className="vc-grow" /><span>{kind === 'gaze' ? 'longer looked at' : 'more clicks'}</span></div>
           </>
         )}
-        <p className="vc-where">From study participants who agreed to take part (eye tracking only from those who also agreed to it, and estimated: about 100–200 px); never other visitors. Open another page and the map follows.</p>
+        <p className="vc-where">{kind === 'gaze' ? 'Where people’s eyes rested (fixations), weighted by how long; webcam eye tracking is estimated, so read areas, not exact spots.' : 'Where people clicked.'} Only study participants who agreed; never other visitors. Pages with ids share a map (/product/:id).</p>
       </div>
     </>
   )
