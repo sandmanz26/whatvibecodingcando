@@ -169,12 +169,14 @@ export const projectDbId = (publicId: string) => dbIds.get(publicId) ?? null
 interface ThreadRow {
   id: string; page: string; anchor: Thread['anchor']; author_name: string; text: string; created_at: string; edited_at: string | null
   resolved_at: string | null; resolved_by: string | null; replies: { id: string; author_name: string; text: string; created_at: string }[] | null
+  kind?: Thread['kind']; version?: string | null; audio?: string | null
 }
 const rowToThread = (r: ThreadRow): Thread => ({
   id: r.id, page: r.page, anchor: r.anchor, author: r.author_name, text: r.text, createdAt: r.created_at,
   ...(r.edited_at ? { editedAt: r.edited_at } : {}),
   ...(r.resolved_at ? { resolved: { by: r.resolved_by ?? '', at: r.resolved_at } } : {}),
   replies: [...(r.replies ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((x) => ({ id: x.id, author: x.author_name, text: x.text, at: x.created_at })),
+  ...(r.kind && r.kind !== 'comment' ? { kind: r.kind } : {}), ...(r.version ? { version: r.version } : {}), ...(r.audio ? { audio: r.audio } : {}),
 })
 
 /** A project's comments for the panel's inbox: read and changed under the members' row level security. */
@@ -184,7 +186,11 @@ export class PanelBackend implements Backend {
   constructor(private publicId: string, private me: string) {}
   private get id() { const id = dbIds.get(this.publicId); if (!id) throw new Error('This project isn’t on the server.'); return id }
   async list() {
-    const { data, error } = await supabase!.from('threads').select('id, page, anchor, author_name, text, created_at, edited_at, resolved_at, resolved_by, replies(id, author_name, text, created_at)').eq('project_id', this.id).order('created_at')
+    const cols = 'id, page, anchor, author_name, text, created_at, edited_at, resolved_at, resolved_by, replies(id, author_name, text, created_at)'
+    const first = await supabase!.from('threads').select(`${cols}, kind, version, audio`).eq('project_id', this.id).order('created_at')
+    // A server without the review kinds yet (migration not run): the comments without them.
+    const res = first.error?.code === '42703' ? await supabase!.from('threads').select(cols).eq('project_id', this.id).order('created_at') : first
+    const { data, error } = res as unknown as { data: ThreadRow[] | null; error: typeof first.error }
     if (error) throw error
     const list = (data as ThreadRow[]).map(rowToThread)
     this.last = new Map(list.map((t) => [t.id, t]))
@@ -207,8 +213,10 @@ export class PanelBackend implements Backend {
     this.last.set(t.id, t)
   }
   async remove(id: string) {
+    const audio = this.last.get(id)?.audio
     const { error } = await supabase!.from('threads').delete().eq('id', id)
     if (error) throw error
+    if (audio) await supabase!.storage.from('narrations').remove([audio]).catch(() => { /* cleared later */ })
     this.last.delete(id)
   }
   subscribe(cb: () => void) {
@@ -369,3 +377,11 @@ export async function projectSessions(publicId: string): Promise<{ runs: (RunRow
   }
   return { runs: runs as (RunRow & { study_id: string })[], events }
 }
+
+/** A link to listen to a voice note, for ten minutes (the bucket is private). */
+export async function voiceUrl(path: string): Promise<string> {
+  const { data, error } = await supabase!.storage.from('narrations').createSignedUrl(path, 600)
+  if (error) throw error
+  return data.signedUrl
+}
+

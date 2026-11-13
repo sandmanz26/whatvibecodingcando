@@ -9,7 +9,7 @@ import { draftOf, liveOf, openAsReviewer, releasable, serveProject, unserveProje
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
-import { PanelBackend, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
+import { PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
 import { download, threadsCsv, toShared } from '../../saas/stats'
@@ -314,13 +314,15 @@ export function Comments() {
   const [params, setParams] = useSearchParams()
   const { threads, backend, reload } = useThreads(project?.id, s.account?.name)
   const [q, setQ] = useState('')
+  const [ver, setVer] = useState('')
   const [deleting, setDeleting] = useState<Thread | null>(null)
   const status = (params.get('status') ?? 'all') as Status | 'all'
   const sharing = params.get('share') === '1'
   if (!project || !backend) return null
   const setStatus = (v: Status | 'all') => setParams(v === 'all' ? {} : { status: v }, { replace: true })
   const setSharing = (v: boolean) => setParams(() => { const n = new URLSearchParams(params); if (v) n.set('share', '1'); else n.delete('share'); return n }, { replace: true })
-  const shown = threads
+  const versions = [...new Set(threads.map((t) => t.version).filter((v): v is string => !!v))]
+  const shown = threads.filter((t) => !ver || t.version === ver)
     .filter((t) => status === 'all' || statusOf(t) === status)
     .filter((t) => !q.trim() || `${t.text} ${t.author} ${t.page} ${t.replies.map((r) => r.text).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -344,6 +346,7 @@ export function Comments() {
         <div className="up-tabs" role="group" aria-label="Status">
           {(['all', 'open', 'ongoing', 'completed'] as const).map((v) => <button key={v} aria-pressed={status === v} onClick={() => setStatus(v)}>{v === 'all' ? 'All' : STATUS_LABEL[v]} <span>{count(v)}</span></button>)}
         </div>
+        {versions.length > 1 && <select className="up-select" value={ver} onChange={(e) => setVer(e.target.value)} aria-label="Version"><option value="">All versions</option>{versions.map((v) => <option key={v} value={v}>v{v}</option>)}</select>}
         <input className="up-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search comments" aria-label="Search comments" />
       </div>
       {shown.length === 0 ? <div className="up-card up-muted">{threads.length === 0 ? 'No comments yet.' : 'Nothing matches.'}</div> : (
@@ -352,8 +355,10 @@ export function Comments() {
             const url = openUrl(t)
             return (
               <li key={t.id} className="up-card">
-                <div className="up-row"><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span><b>{t.author}</b><span className="up-muted">· {ago(t.createdAt)} · <code>{t.page}</code></span></div>
+                <div className="up-row"><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span>{t.kind === 'compare' && <span className="up-badge">A vs B</span>}{t.kind === 'voice' && <span className="up-badge">Voice</span>}{t.version && <span className="up-badge">v{t.version}</span>}<b>{t.author}</b><span className="up-muted">· {ago(t.createdAt)} · <code>{t.page}</code></span></div>
                 <p className="up-text">{t.text}</p>
+                {t.kind === 'compare' && t.anchor.b && <p className="up-muted">A: <code>{t.anchor.sel}</code> · B: <code>{t.anchor.b.sel}</code></p>}
+                {t.kind === 'voice' && t.audio && cloud && <VoiceNote path={t.audio} />}
                 {t.replies.length > 0 && <ul className="up-replies">{t.replies.map((r) => <li key={r.id}><b>{r.author}</b> {r.text}</li>)}</ul>}
                 <div className="up-row">
                   {t.resolved
@@ -699,5 +704,13 @@ function DataCard({ project }: { project: Project }) {
       )}
     </section>
   )
+}
+
+/** A reviewer's voice note, played from the project's private bucket (a ten-minute link). */
+function VoiceNote({ path }: { path: string }) {
+  const [src, setSrc] = useState('')
+  const [err, setErr] = useState(false)
+  if (src) return <audio controls autoPlay src={src} className="up-audio" />
+  return <button className="lp-btn sm" onClick={() => void voiceUrl(path).then(setSrc, () => setErr(true))}>{err ? 'Couldn’t load the voice note. Try again' : '▶ Play the voice note'}</button>
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff } from 'lucide-react'
+import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff, Columns2, Mic, Square, Play } from 'lucide-react'
+import { audioUrl, uploadAudio } from './server'
 import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
 import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
 
@@ -16,6 +17,12 @@ export interface Config {
   comments: boolean
   /** the reviewer tools turned on for the project */
   tools: ToolId[]
+  /** Component review: comments comparing two elements (A vs B) */
+  compare?: boolean
+  /** Narration: voice notes (needs the server) */
+  narration?: boolean
+  /** the site's version (Versions): new comments carry it, and the list can show only it */
+  version?: string
   /** showing the draft configuration (from the panel's preview), with a way out */
   preview?: { exit: () => void }
 }
@@ -38,13 +45,17 @@ const typing = (e: KeyboardEvent) => {
   return path.some((n) => n instanceof HTMLElement && (n.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(n.tagName)))
 }
 
-interface Draft { anchor: Anchor; page: string; text: string }
+type Kind = 'comment' | 'compare' | 'voice'
+interface Draft { anchor: Anchor; page: string; text: string; kind?: Kind; verdict?: string }
+const VERDICTS = ['A is better', 'B is better', 'Both need work']
 
 export function Widget({ backend, config, host }: { backend: Backend; config: Config; host: HTMLElement }) {
   const [threads, setThreads] = useState<Thread[]>([])
   const [loaded, setLoaded] = useState(false)
   const [page, setPage] = useState(pageKey)
   const [placing, setPlacing] = useState(false)
+  const [placingKind, setPlacingKind] = useState<Kind>('comment')
+  const [pickA, setPickA] = useState<Anchor | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [nudge, setNudge] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -145,9 +156,9 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
 
   /* ---- flow ---- */
   const busy = () => { if (draft?.text.trim()) { setNudge((n) => n + 1); return true } return false }
-  const start = () => {
+  const start = (kind: Kind = 'comment') => {
     if (busy() || !config.comments) return
-    setDraft(null); setOpenId(null); setPanel(false); setTool(null); setPlacing(true)
+    setDraft(null); setOpenId(null); setPanel(false); setTool(null); setPickA(null); setPlacingKind(kind); setPlacing(true)
   }
   const pickTool = (id: ToolId) => {
     if (tool === id) { setTool(null); return }
@@ -164,16 +175,32 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     const el = document.elementFromPoint(e.clientX, e.clientY)
     host.style.pointerEvents = prev
     overlay.style.pointerEvents = ''
+    if (!el || el === document.documentElement) { setPlacing(false); say('Click on the page’s content to comment.', true); return }
+    const at = anchorAt(el, e.clientX, e.clientY)
+    // A comparison takes two clicks: A, then B.
+    if (placingKind === 'compare' && !pickA) { setPickA(at); return }
     setPlacing(false)
-    if (!el || el === document.documentElement) { say('Click on the page’s content to comment.', true); return }
-    setDraft({ anchor: anchorAt(el, e.clientX, e.clientY), page, text: '' })
+    if (placingKind === 'compare' && pickA) { setDraft({ anchor: { ...pickA, b: at }, page, text: '', kind: 'compare', verdict: VERDICTS[0] }); setPickA(null); return }
+    setDraft({ anchor: at, page, text: '', kind: placingKind })
   }
   const post = () => {
-    if (!draft || !draft.text.trim()) return
-    const t: Thread = { id: uid(), page: draft.page, anchor: draft.anchor, author: me, text: draft.text.trim().slice(0, MAX_TEXT), createdAt: new Date().toISOString(), replies: [] }
+    if (!draft || (!draft.text.trim() && draft.kind !== 'compare')) return
+    const text = draft.kind === 'compare' ? `${draft.verdict ?? VERDICTS[0]}${draft.text.trim() ? ` — ${draft.text.trim()}` : ''}` : draft.text.trim()
+    const t: Thread = { id: uid(), page: draft.page, anchor: draft.anchor, author: me, text: text.slice(0, MAX_TEXT), createdAt: new Date().toISOString(), replies: [], ...(draft.kind && draft.kind !== 'comment' ? { kind: draft.kind } : {}) }
     setDraft(null)
     setOpenId(t.id)
     void save(t, 'Comment posted')
+  }
+  /** A voice note: the audio goes up first, then the comment that points to it. */
+  const postVoice = async (blob: Blob, note: string) => {
+    if (!draft) return
+    const id = uid()
+    try {
+      const audio = await uploadAudio(config.project, id, blob)
+      const t: Thread = { id, page: draft.page, anchor: draft.anchor, author: me, text: (note.trim() || 'Voice note').slice(0, MAX_TEXT), createdAt: new Date().toISOString(), replies: [], kind: 'voice', audio }
+      setDraft(null); setOpenId(t.id)
+      await save(t, 'Voice note posted')
+    } catch { say('The voice note couldn’t be saved. Try again.', true) }
   }
   const openThread = (id: string) => { if (busy()) return; setDraft(null); setOpenId((cur) => (cur === id ? null : id)) }
   const reveal = (t: Thread) => {
@@ -210,7 +237,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (tool) return
-        if (placing) setPlacing(false)
+        if (placing) { setPlacing(false); setPickA(null) }
         else if (draft) setDraft(null)
         else if (openId) setOpenId(null)
         else if (panel) setPanel(false)
@@ -248,6 +275,14 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
         return (
           <>
             <span className="vc-pin draft" style={{ left: p.x, top: p.y }} aria-hidden>+</span>
+            {draft.kind === 'compare' && draft.anchor.b && (() => { const q = place(draft.anchor.b); return <><span className="vc-ab" style={{ left: p.x, top: p.y }}>A</span><span className="vc-ab" style={{ left: q.x, top: q.y }}>B</span></> })()}
+            {draft.kind === 'voice' ? <Card x={p.x} y={p.y} label="New voice note" shake={nudge}><VoiceCard onCancel={() => setDraft(null)} onPost={(b, n) => void postVoice(b, n)} /></Card> : draft.kind === 'compare' ? (
+            <Card x={p.x} y={p.y} label="Compare A and B" shake={nudge}>
+              <div className="vc-card-head"><b>A vs B</b><span className="vc-grow" /><button className="vc-icon" onClick={() => setDraft(null)} aria-label="Cancel"><X size={14} /></button></div>
+              <div className="vc-seg" role="group" aria-label="Verdict">{VERDICTS.map((v) => <button key={v} aria-pressed={draft.verdict === v} onClick={() => setDraft({ ...draft, verdict: v })}>{v}</button>)}</div>
+              <textarea autoFocus rows={3} maxLength={MAX_TEXT} value={draft.text} placeholder="What should change? (optional)" aria-label="Note" onChange={(e) => setDraft({ ...draft, text: e.target.value })} />
+              <div className="vc-row"><span className="vc-grow" /><button className="vc-btn" onClick={() => setDraft(null)}>Cancel</button><button className="vc-btn primary" onClick={post}>Post</button></div>
+            </Card>) : (
             <Card x={p.x} y={p.y} label="New comment" shake={nudge}>
               <div className="vc-card-head"><b>New comment</b><span className="vc-grow" /><button className="vc-icon" onClick={() => setDraft(null)} aria-label="Cancel"><X size={14} /></button></div>
               <textarea autoFocus rows={3} maxLength={MAX_TEXT} value={draft.text} placeholder="Write a comment…" aria-label="Comment"
@@ -259,20 +294,22 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
                 <button className="vc-btn" onClick={() => setDraft(null)}>Cancel</button>
                 <button className="vc-btn primary" disabled={!draft.text.trim()} onClick={post}>Post</button>
               </div>
-            </Card>
+            </Card>)}
           </>
         )
       })()}
 
       {open && (() => {
         const p = place(open.anchor)
-        return <Card x={p.x} y={p.y} label={`Comment ${number(open)}`}><ThreadView t={open} n={number(open)} me={me} lost={p.lost} onSave={save} onRemove={remove} onClose={() => setOpenId(null)} /></Card>
+        const q = open.kind === 'compare' && open.anchor.b ? place(open.anchor.b) : null
+        return <>{q && <><span className="vc-ab" style={{ left: p.x, top: p.y }}>A</span><span className="vc-ab" style={{ left: q.x, top: q.y }}>B</span></>}<Card x={p.x} y={p.y} label={`Comment ${number(open)}`}><ThreadView t={open} n={number(open)} me={me} lost={p.lost} onSave={save} onRemove={remove} onClose={() => setOpenId(null)} /></Card></>
       })()}
 
-      {placing && <div className="vc-overlay" onClick={drop}><div className="vc-hint">Click anywhere to comment · Esc to cancel</div></div>}
+      {pickA && placing && (() => { const a = place(pickA); return <span className="vc-ab" style={{ left: a.x, top: a.y }}>A</span> })()}
+      {placing && <div className="vc-overlay" onClick={drop}><div className="vc-hint">{placingKind === 'compare' ? (pickA ? 'Now click the second element (B) · Esc to cancel' : 'Click the first element (A) · Esc to cancel') : placingKind === 'voice' ? 'Click where your voice note is about · Esc to cancel' : 'Click anywhere to comment · Esc to cancel'}</div></div>}
 
       {panel && (
-        <List threads={threads} page={page} name={name} setName={setName} where={backend.where}
+        <List version={config.version} threads={threads} page={page} name={name} setName={setName} where={backend.where}
           onPick={go} onClose={() => setPanel(false)} number={(t) => threads.filter((x) => x.page === t.page).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).indexOf(t) + 1} />
       )}
 
@@ -284,7 +321,9 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
         </button>
         <button className="vc-icon dock" onClick={() => setPanel((v) => !v)} aria-label={`All comments, ${openOnPage} open on this page`} aria-expanded={panel}>
           <MessagesSquare size={15} />{openOnPage > 0 && <span className="vc-count">{openOnPage}</span>}
-        </button></>}
+        </button>
+        {config.compare && <button className={`vc-icon dock ${placing && placingKind === 'compare' ? 'on' : ''}`} onClick={() => (placing && placingKind === 'compare' ? setPlacing(false) : start('compare'))} aria-label="Compare two elements (A vs B)" title="Compare two elements (A vs B)"><Columns2 size={15} /></button>}
+        {config.narration && <button className={`vc-icon dock ${placing && placingKind === 'voice' ? 'on' : ''}`} onClick={() => (placing && placingKind === 'voice' ? setPlacing(false) : start('voice'))} aria-label="Voice note" title="Voice note"><Mic size={15} /></button>}</>}
         {config.comments && config.launcher === 'floating' && config.tools.length > 0 && <span className="vc-sep" aria-hidden />}
         {config.tools.map((id) => (
           <button key={id} className={`vc-icon dock ${tool === id ? 'on' : ''}`} onClick={() => pickTool(id)} aria-pressed={tool === id} aria-label={TOOL_META[id].label} title={TOOL_META[id].label}><ToolIcon id={id} /></button>
@@ -338,7 +377,8 @@ function ThreadView({ t, n, me, lost, onSave, onRemove, onClose }: {
           <span className="vc-row"><button className="vc-btn" onClick={() => setConfirm(false)}>Keep</button><button className="vc-btn danger" onClick={() => void onRemove(t)}>Delete</button></span>
         </div>
       )}
-      <div className="vc-meta"><b>{t.author}</b> · {ago(t.createdAt)}{t.editedAt ? ' · edited' : ''}</div>
+      <div className="vc-meta"><b>{t.author}</b> · {ago(t.createdAt)}{t.editedAt ? ' · edited' : ''}{t.version ? <span className="vc-ver">v{t.version}</span> : null}{t.kind === 'compare' ? <span className="vc-ver">A vs B</span> : null}</div>
+      {t.kind === 'voice' && t.audio && <VoicePlayer path={t.audio} />}
       {edit === null ? <p className="vc-text">{t.text}</p> : (
         <div className="vc-stack">
           <textarea autoFocus rows={3} maxLength={MAX_TEXT} value={edit} onChange={(e) => setEdit(e.target.value)} aria-label="Edit comment" />
@@ -379,12 +419,14 @@ function ThreadView({ t, n, me, lost, onSave, onRemove, onClose }: {
   )
 }
 
-function List({ threads, page, name, setName, where, onPick, onClose, number }: {
-  threads: Thread[]; page: string; name: string; setName: (v: string) => void; where: string
+function List({ threads: all, page, name, setName, where, onPick, onClose, number, version }: {
+  version?: string; threads: Thread[]; page: string; name: string; setName: (v: string) => void; where: string
   onPick: (t: Thread) => void; onClose: () => void; number: (t: Thread) => number
 }) {
   const [scope, setScope] = useState<'page' | 'all'>('page')
   const [filter, setFilter] = useState<Status | 'all'>('all')
+  const [thisVersion, setThisVersion] = useState(false)
+  const threads = thisVersion && version ? all.filter((t) => t.version === version) : all
   const inScope = threads.filter((t) => scope === 'all' || t.page === page)
   const count = (f: Status | 'all') => inScope.filter((t) => f === 'all' || statusOf(t) === f).length
   const shown = inScope.filter((t) => filter === 'all' || statusOf(t) === filter).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -396,6 +438,7 @@ function List({ threads, page, name, setName, where, onPick, onClose, number }: 
         <button aria-pressed={scope === 'page'} onClick={() => setScope('page')}>This page</button>
         <button aria-pressed={scope === 'all'} onClick={() => setScope('all')}>All pages</button>
       </div>
+      {version && <label className="vc-check"><input type="checkbox" checked={thisVersion} onChange={(e) => setThisVersion(e.target.checked)} /> Only version {version}</label>}
       <div className="vc-chips" role="group" aria-label="Status">
         {(['all', 'open', 'ongoing', 'completed'] as const).map((f) => (
           <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>{f === 'all' ? 'All' : STATUS_LABEL[f]} <span>{count(f)}</span></button>
@@ -406,7 +449,7 @@ function List({ threads, page, name, setName, where, onPick, onClose, number }: 
         {shown.map((t) => (
           <li key={t.id}>
             <button onClick={() => onPick(t)}>
-              <span className="vc-row"><span className={`vc-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span><b>#{number(t)} {t.author}</b><span className="vc-grow" /><span className="vc-muted">{ago(t.createdAt)}</span></span>
+              <span className="vc-row"><span className={`vc-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span><b>#{number(t)} {t.author}</b>{t.kind === 'voice' ? <Mic size={12} /> : t.kind === 'compare' ? <Columns2 size={12} /> : null}{t.version ? <span className="vc-ver">v{t.version}</span> : null}<span className="vc-grow" /><span className="vc-muted">{ago(t.createdAt)}</span></span>
               <span className="vc-snippet">{t.text}</span>
               <span className="vc-muted">{t.replies.length} repl{t.replies.length === 1 ? 'y' : 'ies'}{t.page !== page ? ` · on ${t.page}` : ''}</span>
             </button>
@@ -417,3 +460,60 @@ function List({ threads, page, name, setName, where, onPick, onClose, number }: 
     </aside>
   )
 }
+
+/** Records a voice note (up to two minutes) in the browser, to post once the reviewer is happy with it. */
+function VoiceCard({ onCancel, onPost }: { onCancel: () => void; onPost: (blob: Blob, note: string) => void }) {
+  const [state, setState] = useState<'idle' | 'recording' | 'done' | 'error'>('idle')
+  const [secs, setSecs] = useState(0)
+  const [note, setNote] = useState('')
+  const [blob, setBlob] = useState<Blob | null>(null)
+  const [url, setUrl] = useState('')
+  const rec = useRef<{ r: MediaRecorder; stream: MediaStream; iv: number } | null>(null)
+  const stop = () => { const x = rec.current; if (!x) return; window.clearInterval(x.iv); if (x.r.state !== 'inactive') x.r.stop(); x.stream.getTracks().forEach((t) => t.stop()); rec.current = null }
+  useEffect(() => () => { stop(); if (url) URL.revokeObjectURL(url) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const record = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'].find((t) => MediaRecorder.isTypeSupported?.(t)) ?? ''
+      const r = new MediaRecorder(stream, type ? { mimeType: type } : undefined)
+      const parts: Blob[] = []
+      r.ondataavailable = (e) => { if (e.data.size) parts.push(e.data) }
+      r.onstop = () => { const b = new Blob(parts, { type: r.mimeType || 'audio/webm' }); setBlob(b); setUrl(URL.createObjectURL(b)); setState('done') }
+      r.start()
+      const t0 = Date.now()
+      const iv = window.setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); setSecs(s); if (s >= 120) stop() }, 250)
+      rec.current = { r, stream, iv }
+      setSecs(0); setState('recording')
+    } catch { setState('error') }
+  }
+  return (
+    <>
+      <div className="vc-card-head"><b>Voice note</b><span className="vc-grow" /><button className="vc-icon" onClick={() => { stop(); onCancel() }} aria-label="Cancel"><X size={14} /></button></div>
+      {state === 'error' && <p className="vc-bad">The microphone isn’t available here (allowed, connected, on an https page?).</p>}
+      {state === 'done' && url ? <audio controls src={url} className="vc-audio" /> : (
+        <div className="vc-row">
+          {state === 'recording'
+            ? <button className="vc-btn danger" onClick={stop}><Square size={13} /> Stop · {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</button>
+            : <button className="vc-btn primary" onClick={() => void record()}><Mic size={13} /> Record</button>}
+          <span className="vc-muted">Up to 2 minutes.</span>
+        </div>
+      )}
+      <textarea rows={2} maxLength={MAX_TEXT} value={note} placeholder="A line about it (optional)" aria-label="Note" onChange={(e) => setNote(e.target.value)} />
+      <div className="vc-row">
+        {state === 'done' && <button className="vc-btn" onClick={() => { setBlob(null); setState('idle') }}>Record again</button>}
+        <span className="vc-grow" />
+        <button className="vc-btn primary" disabled={!blob || blob.size > 5_000_000} onClick={() => blob && onPost(blob, note)}>Post</button>
+      </div>
+      <p className="vc-where">Saved privately for this site’s team and its reviewers.</p>
+    </>
+  )
+}
+
+/** Plays a voice note: a short-lived link to the private file, fetched when asked. */
+function VoicePlayer({ path }: { path: string }) {
+  const [src, setSrc] = useState('')
+  const [err, setErr] = useState(false)
+  if (src) return <audio controls autoPlay src={src} className="vc-audio" />
+  return <button className="vc-btn" onClick={() => void audioUrl(path).then(setSrc, () => setErr(true))}><Play size={13} /> {err ? 'Couldn’t load. Try again' : 'Play the voice note'}</button>
+}
+

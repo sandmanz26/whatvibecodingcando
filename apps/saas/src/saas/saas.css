@@ -473,3 +473,4 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 .rs-trail { display: flex; flex-wrap: wrap; gap: 4px; }
 .rs-trail code::after { content: ' →'; color: var(--lp-ink-2); }
 .rs-trail code:last-child::after { content: ''; }
+.up-audio { width: 100%; max-width: 420px; height: 36px; }

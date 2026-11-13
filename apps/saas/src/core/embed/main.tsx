@@ -374,6 +374,7 @@ async function boot() {
       project, position: c.launcher.position, shortcut: c.launcher.shortcut, launcher: c.launcher.kind, label: c.launcher.label,
       accent: c.theme.accent, mode: c.theme.mode,
       comments: decision.comments, tools: decision.tools,
+      compare: decision.comments && !!c.modules.compare, narration: decision.comments && !!c.modules.narration && m.sessions, version: c.version,
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
     }
     return <>{notice}<Widget backend={backend} config={config} host={host} /></>

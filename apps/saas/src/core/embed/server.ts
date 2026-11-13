@@ -236,9 +236,34 @@ export function reportSeen(project: string, version: string, shown: boolean, why
   void rpc('report_seen', { p_public_id: project, p_version: version, p_shown: shown, p_why: why.slice(0, 200) }, { anon: true }).catch(() => { /* best effort */ })
 }
 
+/* ---------- voice notes: the project's private bucket ---------- */
+
+async function storage(method: string, path: string, body?: BodyInit, type?: string): Promise<Response> {
+  const s = await ensureSession(false)
+  if (!s) throw new ServerError('not_invited')
+  const r = await fetch(`${URL_}/storage/v1/object/${path}`, { method, headers: { apikey: KEY, Authorization: `Bearer ${s.access_token}`, ...(type ? { 'Content-Type': type } : {}) }, body })
+  if (!r.ok) throw new ServerError(String(r.status))
+  return r
+}
+/** Uploads a voice note's audio; its path ("<project>/<id>.<ext>") goes with the comment. */
+export async function uploadAudio(project: string, id: string, blob: Blob): Promise<string> {
+  const ext = /ogg/.test(blob.type) ? 'ogg' : /mp4|m4a/.test(blob.type) ? 'm4a' : 'webm'
+  const path = `${project}/${id}.${ext}`
+  await storage('POST', `narrations/${path}`, blob, blob.type.split(';')[0] || 'audio/webm')
+  return path
+}
+/** A link to listen to a voice note, for ten minutes (the bucket is private). */
+export async function audioUrl(path: string): Promise<string> {
+  const r = await storage('POST', `sign/narrations/${path}`, JSON.stringify({ expiresIn: 600 }), 'application/json')
+  const j = await r.json() as { signedURL?: string; signedUrl?: string }
+  const u = j.signedURL ?? j.signedUrl ?? ''
+  return u.startsWith('http') ? u : `${URL_}/storage/v1${u}`
+}
+
 /* ---------- comments ---------- */
 
-interface ServerThread extends Omit<Thread, 'resolved' | 'replies'> {
+interface ServerThread extends Omit<Thread, 'resolved' | 'replies' | 'version' | 'audio' | 'kind'> {
+  kind?: Thread['kind']; version?: string | null; audio?: string | null
   mine: boolean
   resolved: { by: string; at: string } | null
   replies: { id: string; author: string; text: string; at: string; mine: boolean }[]
@@ -248,6 +273,7 @@ const toThread = (t: ServerThread): Thread => ({
   ...(t.editedAt ? { editedAt: t.editedAt } : {}), ...(t.resolved ? { resolved: t.resolved } : {}),
   replies: t.replies.map((r) => ({ id: r.id, author: r.author, text: r.text, at: r.at, mine: r.mine })),
   mine: t.mine,
+  ...(t.kind && t.kind !== 'comment' ? { kind: t.kind } : {}), ...(t.version ? { version: t.version } : {}), ...(t.audio ? { audio: t.audio } : {}),
 })
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -267,7 +293,8 @@ export class ServerBackend implements Backend {
     const before = this.last.get(t.id)
     let now: ServerThread | null = null
     if (!before) {
-      now = await rpc<ServerThread>('post_thread', { p_public_id: this.project, p_page: t.page, p_anchor: t.anchor, p_text: t.text, p_id: UUID.test(t.id) ? t.id : null })
+      // Kind and audio only when there are some: a server without them (older settings) still takes comments.
+      now = await rpc<ServerThread>('post_thread', { p_public_id: this.project, p_page: t.page, p_anchor: t.anchor, p_text: t.text, p_id: UUID.test(t.id) ? t.id : null, ...(t.kind && t.kind !== 'comment' ? { p_kind: t.kind } : {}), ...(t.audio ? { p_audio: t.audio } : {}) })
     } else {
       if (t.text !== before.text) now = await rpc('edit_thread', { p_thread: t.id, p_text: t.text })
       if (!!t.resolved !== !!before.resolved) now = await rpc('set_resolved', { p_thread: t.id, p_resolved: !!t.resolved })
@@ -279,7 +306,10 @@ export class ServerBackend implements Backend {
     if (now) this.last.set(now.id, toThread(now))
   }
   async remove(id: string) {
+    const audio = this.last.get(id)?.audio
     await rpc('delete_thread', { p_thread: id })
+    // A voice note's audio goes with it.
+    if (audio) void storage('DELETE', `narrations/${audio}`).catch(() => { /* the members can clear it */ })
     this.last.delete(id)
   }
   /** Others' changes: checked every 15 s while the tab is in view (a reviewer's tab only). */

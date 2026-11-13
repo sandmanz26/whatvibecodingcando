@@ -19,7 +19,7 @@ export const CONFIG_VERSION = 1
 export interface Env { id: string; name: string; host: string; on: boolean }
 export type Audience = 'reviewers' | 'everyone'
 /** The products the script runs, one switch each. Comments is always present; the others only when on. */
-export const SCRIPT_MODULES = ['comments', 'inspect', 'dscheck', 'tokens', 'heatmap', 'usability', 'fivesec', 'doors', 'gaze'] as const
+export const SCRIPT_MODULES = ['comments', 'inspect', 'dscheck', 'tokens', 'heatmap', 'usability', 'fivesec', 'doors', 'gaze', 'versions', 'compare', 'narration'] as const
 export type ModuleId = typeof SCRIPT_MODULES[number]
 export type Modules = { comments: boolean } & Partial<Record<Exclude<ModuleId, 'comments'>, true>>
 /** Modules in one canonical form (extras listed only when on), so two configurations compare as data. */
@@ -33,6 +33,8 @@ export interface WidgetConfig {
   v: 1
   /** the project's off switch: false and the widget shows nowhere */
   on: boolean
+  /** the site's current version label (Versions): comments made now carry it */
+  version?: string
   modules: Modules
   theme: { accent: string; mode: 'light' | 'dark' }
   launcher: { kind: 'floating' | 'hidden'; position: 'right' | 'left'; label: string; shortcut: boolean }
@@ -158,6 +160,7 @@ export function parseConfig(v: unknown): WidgetConfig | null {
   if (typeof v.on !== 'boolean' || typeof modules.comments !== 'boolean') return null
   return {
     v: 1, on: v.on, modules: modulesOf((id) => modules[id] === true),
+    ...(typeof v.version === 'string' && /^[\w. -]{1,20}$/.test(v.version.trim()) ? { version: v.version.trim() } : {}),
     theme: { accent, mode: theme.mode === 'dark' ? 'dark' : 'light' },
     launcher: { kind: launcher.kind === 'hidden' ? 'hidden' : 'floating', position: launcher.position === 'left' ? 'left' : 'right', label: label || 'Comment', shortcut: launcher.shortcut !== false },
     audience: v.audience === 'everyone' ? 'everyone' : 'reviewers',

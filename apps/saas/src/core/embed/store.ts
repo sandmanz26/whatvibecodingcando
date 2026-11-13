@@ -18,6 +18,8 @@ export interface Anchor {
   x: number
   y: number
   vw: number
+  /** the second element of a comparison (A vs B) */
+  b?: Omit<Anchor, 'b'>
 }
 /** `mine`: set by the server (it knows who wrote what); without one, the widget compares names. */
 export interface Reply { id: string; author: string; text: string; at: string; mine?: boolean }
@@ -32,6 +34,12 @@ export interface Thread {
   resolved?: { by: string; at: string }
   replies: Reply[]
   mine?: boolean
+  /** comment (default), compare (A vs B), voice (a voice note, its audio on the server) */
+  kind?: 'comment' | 'compare' | 'voice'
+  /** the site's version it was made on (set by the server from the published settings) */
+  version?: string
+  /** a voice note's audio, in the project's private bucket */
+  audio?: string
 }
 export type Status = 'open' | 'ongoing' | 'completed'
 export const statusOf = (t: Thread): Status => (t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open')
@@ -120,6 +128,9 @@ export function isThread(v: unknown): v is Thread {
   return !!t && typeof t === 'object' && str(t.id, 64) && str(t.page, 2000) && str(t.author, 80) && str(t.text, MAX_TEXT) && str(t.createdAt, 40)
     && !!t.anchor && str(t.anchor.sel, MAX_SELECTOR) && num(t.anchor.rx) && num(t.anchor.ry) && num(t.anchor.x) && num(t.anchor.y) && num(t.anchor.vw)
     && Array.isArray(t.replies) && t.replies.every((r) => !!r && str(r.id, 64) && str(r.author, 80) && str(r.text, MAX_TEXT) && str(r.at, 40))
+    && (t.anchor.b === undefined || (!!t.anchor.b && str(t.anchor.b.sel, MAX_SELECTOR) && num(t.anchor.b.rx) && num(t.anchor.b.ry) && num(t.anchor.b.x) && num(t.anchor.b.y) && num(t.anchor.b.vw)))
+    && (t.kind === undefined || t.kind === 'comment' || t.kind === 'compare' || t.kind === 'voice')
+    && (t.version === undefined || str(t.version, 20)) && (t.audio === undefined || str(t.audio, 120))
 }
 
 /**

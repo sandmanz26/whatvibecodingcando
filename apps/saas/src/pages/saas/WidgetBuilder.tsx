@@ -79,6 +79,15 @@ export function WidgetBuilder() {
             </section>
           )}
 
+          {project.products.includes('versions') && (
+            <section className="up-card">
+              <h2>Version</h2>
+              <p className="up-muted">Your site’s current version. Comments made after you publish carry it, so feedback stays with the release it was about. Change it, and publish, when you deploy a new one.</p>
+              <input className="up-search" value={draft.version ?? ''} maxLength={20} placeholder="e.g. 1.4 or 2026-11-13" aria-label="Current version"
+                onChange={(e) => { const v = e.target.value.replace(/[^\w. -]/g, '').slice(0, 20); edit((c) => { const { version: _drop, ...rest } = c; void _drop; return v.trim() ? { ...rest, version: v } : rest }) }} />
+            </section>
+          )}
+
           <section className="up-card">
             <h2>Modules</h2>
             {PRODUCTS.filter((p) => (SCRIPT_MODULES as readonly string[]).includes(p.id)).map((p) => {
