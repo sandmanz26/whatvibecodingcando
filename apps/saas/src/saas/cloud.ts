@@ -281,10 +281,18 @@ export async function projectStats(publicId: string): Promise<Stats | null> {
 }
 
 /** Clears one kind of data for a project (members only; the server checks). */
-export async function clearCloud(publicId: string, what: 'comments' | 'reviewers' | 'reports' | 'links') {
+export async function clearCloud(publicId: string, what: 'comments' | 'reviewers' | 'reports' | 'links' | 'research') {
   const id = dbIds.get(publicId)
   if (!id) throw new Error('This project isn’t on the server.')
   if (what === 'links') { const { error } = await supabase!.rpc('revoke_review_links', { p_project: id }); if (error) throw error; return }
+  // Participants' runs: their clicks, gaze, answers and results go with them; the studies stay.
+  if (what === 'research') { const { error } = await supabase!.from('runs').delete().eq('project_id', id); if (error) throw error; return }
+  // Voice notes' audio goes with the comments (a server without voice notes has no such column).
+  if (what === 'comments') {
+    const { data } = await supabase!.from('threads').select('audio').eq('project_id', id).not('audio', 'is', null)
+    const files = ((data ?? []) as { audio: string | null }[]).map((r) => r.audio).filter((a): a is string => !!a)
+    for (let i = 0; i < files.length; i += 100) await supabase!.storage.from('narrations').remove(files.slice(i, i + 100)).catch(() => { /* the rows go anyway */ })
+  }
   const table = what === 'comments' ? 'threads' : what === 'reviewers' ? 'reviewers' : 'installs'
   const { error } = await supabase!.from(table).delete().eq('project_id', id)
   if (error) throw error

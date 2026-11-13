@@ -112,12 +112,24 @@ export function pageOf(path: string): string {
 interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze'; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [onclick], [contenteditable=""], [contenteditable=true]'
+/**
+ * Personal data that can show in a page's own text (the signed-in person's name in a greeting is
+ * beyond a pattern, but email addresses, phone numbers and long numbers such as card, order or
+ * account numbers are not): replaced before a label leaves the browser.
+ */
+export const redact = (s: string) => s
+  .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[email]')
+  .replace(/\+?\d[\d\s().-]{6,}\d/g, (m) => (m.replace(/\D/g, '').length >= 7 ? '[number]' : m))
+/** Marked private by the site: data-private / data-vibe-private, or a class "private", on it or around it. */
+const PRIVATE = '[data-private], [data-vibe-private], .private, [data-sensitive]'
 /** A short label of what an element shows. A form field: its tag and its label only, never its value. */
 export function labelOf(el: Element) {
+  const tag = el.tagName.toLowerCase()
+  if (el.closest(PRIVATE)) return `${tag} (private)`
   const aria = el.getAttribute('aria-label')
-  if (/^(input|select|textarea)$/i.test(el.tagName) || (el as HTMLElement).isContentEditable) return `${el.tagName.toLowerCase()}${aria ? ` “${aria.slice(0, 40)}”` : ''}`
-  const text = (aria ?? el.textContent ?? '').replace(/\s+/g, ' ').trim()
-  return `${el.tagName.toLowerCase()}${text ? ` “${text.slice(0, 40)}”` : ''}`
+  if (/^(input|select|textarea)$/i.test(el.tagName) || (el as HTMLElement).isContentEditable) return `${tag}${aria ? ` “${redact(aria).slice(0, 40)}”` : ''}`
+  const text = redact((aria ?? el.textContent ?? '').replace(/\s+/g, ' ').trim())
+  return `${tag}${text ? ` “${text.slice(0, 40)}”` : ''}`
 }
 
 export class Recorder {
@@ -151,7 +163,7 @@ export class Recorder {
       this.push({
         t, task: task?.(), kind: 'click', page,
         x: Math.round(e.pageX), y: Math.round(e.pageY), vw: window.innerWidth, doc_h: document.documentElement.scrollHeight,
-        sel: selectorFor(el).slice(0, 400), label: labelOf(el).slice(0, 80),
+        sel: redact(selectorFor(el)).slice(0, 400), label: labelOf(el).slice(0, 80),
         ex: r.width ? Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) : 0.5, ey: r.height ? Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) : 0.5,
         hit: hit?.(el), rage: this.recent.length >= 3, dead: !e.target.closest(INTERACTIVE),
       })
@@ -191,7 +203,7 @@ export class Recorder {
       // What was looked at: the element under the point (a field by its tag and label only).
       // Also where on that element, so the point follows the element on other screen widths.
       ...(el ? (() => { const r = el.getBoundingClientRect(); const cx = x - window.scrollX, cy = y - window.scrollY
-        return { sel: selectorFor(el).slice(0, 400), label: labelOf(el).slice(0, 80), ex: r.width ? Math.min(1, Math.max(0, (cx - r.left) / r.width)) : 0.5, ey: r.height ? Math.min(1, Math.max(0, (cy - r.top) / r.height)) : 0.5 } })() : {}) })
+        return { sel: redact(selectorFor(el)).slice(0, 400), label: labelOf(el).slice(0, 80), ex: r.width ? Math.min(1, Math.max(0, (cx - r.left) / r.width)) : 0.5, ey: r.height ? Math.min(1, Math.max(0, (cy - r.top) / r.height)) : 0.5 } })() : {}) })
   }
   /** A fake door seen (hit false) or clicked (hit true). */
   door(d: { page: string; sel: string; label: string }, hit: boolean, task?: string) {

@@ -19,7 +19,7 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
       </header>
       <main className="lp-wrap lp-legal-main">
         <h1>{title}</h1>
-        <p className="lp-note"><TriangleAlert size={13} /> Draft for the beta, last updated 10 November 2026. It describes what the product does today; it will be reviewed before sign-up opens to everyone.</p>
+        <p className="lp-note"><TriangleAlert size={13} /> Draft for the beta, last updated 13 November 2026. It describes what the product does today; it will be reviewed before sign-up opens to everyone.</p>
         {children}
       </main>
     </div>
@@ -35,7 +35,16 @@ export function Privacy() {
         <li><b>Your workspace:</b> projects, their site addresses, widget settings and their published versions, and invites you create.</li>
         <li><b>Comments on your sites:</b> the comment and reply text, the page path it was made on, where on the page (the element and position), the time, and the name the reviewer gave.</li>
         <li><b>Reviewers:</b> a reviewer who opens a review link gets an anonymous session for that browser. We keep the name they give and when they were last active; no email or password.</li>
-        <li><b>Installation check:</b> the host name of a site where the script ran, its version, and whether the widget showed.</li>
+        <li><b>Installation check:</b> the host name of a site where the script ran (only the project’s own sites), its version, and whether the widget showed.</li>
+        <li><b>Voice notes (Narration):</b> the audio a reviewer chose to record and post, kept in a private store for the project’s team and reviewers. Deleting the comment deletes the audio.</li>
+      </ul>
+      <h2>Study participants (research)</h2>
+      <ul>
+        <li>Only people who open a study’s participant link and press <b>I agree</b> on its consent screen are recorded. Nothing is recorded before that, and other visitors never are.</li>
+        <li><b>What is kept:</b> where they click (the page’s address without its query, the position, which element and a short label of what it shows), the pages they open, how long tasks take and how they end, and the answers they type into the study’s own questions.</li>
+        <li><b>What never is:</b> what they type into the site, their screen as video, cookies or other identifiers of theirs. Email addresses, phone numbers and long numbers in labels are replaced before anything is sent; ids in page addresses are folded (<code>/order/:id</code>); elements a site marks <code>data-private</code> are kept as “private”.</li>
+        <li><b>Eye tracking</b> is asked for separately and can be refused. The camera picture is turned into face landmarks in the participant’s browser and dropped; it never leaves the browser and is never stored. Only estimated gaze points (where on the page) and the calibration accuracy are kept.</li>
+        <li>A participant’s data is tied to an anonymous session of their browser, not to their name or email. The project’s team can delete one participant’s data, or all of it (Settings → Data).</li>
       </ul>
       <h2>What we don’t collect</h2>
       <ul>
@@ -65,13 +74,15 @@ export function Terms() {
       <h2>The beta</h2>
       <ul>
         <li>{BRAND} is in beta and free. Features can change; we’ll say so in the panel before something you use goes away.</li>
-        <li>{inScript()} run on your own site today. Products marked “Early access” work in the demo console only.</li>
+        <li>{inScript()} run on your own site today; Reports and Prompts are in your panel.</li>
       </ul>
       <h2>Your part</h2>
       <ul>
         <li>Install the script only on sites you run or may change, and tell your reviewers that their comments are stored by us.</li>
         <li>Don’t use it to collect personal data from your visitors, or for anything unlawful.</li>
         <li>Keep review links to the people they are for: anyone with a valid link can comment until it expires.</li>
+        <li>For studies, invite participants yourself and tell them who you are and what the study is for; our consent screen says what is recorded, and you are responsible for having a reason to run the study (and for any extra consent your law asks for, for example for minors). Don’t ask participants for personal data in a study’s questions.</li>
+        <li>Mark parts of your pages that show personal data with <code>data-private</code>, so their text is never sent.</li>
       </ul>
       <h2>Our part</h2>
       <ul>

@@ -298,6 +298,8 @@ export function Install() {
           <dd>If your site sends one, allow the script: <code>script-src {scriptHost}</code>. When the server is live, also <code>connect-src</code> for its API.</dd>
           <dt>Your own button</dt>
           <dd><code>{'<button data-vibe="comment">Give feedback</button>'}</code> starts a comment; <code>data-vibe="comments"</code> opens the list. From code: <code>window.VibeCollab.open('comment')</code>.</dd>
+          <dt>Private parts of a page</dt>
+          <dd>Add <code>data-private</code> to anything that shows personal data (an account menu, an order number): study recordings keep it as “private”, never its text.</dd>
           <dt>Tests and local builds</dt>
           <dd>Add <code>data-disabled</code> to the script tag where it shouldn’t load (end-to-end tests, for example).</dd>
           <dt>Staging and previews</dt>
@@ -661,12 +663,13 @@ function Reviewers() {
   )
 }
 
-type Clearable = 'comments' | 'reviewers' | 'reports' | 'links'
+type Clearable = 'comments' | 'reviewers' | 'reports' | 'links' | 'research'
 const CLEAR: Record<Clearable, { title: string; text: string; cloudOnly?: boolean }> = {
-  comments: { title: 'Clear all comments', text: 'Every comment and reply on every page of the project. Reviewers keep their access.' },
+  comments: { title: 'Clear all comments', text: 'Every comment and reply on every page of the project, with voice notes’ audio. Reviewers keep their access.' },
   reviewers: { title: 'Remove all reviewers', text: 'Everyone loses access to comment, and review links not used yet stop working. Comments are kept.', cloudOnly: true },
   links: { title: 'Revoke review links', text: 'Review and invite links not used yet stop working. Reviewers already in keep their access.', cloudOnly: true },
   reports: { title: 'Clear installation reports', text: 'The list of sites where the script was seen. It fills again as pages load.' },
+  research: { title: 'Clear research data', text: 'Every participant’s run: their clicks, pages, eye tracking, answers and results. The studies and their links stay.', cloudOnly: true },
 }
 
 /** Clearing a project's data, one kind at a time, after typing the project id. */
