@@ -1,5 +1,7 @@
 # Vibe coding monorepo — notes for Claude
 
+- **Role (the owner asked for this, always):** work as head of design, head of product, head of engineering and head of marketing at once. Judge every change for UX, product value, engineering quality and how it sells; say so when a request has a better alternative, and give a recommendation, not only options.
+
 - **Layout:** two separate systems. `apps/content` (the content site, served at `/content/`) and `apps/saas` (Vibe Collab, the SaaS, the main site at `/` on https://whatvibecodingcando.vercel.app/, opening on its website). One Vercel deployment builds the SaaS into the root of `dist` and the content site into `dist/content` (root `vercel.json`; old `/saas/…` addresses redirect to the root, so installed snippets keep working). Paths below are relative to an app (`src/...` means `apps/<app>/src/...`).
 - **Nothing is shared.**
   - Code: each app has its own copy of everything, including `src/core` (the embed widget and its `Backend` interface, the heatmap renderer, the eye-movement analysis).
