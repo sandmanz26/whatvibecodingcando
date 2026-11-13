@@ -177,6 +177,21 @@ export async function rpc<T>(fn: string, args: Record<string, unknown>, opts: { 
   return j as T
 }
 
+/**
+ * The last call of a page that is closing (events not sent yet): sent with keepalive so it survives
+ * the navigation, with the session this page already has (nothing can be awaited any more).
+ */
+export function rpcOnLeave(fn: string, args: Record<string, unknown>) {
+  if (!session) return
+  try {
+    void fetch(`${URL_}/rest/v1/rpc/${fn}`, {
+      method: 'POST', keepalive: true,
+      headers: { apikey: KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    }).catch(() => { /* lost: at most a few clicks */ })
+  } catch { /* ignore */ }
+}
+
 /* ---------- reviewer state ---------- */
 
 export interface ReviewStart { name: string; preview: boolean; draft: unknown }

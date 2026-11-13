@@ -308,3 +308,48 @@ export async function getShareCloud(token: string): Promise<SharedList | null> {
   if (error) return null
   return data as SharedList
 }
+
+/* ---------- research: studies, participant links, results ---------- */
+
+export type StudyKind = 'usability' | 'fivesec' | 'browse'
+export interface StudyRow { id: string; kind: StudyKind; name: string; config: Record<string, unknown>; status: 'open' | 'closed'; eye_tracking: boolean; max_runs: number; link_expires: string | null; has_link: boolean; created_at: string; runs: number }
+export interface RunRow { id: string; started_at: string; finished_at: string | null; device: string | null; vw: number | null; gaze_accuracy: number | null; result: { tasks?: { id: string; outcome: string; ms: number; pages?: string[]; clicks?: number; firstClickHit?: boolean | null }[]; answers?: string[] }; events: number }
+export interface EventRow { run_id: string; t: number; task: string | null; kind: 'click' | 'page' | 'gaze' | 'door'; page: string; label: string | null; sel: string | null; rage: boolean | null; dead: boolean | null; hit: boolean | null }
+
+export async function listStudies(publicId: string): Promise<StudyRow[]> {
+  const id = dbIds.get(publicId)
+  if (!id) return []
+  const { data, error } = await supabase!.from('studies').select('id, kind, name, config, status, eye_tracking, max_runs, link_expires, link_hash, created_at, runs(count)').eq('project_id', id).order('created_at', { ascending: false })
+  if (error) throw error
+  return (data as (Omit<StudyRow, 'has_link' | 'runs'> & { link_hash: string | null; runs: { count: number }[] })[]).map(({ link_hash, runs, ...s }) => ({ ...s, has_link: !!link_hash, runs: runs?.[0]?.count ?? 0 }))
+}
+export async function saveStudy(publicId: string, s: { id?: string; kind: StudyKind; name: string; config: Record<string, unknown>; status?: 'open' | 'closed'; eye_tracking?: boolean; max_runs?: number }): Promise<string> {
+  const pid = dbIds.get(publicId)
+  if (!pid) throw new Error('This project isn’t on the server.')
+  const row = { name: s.name.trim().slice(0, 80), config: s.config, status: s.status ?? 'open', eye_tracking: !!s.eye_tracking, max_runs: s.max_runs ?? 200 }
+  if (s.id) { const { error } = await supabase!.from('studies').update(row).eq('id', s.id); if (error) throw error; return s.id }
+  const { data, error } = await supabase!.from('studies').insert({ ...row, project_id: pid, kind: s.kind }).select('id').single()
+  if (error) throw error
+  return data.id as string
+}
+export async function deleteStudy(id: string) { const { error } = await supabase!.from('studies').delete().eq('id', id); if (error) throw error }
+export async function studyLink(id: string, days = 30): Promise<string> {
+  const { data, error } = await supabase!.rpc('create_study_link', { p_study: id, p_days: days })
+  if (error) throw error
+  return data as string
+}
+export async function revokeStudyLink(id: string) { const { error } = await supabase!.rpc('revoke_study_link', { p_study: id }); if (error) throw error }
+/** A study's runs, and their events (the latest 20,000). */
+export async function studyResults(id: string): Promise<{ runs: RunRow[]; events: EventRow[] }> {
+  const { data: runs, error } = await supabase!.from('runs').select('id, started_at, finished_at, device, vw, gaze_accuracy, result, events').eq('study_id', id).order('started_at', { ascending: false }).limit(1000)
+  if (error) throw error
+  const ids = (runs ?? []).map((r) => r.id as string)
+  const events: EventRow[] = []
+  for (let i = 0; i < ids.length && events.length < 20000; i += 100) {
+    const { data, error: e } = await supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit').in('run_id', ids.slice(i, i + 100)).order('t').limit(20000 - events.length)
+    if (e) throw e
+    events.push(...(data as EventRow[]))
+  }
+  return { runs: runs as RunRow[], events }
+}
+export async function deleteRun(id: string) { const { error } = await supabase!.from('runs').delete().eq('id', id); if (error) throw error }

@@ -62,8 +62,8 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
   return <button type="button" role="switch" className="switch" aria-checked={checked} aria-label={label} onClick={onChange} />
 }
 
-export function Modal({ title, description, onClose, children, footer }: {
-  title: string; description?: string; onClose: () => void; children?: ReactNode; footer?: ReactNode
+export function Modal({ title, description, onClose, children, footer, wide = false }: {
+  title: string; description?: string; onClose: () => void; children?: ReactNode; footer?: ReactNode; wide?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -76,7 +76,7 @@ export function Modal({ title, description, onClose, children, footer }: {
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={ref}>
+      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <div className="modal-head">
           <h2 style={{ fontSize: 16 }}>{title}</h2>
           {description && <p>{description}</p>}

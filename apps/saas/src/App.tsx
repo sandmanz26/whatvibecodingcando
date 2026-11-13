@@ -30,6 +30,7 @@ import { Forgot as LocalForgot, Login as LocalLogin, Register as LocalRegister, 
 import { CloudForgot, CloudLogin, CloudRegister, CloudReset, Confirm } from './pages/saas/AuthCloud'
 import { cloud } from './saas/supabase'
 import { WidgetBuilder } from './pages/saas/WidgetBuilder'
+import { Research, StudyResults } from './pages/saas/Research'
 import { Dashboard } from './pages/saas/Dashboard'
 import SharePage from './pages/saas/SharePage'
 import { Privacy, Terms } from './pages/saas/Legal'
@@ -70,6 +71,8 @@ export default function App() {
             <Route path="install" element={<PanelInstall />} />
             <Route path="widget" element={<WidgetBuilder />} />
             <Route path="comments" element={<Comments />} />
+            <Route path="research" element={<Research />} />
+            <Route path="research/:id" element={<StudyResults />} />
             <Route path="team" element={<Team />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

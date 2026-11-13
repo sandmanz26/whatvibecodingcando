@@ -55,6 +55,11 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 - **`migrations/20261112000000_install_reports.sql`**: installation reports only from a project's own sites.
   - `report_seen` records a site only when the request comes from one of the project's environments (on or off) or the hosted demo site; made-up origins are dropped.
   - At most 20 sites per project, and 120 reports a minute per project. Reports already recorded from other places are deleted.
+- **`migrations/20261113000000_research.sql`**: research with participants who agreed.
+  - **Tables:** `studies` (usability, 5-second, heatmap visit; a participant link stored as a SHA-256 only), `runs` (one participant, one study: per-task results, answers), `run_events` (clicks and pages: path without query, position, selector, a short label; rage and dead clicks). Members read and delete them; nobody else reads them.
+  - **Participants** (anonymous sessions, after "I agree"): `study_info` (the consent screen, no session), `start_run`, `log_events` (200 per call, 5,000 per run, each value checked), `finish_run`. Each checks the link, that the study is open and not full, the Origin against the project's environments, and that the study's product is on (`_origin_ok`).
+  - **Reviewers:** `heatmap_points` (clicks of a page, at most 20,000) for the script's Heatmap over the real page.
+  - **Members:** `create_study_link` (a new link replaces the old) and `revoke_study_link`; members can't write a link hash themselves.
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.
@@ -87,7 +92,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 
 ## Tests
 
-- `tests/run.sh` runs every `*_test.sql` on a fresh database: `rls_test.sql` (row level security), `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account), `share_test.sql` (dashboard, clearing data, share links) and `install_test.sql` (installation reports).
+- `tests/run.sh` runs every `*_test.sql` on a fresh database: `rls_test.sql` (row level security), `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account), `share_test.sql` (dashboard, clearing data, share links), `install_test.sql` (installation reports) and `research_test.sql` (studies, participants, events, heatmap).
 - The full path (panel → invite link → reviewer on another domain → comment in the database → panel inbox, plus kill switch, preview and delete account) was checked in a browser against these migrations on Postgres 16. It is not in CI yet.
 
 ## Not done yet (before a public launch)

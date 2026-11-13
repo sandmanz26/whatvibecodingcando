@@ -28,6 +28,8 @@ import { CSS } from './styles'
 import { LocalConfigSource, anyModule, envFor, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
 import * as server from './server'
 import { frameMain } from './frame'
+import { Participant } from './Research'
+import { loadRun, saveRun, studyInfo, takeStudyToken, type RunState } from './research'
 
 /** The public API: window.VibeCollab.open('comment' | 'list'). Calls made before the script loaded are queued in q. */
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
@@ -236,6 +238,8 @@ const LINK_PROBLEMS: Record<string, string> = {
   origin_not_allowed: 'This review link doesn’t work on this address: the site owner hasn’t switched it on (Widget → Where), or the widget is off.',
   no_project: 'This review link is for a project that no longer exists.',
   rate_limited: 'Too many tries. Wait a minute and open the link again.',
+  study_closed: 'This study has ended. Thank you for opening it!',
+  study_full: 'This study has all the participants it needs. Thank you!',
   captcha_failed: 'The check that you’re a person didn’t pass. Open the review link again.',
   captcha_timeout: 'The check that you’re a person timed out. Open the review link again.',
   captcha_unavailable: 'The check that you’re a person couldn’t load. Check your connection and open the link again.',
@@ -275,6 +279,27 @@ async function boot() {
     return m[1]
   }
   const token = takeToken()
+
+  // A study's participant (#vibe_r=… and "I agree"): the study runs instead of the widget, for this tab.
+  const studyToken = takeStudyToken()
+  if (server.hasServer && (studyToken || loadRun(project))) {
+    let study = loadRun(project)
+    if (studyToken) {
+      try {
+        const info = await studyInfo(project, studyToken)
+        study = { token: studyToken, phase: 'consent', info, index: 0, pages: [], clicks: 0, firstClickHit: null, results: [], answers: [] }
+        saveRun(project, study)
+      } catch (e) {
+        mountAlone(<LinkNotice why={(e as Error).message} onClose={() => document.getElementById('vibe-collab')?.remove()} />)
+        return
+      }
+    }
+    if (study && study.phase !== 'declined') {
+      const file = await server.fetchSettings(project)
+      mountAlone(<Participant project={project} initial={study as RunState} accent={file.live?.config.theme.accent ?? '#e8590c'} />)
+      return
+    }
+  }
 
   // Server first: a project with a published settings file on the CDN runs on the server.
   let mode: Mode | null = null
@@ -392,6 +417,26 @@ async function boot() {
   }
   if (document.body) start()
   else document.addEventListener('DOMContentLoaded', start, { once: true })
+}
+
+/** The widget's host element with one thing in it (a study, or a notice), for the cases without the widget. */
+function mountAlone(node: ReactNode) {
+  const host = document.createElement('vibe-collab')
+  host.id = 'vibe-collab'
+  host.setAttribute('data-vibe-collab', VERSION)
+  pinHostStyle(host)
+  const go = () => {
+    try {
+      document.documentElement.appendChild(host)
+      const root = host.attachShadow({ mode: 'open' })
+      addStyles(root, CSS)
+      const el = document.createElement('div')
+      root.appendChild(el)
+      createRoot(el).render(<Boundary>{node}</Boundary>)
+    } catch (e) { console.warn('[Vibe Collab] could not start; the page is unaffected.', e) }
+  }
+  if (document.body) go()
+  else document.addEventListener('DOMContentLoaded', go, { once: true })
 }
 
 boot().catch((e) => console.warn('[Vibe Collab] could not start; the page is unaffected.', e))

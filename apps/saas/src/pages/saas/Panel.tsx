@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2, ChevronsUpDown } from 'lucide-react'
+import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2, ChevronsUpDown, FlaskConical } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
@@ -94,6 +94,7 @@ export function PanelLayout() {
     { to: '/app/install', icon: Code2, label: 'Install' },
     { to: '/app/widget', icon: SlidersHorizontal, label: 'Widget' },
     { to: '/app/comments', icon: MessagesSquare, label: 'Comments' },
+    { to: '/app/research', icon: FlaskConical, label: 'Research' },
     { to: '/app/team', icon: Users, label: 'Team' },
     { to: '/app/settings', icon: Settings, label: 'Settings' },
   ]

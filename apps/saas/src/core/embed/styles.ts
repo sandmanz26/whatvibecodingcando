@@ -115,4 +115,28 @@ export const CSS = `
 .vc-check input { width: auto; margin-top: 2px; }
 .vc-drop { height: 44px; justify-content: center; border-style: dashed; }
 .vc-toks li { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; padding: 4px 2px; border-bottom: 1px solid var(--vc-line); }
+
+/* studies: what a participant sees */
+.vc-scrim { position: fixed; inset: 0; z-index: 2147483005; background: rgba(15,15,15,.45); display: grid; place-items: center; padding: 16px; }
+.vc-cover { position: fixed; inset: 0; z-index: 2147483005; background: #f4f4f4; display: grid; place-items: center; padding: 16px; }
+.vc-modal { width: min(440px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--vc-bg); color: var(--vc-ink); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.3); padding: 22px; display: flex; flex-direction: column; gap: 10px; font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+.vc-modal h2 { margin: 0; font-size: 20px; line-height: 1.25; }
+.vc-modal p { margin: 0; }
+.vc-kicker { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--vc-accent); }
+.vc-list { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.vc-list li { display: flex; gap: 8px; align-items: flex-start; }
+.vc-list svg { flex: none; margin-top: 3px; color: #237032; }
+.vc-q { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
+.vc-q textarea { font: inherit; font-weight: 400; border: 1px solid var(--vc-line); border-radius: 8px; padding: 7px 9px; resize: vertical; }
+.vc-taskbar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2147483004; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); padding: 6px 6px 6px 14px; border-radius: 999px; background: #1c1c1c; color: #fff; box-shadow: 0 8px 28px rgba(0,0,0,.3); font: 13px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+.vc-taskbar.small { padding: 6px 14px; gap: 6px; font-weight: 700; }
+.vc-taskbar .vc-kicker { color: #ffb38a; }
+.vc-taskprompt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 46vw; font-weight: 600; }
+.vc-clock { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; opacity: .85; }
+.vc-taskbar .vc-btn { height: 30px; border-radius: 999px; }
+/* the reviewer's heatmap over the page */
+.vc-heat { position: fixed; inset: 0; z-index: 2147482994; pointer-events: none; width: 100vw; height: 100vh; }
+.vc-heatpanel { top: auto; bottom: 74px; height: auto; max-height: 60vh; }
+.vc-legend { height: 8px; border-radius: 4px; }
+.vc-q select, .vc-q input[type=range] { font: inherit; }
 `

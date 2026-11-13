@@ -4,16 +4,19 @@
  * They work in the reviewer's tab only and send nothing anywhere (see design.ts).
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, Palette, RotateCcw, ScanSearch, SquareDashedMousePointer, TriangleAlert, Upload, X } from 'lucide-react'
+import { Check, Flame, Palette, RotateCcw, ScanSearch, SquareDashedMousePointer, TriangleAlert, Upload, X } from 'lucide-react'
 import { HOST_TAG, MAX_FILE, RULE_LABEL, applyTokens, dropProbe, inspect, pageTokens, parseTokenFile, removeTokens, scanPage, type Group, type Scan, type Tokens } from './design'
 import { NS } from './store'
+import { drawHeat, LEGEND } from '../heat'
+import * as server from './server'
 
-export type ToolId = 'inspect' | 'dscheck' | 'tokens'
-export const TOOL_IDS: ToolId[] = ['inspect', 'dscheck', 'tokens']
+export type ToolId = 'inspect' | 'dscheck' | 'tokens' | 'heatmap'
+export const TOOL_IDS: ToolId[] = ['inspect', 'dscheck', 'tokens', 'heatmap']
 export const TOOL_META: Record<ToolId, { label: string; Icon: typeof Palette }> = {
   inspect: { label: 'Inspect', Icon: SquareDashedMousePointer },
   dscheck: { label: 'Design system check', Icon: ScanSearch },
   tokens: { label: 'Design tokens', Icon: Palette },
+  heatmap: { label: 'Heatmap', Icon: Flame },
 }
 
 /* ---------- the reviewer's token file (this tab only) ---------- */
@@ -56,6 +59,7 @@ const ours = (e: Event) => e.composedPath().some((n) => n instanceof Element && 
 export function ToolView({ tool, project, onClose }: { tool: ToolId; project: string; onClose: () => void }) {
   if (tool === 'inspect') return <InspectTool project={project} onClose={onClose} />
   if (tool === 'dscheck') return <CheckTool project={project} onClose={onClose} />
+  if (tool === 'heatmap') return <HeatmapTool project={project} onClose={onClose} />
   return <TokensTool project={project} onClose={onClose} />
 }
 
@@ -257,3 +261,85 @@ function TokensTool({ project, onClose }: { project: string; onClose: () => void
 }
 
 export const ToolIcon = ({ id }: { id: ToolId }) => { const I = TOOL_META[id].Icon; return <I size={15} /> }
+
+/* ---------- Heatmap: study participants' clicks, drawn over this page ---------- */
+
+interface HeatPt { x: number; y: number; vw: number | null; sel: string | null; ex: number | null; ey: number | null; rage: boolean | null; dead: boolean | null }
+const HEAT_ERRORS: Record<string, string> = {
+  not_invited: 'Open the site through a review link to see its heatmap.',
+  origin_not_allowed: 'The Heatmap product isn’t on for this address (Widget → Website, Products).',
+  rate_limited: 'Too many requests. Wait a minute.',
+}
+function HeatmapTool({ project, onClose }: { project: string; onClose: () => void }) {
+  const [data, setData] = useState<{ studies: { id: string; name: string }[]; points: HeatPt[] } | null>(null)
+  const [study, setStudy] = useState('')
+  const [error, setError] = useState('')
+  const [opacity, setOpacity] = useState(0.75)
+  const [page, setPage] = useState(window.location.pathname)
+  const canvas = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    let live = true
+    setData(null); setError('')
+    server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null })
+      .then((d) => { if (live) setData({ studies: d.studies ?? [], points: d.points ?? [] }) })
+      .catch((e: Error) => { if (live) setError(HEAT_ERRORS[e.message] ?? `The heatmap couldn’t load (${e.message}).`) })
+    return () => { live = false }
+  }, [project, page, study])
+  useEffect(() => {
+    if (!data) return
+    let raf = 0
+    const draw = () => {
+      const c = canvas.current
+      if (!c) return
+      const W = window.innerWidth, H = window.innerHeight
+      const found = new Map<string, Element | null>()
+      const at = (sel: string) => { if (!found.has(sel)) { let el: Element | null = null; try { el = document.querySelector(sel) } catch { el = null } found.set(sel, el) } return found.get(sel) }
+      const pts: { x: number; y: number }[] = []
+      for (const p of data.points) {
+        let x: number, y: number
+        const el = p.sel ? at(p.sel) : null
+        const r = el?.getBoundingClientRect()
+        if (r && r.width > 0 && r.height > 0 && p.ex != null && p.ey != null) { x = r.left + p.ex * r.width; y = r.top + p.ey * r.height }
+        else { x = p.x * (W / (p.vw || W)) - window.scrollX; y = p.y - window.scrollY }
+        if (x > -60 && x < W + 60 && y > -60 && y < H + 60) pts.push({ x, y })
+      }
+      drawHeat(c, pts, 1, 28, opacity)
+    }
+    const redraw = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw) }
+    draw()
+    window.addEventListener('scroll', redraw, true)
+    window.addEventListener('resize', redraw)
+    const iv = window.setInterval(() => { if (window.location.pathname !== page) setPage(window.location.pathname) }, 500)
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', key)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', redraw, true); window.removeEventListener('resize', redraw); window.clearInterval(iv); window.removeEventListener('keydown', key) }
+  }, [data, opacity, page, onClose])
+  const n = data?.points.length ?? 0
+  const rage = data?.points.filter((p) => p.rage).length ?? 0
+  const dead = data?.points.filter((p) => p.dead).length ?? 0
+  return (
+    <>
+      <canvas ref={canvas} className="vc-heat" aria-hidden />
+      <div className="vc-panel vc-heatpanel" role="dialog" aria-label="Heatmap">
+        <div className="vc-card-head"><b>Heatmap · {page}</b><span className="vc-grow" /><button className="vc-icon" onClick={onClose} aria-label="Close"><X size={14} /></button></div>
+        {error ? <p className="vc-bad">{error}</p> : !data ? <p className="vc-empty">Loading…</p> : (
+          <>
+            <p className={`vc-sum ${n ? '' : 'bad'}`}>{n ? `${n} click${n === 1 ? '' : 's'} on this page${n >= 20000 ? ' (the latest 20,000)' : ''}` : 'No clicks on this page yet'}{n ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
+            {data.studies.length > 0 && (
+              <label className="vc-q">Study
+                <select value={study} onChange={(e) => setStudy(e.target.value)}>
+                  <option value="">All studies</option>
+                  {data.studies.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="vc-q">Opacity <input type="range" min={0.2} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label>
+            <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>fewer</span><span className="vc-grow" /><span>more clicks</span></div>
+          </>
+        )}
+        <p className="vc-where">Clicks of study participants who agreed to take part; never other visitors. Open another page and the map follows.</p>
+      </div>
+    </>
+  )
+}
+

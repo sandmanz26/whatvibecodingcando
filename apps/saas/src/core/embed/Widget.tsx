@@ -49,7 +49,14 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const [nudge, setNudge] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [panel, setPanel] = useState(false)
-  const [tool, setTool] = useState<ToolId | null>(null)
+  // The panel can open a tool on arrival (#vibe_tool=heatmap); the hint leaves the address at once.
+  const [tool, setTool] = useState<ToolId | null>(() => {
+    const m = /(?:^#|&)vibe_tool=([a-z]+)/.exec(window.location.hash)
+    if (!m) return null
+    const rest = window.location.hash.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_tool=')).join('&')
+    try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
+    return config.tools.includes(m[1] as ToolId) ? (m[1] as ToolId) : null
+  })
   const [name, setNameState] = useState(readName)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)
   const [, setTick] = useState(0)
