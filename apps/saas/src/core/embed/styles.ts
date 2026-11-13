@@ -16,6 +16,11 @@ export const CSS = `
 
 .vc-dock { position: fixed; bottom: 18px; right: 18px; z-index: 2147483000; display: flex; gap: 6px; align-items: center; padding: 6px; border-radius: 999px; background: #1c1c1c; box-shadow: 0 8px 28px rgba(0,0,0,.28); }
 .vc.left .vc-dock { right: auto; left: 18px; }
+/* Many tools on a phone: the dock stays on screen and scrolls sideways instead of running off it. */
+.vc-dock { max-width: calc(100vw - 24px); box-sizing: border-box; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.vc-dock::-webkit-scrollbar { display: none; }
+.vc-dock > * { flex-shrink: 0; }
+@media (max-width: 480px) { .vc-dock { bottom: 12px; right: 12px; } .vc.left .vc-dock { left: 12px; } }
 .vc-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--vc-line); background: var(--vc-bg); font-weight: 550; font-size: 13px; white-space: nowrap; }
 .vc-btn:hover:not(:disabled) { border-color: var(--vc-hover); }
 .vc-btn.primary { background: var(--vc-accent); border-color: transparent; color: #fff; }

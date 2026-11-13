@@ -53,7 +53,7 @@ export function statsOf(threads: Thread[], sites: Stats['sites'] = []): Stats {
 
 /* ---------- the shared comment list ---------- */
 
-export interface SharedThread { page: string; author: string; text: string; createdAt: string; editedAt?: string | null; resolved: { by: string; at: string } | null; replies: { author: string; text: string; at: string }[] }
+export interface SharedThread { page: string; kind?: string | null; version?: string | null; author: string; text: string; createdAt: string; editedAt?: string | null; resolved: { by: string; at: string } | null; replies: { author: string; text: string; at: string }[] }
 export interface SharedList { project: string; site: string; label: string | null; filter: 'all' | 'open' | 'completed'; created_at: string; expires_at: string | null; threads: SharedThread[] }
 export interface ShareRow { id: string; label: string | null; status_filter: 'all' | 'open' | 'completed'; created_at: string; expires_at: string | null; revoked_at: string | null; views: number; last_viewed: string | null }
 
@@ -73,14 +73,16 @@ export function decodeLocalShare(token: string): SharedList | null {
     return v && typeof v.project === 'string' && Array.isArray(v.threads) ? v : null
   } catch { return null }
 }
-export const toShared = (t: Thread): SharedThread => ({ page: t.page, author: t.author, text: t.text, createdAt: t.createdAt, editedAt: t.editedAt ?? null, resolved: t.resolved ?? null, replies: t.replies.map((r) => ({ author: r.author, text: r.text, at: r.at })) })
+export const toShared = (t: Thread): SharedThread => ({ page: t.page, kind: t.kind ?? 'comment', version: t.version ?? null, author: t.author, text: t.text, createdAt: t.createdAt, editedAt: t.editedAt ?? null, resolved: t.resolved ?? null, replies: t.replies.map((r) => ({ author: r.author, text: r.text, at: r.at })) })
 export const keepFor = (filter: SharedList['filter']) => (t: { resolved?: unknown }) => filter === 'all' || (filter === 'open' ? !t.resolved : !!t.resolved)
 
 /** The list as CSV (for a spreadsheet). */
 export function threadsCsv(rows: SharedThread[]): string {
-  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const lines = [['page', 'status', 'author', 'comment', 'created', 'replies'].join(',')]
-  for (const t of rows) lines.push([t.page, t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')].map((v) => esc(String(v))).join(','))
+  // Comments come from reviewers: a cell starting with = + - @ (or a tab/return) would run as a
+  // formula in Excel or Sheets, so it gets a leading apostrophe and stays text.
+  const esc = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`
+  const lines = [['page', 'kind', 'version', 'status', 'author', 'comment', 'created', 'replies'].join(',')]
+  for (const t of rows) lines.push([t.page, t.kind ?? 'comment', t.version ?? '', t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')].map((v) => esc(String(v))).join(','))
   return lines.join('\n')
 }
 export function download(name: string, text: string, type = 'text/csv') {

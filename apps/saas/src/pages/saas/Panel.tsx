@@ -5,7 +5,7 @@ import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf, statusLabel } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
-import { draftOf, liveOf, openAsReviewer, releasable, serveProject, unserveProject } from '../../saas/widget'
+import { draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
@@ -191,6 +191,7 @@ function ProjectSwitcher({ projects, current, onPick, onNew }: { projects: Proje
 export function Products() {
   const { project, setProject } = usePanel()
   const { toast } = useStore()
+  const [s] = useSaas()
   if (!project) return null
   const toggle = (id: string) => {
     const on = project.products.includes(id)
@@ -203,7 +204,10 @@ export function Products() {
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Products</h1><p>Turn tools on or off for “{project.name}”. Early-access tools are built and usable in the demo; they switch on in your script as they move into it.</p></div></div>
-      {pending && <p className="up-warn"><TriangleAlert size={14} /> Your site follows this change once you <Link to="/app/widget">publish the widget</Link>. The snippet stays the same.</p>}
+      {pending && <p className="up-warn"><TriangleAlert size={14} /> Your site still has the old set of tools. <button className="lp-btn sm primary" onClick={() => {
+        if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) toast(`Published v${live!.version + 1}: your site follows on its next page load`)
+        else toast('Not published: this browser’s storage is full or blocked.', 'error')
+      }}>Publish this change</button> Only the tools change; other edits in <Link to="/app/widget">Widget</Link> stay a draft. The snippet stays the same.</p>}
       <div className="up-products">
         {PRODUCTS.map((p) => {
           const on = project.products.includes(p.id)

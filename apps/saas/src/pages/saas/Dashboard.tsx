@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, Circle, ExternalLink, X, Power, MessagesSquare, Users, Globe, Share2 } from 'lucide-react'
+import { CheckCircle2, Circle, ExternalLink, X, Power, MessagesSquare, Users, Globe, Share2, FlaskConical } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch } from '../../components/ui'
 import { STATUS_LABEL, statusOf } from '../../core/embed/store'
@@ -8,7 +8,7 @@ import { lastSeen } from '../../core/embed/config'
 import { productOf } from '../../saas/products'
 import { liveOf, setLiveOn } from '../../saas/widget'
 import { cloud } from '../../saas/supabase'
-import { projectStats } from '../../saas/cloud'
+import { listStudies, projectStats, type StudyRow } from '../../saas/cloud'
 import { statsOf, type Stats } from '../../saas/stats'
 import { AnonWarning, ago, openDemo, usePanel, useThreads } from './Panel'
 
@@ -25,6 +25,14 @@ export function Dashboard() {
   const [server, setServer] = useState<Stats | null>(null)
   const [failed, setFailed] = useState('')
   const [confirmOff, setConfirmOff] = useState(false)
+  const [studies, setStudies] = useState<StudyRow[] | null>(null)
+  const research = !!project && ['usability', 'fivesec', 'heatmap'].some((id) => project.products.includes(id))
+  useEffect(() => {
+    if (!cloud || !project || !research) return
+    let live = true
+    void listStudies(project.id).then((x) => { if (live) setStudies(x) }).catch(() => { if (live) setStudies([]) })
+    return () => { live = false }
+  }, [project?.id, research]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!cloud || !project) return
     let live = true
@@ -54,6 +62,7 @@ export function Dashboard() {
     { done: !!st?.sites.length, label: 'See the script running on a site', to: '/app/install' },
     { done: cloud ? (st?.reviewers ?? 0) > 0 : total > 0, label: cloud ? 'Invite a reviewer' : 'Leave the first comment', to: cloud ? '/app/team' : '/app/install' },
     { done: total > 0, label: 'Get the first comment', to: '/app/comments' },
+    ...(cloud && research ? [{ done: !!studies?.some((x) => x.runs > 0), label: 'Run a first study with participants', to: '/app/research' }] : []),
   ]
   const left = steps.filter((x) => !x.done).length
 
@@ -125,6 +134,20 @@ export function Dashboard() {
           )}
         </section>
       </div>
+
+      {research && (
+        <section className="up-card">
+          <div className="up-row"><h2 className="lp-grow"><FlaskConical size={15} /> Research</h2><Link to="/app/research" className="lp-btn sm">{cloud ? 'Studies' : 'Open'}</Link></div>
+          {!cloud ? <p className="up-muted">Studies with participants on your site need the server; this demo panel has none.</p>
+            : !studies ? <p className="up-muted">Loading…</p>
+              : !studies.length ? <p className="up-muted">No studies yet. <Link to="/app/research">Make one</Link> and send its link to participants.</p>
+                : <div className="db-kpis">
+                  <div className="db-kpi"><span>Open studies</span><b>{studies.filter((x) => x.status === 'open').length}</b></div>
+                  <div className="db-kpi"><span>Participants</span><b>{studies.reduce((n, x) => n + x.runs, 0)}</b></div>
+                  <div className="db-kpi"><span>Latest study</span><b className="up-clip" style={{ fontSize: 15 }}>{studies[0].name}</b><small>{ago(studies[0].created_at)}</small></div>
+                </div>}
+        </section>
+      )}
 
       <div className="up-cols">
         {left > 0 && (

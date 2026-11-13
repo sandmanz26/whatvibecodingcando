@@ -38,6 +38,17 @@ export function publish(p: Project, by: string, config = draftOf(p)): Project {
 }
 
 /**
+ * Publishes only the Products change: a new release of what is live with the modules that Products
+ * now allows. Other unpublished edits in the builder stay in the draft.
+ */
+export function publishProducts(p: Project, by: string): Project {
+  const live = liveOf(p)
+  if (!live) return p
+  const release: Release = { version: live.version + 1, config: releasable(p, live.config), at: new Date().toISOString(), by }
+  return { ...p, releases: [...(p.releases ?? []), release].slice(-50) }
+}
+
+/**
  * Switches the widget on or off on every site at once: a new release of what is live, with only
  * the off switch changed. The draft keeps its other unpublished changes.
  */
