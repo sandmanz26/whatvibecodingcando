@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2, ChevronsUpDown, FlaskConical, FileText, Sparkles } from 'lucide-react'
+import { Link, Navigate, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf, statusLabel } from '../../saas/products'
@@ -12,6 +12,7 @@ import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../..
 import { PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
+import { PanelNav } from './Nav'
 import { download, threadsCsv, toShared } from '../../saas/stats'
 import { LocalBackend, NS, STATUS_LABEL, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
@@ -29,6 +30,16 @@ const ago = (iso: string) => {
 const snippetOf = (p: Project) => installSnippet(p.id)
 /** Opens the demo site as a reviewer of the project (the widget shows to reviewers only by default). */
 export const openDemo = (projectId: string, toast: (t: string, k?: 'error') => void) => { void openAsReviewer(projectId, demoUrl(projectId)).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') }) }
+/**
+ * Opens the project's own site as a reviewer, with the published settings. With the default audience
+ * (reviewers only) this is how the owner sees the widget on their site: a plain visit shows nothing.
+ * The browser stays a reviewer afterwards, so later visits show it too.
+ */
+export const openMySite = (p: Project, toast: (t: string, k?: 'error') => void) => {
+  if (!p.siteUrl) { toast('Add your site’s address in Widget → Website first.', 'error'); return }
+  if (!liveOf(p)) { toast('Press Update site in Widget first: your site has no settings yet.', 'error'); return }
+  void openAsReviewer(p.id, p.siteUrl).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })
+}
 /** "x min ago" for the panel. */
 export { ago }
 
@@ -88,26 +99,12 @@ export function PanelLayout() {
     if (!ok) toast('Not saved: this browser’s storage is full or blocked.', 'error')
     return ok
   }
-  const LINKS = [
-    { to: '/app', end: true, icon: LayoutDashboard, label: 'Overview' },
-    { to: '/app/products', icon: Boxes, label: 'Products' },
-    { to: '/app/install', icon: Code2, label: 'Install' },
-    { to: '/app/widget', icon: SlidersHorizontal, label: 'Widget' },
-    { to: '/app/comments', icon: MessagesSquare, label: 'Comments' },
-    { to: '/app/research', icon: FlaskConical, label: 'Research' },
-    ...(project?.products.includes('report') ? [{ to: '/app/report', icon: FileText, label: 'Report' }] : []),
-    ...(project?.products.includes('prompts') ? [{ to: '/app/prompts', icon: Sparkles, label: 'Prompts' }] : []),
-    { to: '/app/team', icon: Users, label: 'Team' },
-    { to: '/app/settings', icon: Settings, label: 'Settings' },
-  ]
   return (
     <div className="up">
       <aside className="up-side">
         <Link to="/landingpage" className="lp-logo sm"><span className="lp-mark" aria-hidden><MousePointer2 size={13} /></span>{BRAND}</Link>
         <ProjectSwitcher projects={s.projects} current={project} onPick={(id) => update((x) => ({ ...x, current: id }))} onNew={() => setCreating(true)} />
-        <nav className="up-nav" aria-label="Panel">
-          {LINKS.map(({ to, end, icon: Icon, label }) => <NavLink key={to} to={to} end={end}><Icon size={16} /> {label}</NavLink>)}
-        </nav>
+        <PanelNav project={project} />
         <span className="lp-grow" />
         <div className="up-me"><b>{s.account.name}</b><span>{s.account.email}</span><button className="up-logout" onClick={logOut}><LogOut size={13} /> Log out</button></div>
         <Link to="/landingpage" className="up-back"><ArrowLeft size={14} /> Website</Link>
@@ -205,9 +202,9 @@ export function Products() {
     <div className="up-page">
       <div className="up-head"><div><h1>Products</h1><p>Turn tools on or off for “{project.name}”. Early-access tools are built and usable in the demo; they switch on in your script as they move into it.</p></div></div>
       {pending && <p className="up-warn"><TriangleAlert size={14} /> Your site still has the old set of tools. <button className="lp-btn sm primary" onClick={() => {
-        if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) toast(`Published v${live!.version + 1}: your site follows on its next page load`)
+        if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) toast('Site updated: it follows on its next page load')
         else toast('Not published: this browser’s storage is full or blocked.', 'error')
-      }}>Publish this change</button> Only the tools change; other edits in <Link to="/app/widget">Widget</Link> stay a draft. The snippet stays the same.</p>}
+      }}>Update site</button> Only the tools change; other edits in <Link to="/app/widget">Widget</Link> wait until you update from there. The snippet stays the same.</p>}
       <div className="up-products">
         {PRODUCTS.map((p) => {
           const on = project.products.includes(p.id)
@@ -239,7 +236,7 @@ const GUIDES: { id: string; label: string; where: string; code?: (s: string) => 
   { id: 'vite', label: 'React / Vue / Svelte (Vite)', where: 'Paste it into index.html at the project root, before </body>. One place covers every route.' },
   { id: 'next', label: 'Next.js', where: 'Add it to app/layout.tsx with next/script, inside <body>:', code: (s) => `import Script from 'next/script'\n\n<Script\n  src="${(s.match(/src="([^"]+)"/) ?? [])[1]}"\n${(s.match(/  data-[^\n]+/g) ?? []).map((x) => x.replace(/^\s+/, '  ')).join('\n')}\n  strategy="afterInteractive"\n/>` },
   { id: 'cms', label: 'WordPress / Webflow / Framer', where: 'Use the site’s “custom code” setting for the footer (Webflow: Site settings → Custom code → Footer; Framer: Site settings → General → End of <body>; WordPress: a header-and-footer plugin).' },
-  { id: 'claude', label: 'Ask Claude', where: 'Paste this into Claude Code in your project:', code: (s) => `Add this script tag to my site so it loads on every page, once (just before </body>, or the framework's equivalent such as next/script in the root layout). Don't change anything else.\n\n${s}` },
+  { id: 'ai', label: 'Ask an AI assistant', where: 'Paste this into your AI coding assistant, opened in your project:', code: (s) => `Add this script tag to my site so it loads on every page, once (just before </body>, or the framework's equivalent such as next/script in the root layout). Don't change anything else.\n\n${s}` },
 ]
 
 export function Install() {
@@ -271,7 +268,18 @@ export function Install() {
       <div className="up-head"><div><h1>Install</h1><p>One snippet per project. Paste it once; it works on every page and never has to change. What the widget shows, to whom and where is set in <Link to="/app/widget">Widget</Link>.</p></div>
         <button className="lp-btn" onClick={() => openDemo(project.id, toast)}>Try on the demo site <ExternalLink size={13} /></button></div>
       {stale && <p className="up-warn"><TriangleAlert size={14} /> The snippet on your site is from an older version or another project. It keeps working; copy this one when you next touch your site.</p>}
-      {!live && <p className="up-warn"><TriangleAlert size={14} /> No widget settings published yet: your site uses the old snippet options. <Link to="/app/widget">Publish them</Link> to control it from here.</p>}
+      {!live && <p className="up-warn"><TriangleAlert size={14} /> Your site has no settings yet. Open <Link to="/app/widget">Widget</Link> and press Update site to control it from here.</p>}
+      {project.siteUrl && live && (
+        <section className="up-card up-seeit">
+          <div className="lp-grow">
+            <h2>See it on your site</h2>
+            <p className="up-muted">{live.config.audience === 'everyone'
+              ? 'Comments are open to everyone visiting, so the widget shows on every page. Reviewers also get the design tools.'
+              : <>Only <b>reviewers</b> see the widget, so opening your site normally shows nothing, not even to you. Open it from here once: this browser becomes a reviewer and keeps seeing it. Change who sees it in <Link to="/app/widget">Widget → Who sees it</Link>.</>}</p>
+          </div>
+          <button className="lp-btn primary" onClick={() => openMySite(project, toast)}>Open my site <ExternalLink size={13} /></button>
+        </section>
+      )}
       <div className="up-cols">
         <section className="up-card">
           <h2>Your snippet</h2>
@@ -284,8 +292,9 @@ export function Install() {
             <>
               <p className={`up-check ${seen.shown ? 'ok' : 'warn'}`}>{seen.shown ? <CheckCircle2 size={14} /> : <TriangleAlert size={14} />} Script {seen.version} loaded on <code>{seen.host}{seen.page}</code> {ago(seen.at)}.</p>
               <p className="up-muted">{seen.shown ? 'The widget was shown.' : `The widget stayed hidden: ${seen.why}`}</p>
+              {!seen.shown && /reviewers/i.test(seen.why) && project.siteUrl && <button className="lp-btn sm" onClick={() => openMySite(project, toast)}>Open my site as a reviewer <ExternalLink size={12} /></button>}
             </>
-          ) : <p className="up-muted">Not seen yet. Open your site, or the demo site, after installing.</p>}
+          ) : <p className="up-muted">Not seen yet. After installing, press Open my site above (or try the demo site).</p>}
           <p className="up-note">{cloud ? 'Every site with your snippet reports here: right away when the widget shows, and now and then (a sample) when it stays hidden, so plain page views barely reach the server.' : 'Beta without a server: this check only sees the demo site opened in this browser.'}</p>
         </section>
       </div>
@@ -293,7 +302,7 @@ export function Install() {
         <h2>Where to paste it</h2>
         <div className="up-tabs" role="tablist">{GUIDES.map((x) => <button key={x.id} role="tab" aria-selected={guide === x.id} onClick={() => setGuide(x.id)}>{x.label}</button>)}</div>
         <p>{g.where}</p>
-        {g.code && <><pre className="up-code">{g.code(code)}</pre><button className="lp-btn sm" onClick={() => void copy(g.code!(code), g.id === 'claude' ? 'Prompt' : 'Code', g.id !== 'claude')}><Copy size={13} /> Copy</button></>}
+        {g.code && <><pre className="up-code">{g.code(code)}</pre><button className="lp-btn sm" onClick={() => void copy(g.code!(code), g.id === 'ai' ? 'Prompt' : 'Code', g.id !== 'ai')}><Copy size={13} /> Copy</button></>}
       </section>
       <section className="up-card">
         <h2>For developers</h2>
@@ -324,24 +333,28 @@ export function Comments() {
   const [q, setQ] = useState('')
   const [ver, setVer] = useState('')
   const [deleting, setDeleting] = useState<Thread | null>(null)
+  const [bulk, setBulk] = useState(false)
   const status = (params.get('status') ?? 'all') as Status | 'all'
   const sharing = params.get('share') === '1'
+  // ?kind=compare or ?kind=voice: the sidebar's Component reviews and Voice notes (Results).
+  const kind = (['compare', 'voice'] as const).find((k) => k === params.get('kind')) ?? null
   if (!project || !backend) return null
-  const setStatus = (v: Status | 'all') => setParams(v === 'all' ? {} : { status: v }, { replace: true })
+  const setStatus = (v: Status | 'all') => setParams(() => { const n = new URLSearchParams(params); if (v === 'all') n.delete('status'); else n.set('status', v); return n }, { replace: true })
   const setSharing = (v: boolean) => setParams(() => { const n = new URLSearchParams(params); if (v) n.set('share', '1'); else n.delete('share'); return n }, { replace: true })
   const versions = [...new Set(threads.map((t) => t.version).filter((v): v is string => !!v))]
-  const shown = threads.filter((t) => !ver || t.version === ver)
+  const ofKind = threads.filter((t) => !kind || t.kind === kind)
+  const shown = ofKind.filter((t) => !ver || t.version === ver)
     .filter((t) => status === 'all' || statusOf(t) === status)
     .filter((t) => !q.trim() || `${t.text} ${t.author} ${t.page} ${t.replies.map((r) => r.text).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  const count = (v: Status | 'all') => threads.filter((t) => v === 'all' || statusOf(t) === v).length
+  const count = (v: Status | 'all') => ofKind.filter((t) => v === 'all' || statusOf(t) === v).length
   const save = async (t: Thread, msg: string) => { try { await backend.upsert(t); reload(); toast(msg) } catch { toast('Not saved: storage is blocked.', 'error') } }
   // Comments made on the demo site live on this domain; others on the project's own site.
   // Only ever a page of the project's own site (or the demo): a page key that would lead elsewhere gets no link.
   const openUrl = (t: Thread) => (t.page.startsWith('/embed-demo.html') ? demoUrl(project.id) + (t.page.split('#')[1] ? `#${t.page.split('#')[1]}` : '') : project.siteUrl ? pageUrl(t.page, project.siteUrl) : null)
   return (
     <div className="up-page">
-      <div className="up-head"><div><h1>Comments</h1><p>Everything your reviewers left on “{project.name}”.</p></div>
+      <div className="up-head"><div><h1>{kind === 'compare' ? 'Component reviews' : kind === 'voice' ? 'Voice notes' : 'Comments'}</h1><p>{kind === 'compare' ? 'A vs B comparisons your reviewers made' : kind === 'voice' ? 'Spoken notes your reviewers recorded' : 'Everything your reviewers left'} on “{project.name}”.{kind && <> <Link to="/app/comments">See all comments</Link></>}</p></div>
         <span className="up-row">
           <button className="lp-btn" disabled={!threads.length} onClick={() => download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(toShared)))}><Download size={14} /> CSV</button>
           <button className="lp-btn primary" onClick={() => setSharing(true)}><Share2 size={14} /> Share list</button>
@@ -356,8 +369,9 @@ export function Comments() {
         </div>
         {versions.length > 1 && <select className="up-select" value={ver} onChange={(e) => setVer(e.target.value)} aria-label="Version"><option value="">All versions</option>{versions.map((v) => <option key={v} value={v}>v{v}</option>)}</select>}
         <input className="up-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search comments" aria-label="Search comments" />
+        {shown.length > 0 && <button className="lp-btn sm ghost danger" onClick={() => setBulk(true)}><Trash2 size={13} /> Delete {shown.length === ofKind.length && !q.trim() && !ver && status === 'all' ? 'all' : 'these'} ({shown.length})</button>}
       </div>
-      {shown.length === 0 ? <div className="up-card up-muted">{threads.length === 0 ? 'No comments yet.' : 'Nothing matches.'}</div> : (
+      {shown.length === 0 ? <div className="up-card up-muted">{ofKind.length === 0 ? (kind === 'compare' ? 'No component reviews yet. Reviewers start one with the A vs B button in the widget.' : kind === 'voice' ? 'No voice notes yet. Reviewers record one with the microphone button in the widget.' : 'No comments yet.') : 'Nothing matches.'}</div> : (
         <ul className="up-inbox">
           {shown.map((t) => {
             const url = openUrl(t)
@@ -384,7 +398,12 @@ export function Comments() {
           })}
         </ul>
       )}
-      {deleting && <Modal title="Delete this comment?" description={`“${deleting.text.slice(0, 80)}” and its ${deleting.replies.length} replies are removed for everyone using this browser.`} onClose={() => setDeleting(null)}
+      {bulk && <Modal title={`Delete ${shown.length} comment${shown.length === 1 ? '' : 's'}?`} description={`The ${shown.length === 1 ? 'comment' : 'comments'} shown with the current filter, with their replies${cloud ? ' and recordings, are removed for everyone' : ', are removed from this browser'}. This can’t be undone. To clear every comment of the project at once, use Settings → Data.`} onClose={() => setBulk(false)}
+        footer={<><button className="btn" onClick={() => setBulk(false)}>Keep them</button><button className="btn primary" onClick={() => {
+          const ids = shown.map((t) => t.id); setBulk(false)
+          void (async () => { let failed = 0; for (const tid of ids) { try { await backend.remove(tid) } catch { failed++ } } reload(); toast(failed ? `${ids.length - failed} deleted, ${failed} couldn’t be` : `${ids.length} comment${ids.length === 1 ? '' : 's'} deleted`, failed ? 'error' : undefined) })()
+        }}>Delete</button></>} />}
+      {deleting && <Modal title="Delete this comment?" description={`“${deleting.text.slice(0, 80)}” and its ${deleting.replies.length} replies are removed ${cloud ? 'for everyone' : 'from this browser'}${deleting.kind === 'voice' ? ', with its recording' : ''}. This can’t be undone.`} onClose={() => setDeleting(null)}
         footer={<><button className="btn" onClick={() => setDeleting(null)}>Keep</button><button className="btn primary" onClick={() => { void backend.remove(deleting.id).then(() => { reload(); toast('Comment deleted') }); setDeleting(null) }}>Delete</button></>} />}
     </div>
   )
@@ -625,11 +644,11 @@ export function ReviewLinkMaker({ onMade }: { onMade?: () => void }) {
       <form className="up-row wrap" onSubmit={(ev) => { ev.preventDefault(); void make() }}>
         <input className="up-search grow" value={name} onChange={(ev) => setName(ev.target.value)} maxLength={80} placeholder="Their name, e.g. Pak Budi" aria-label="Reviewer name" />
         <select className="up-select" value={target.key} onChange={(ev) => setPick(ev.target.value)} aria-label="Where the link opens">
-          {targets.map((t) => <option key={t.key} value={t.key}>{t.label}{t.live ? '' : ' (publish first)'}</option>)}
+          {targets.map((t) => <option key={t.key} value={t.key}>{t.label}{t.live ? '' : ' (update your site first)'}</option>)}
         </select>
         <button className="lp-btn primary" type="submit" disabled={!name.trim() || busy || !target.live}><Plus size={14} /> Make link</button>
       </form>
-      {!target.live && <p className="up-hint">{target.key} isn’t in the published settings yet: publish the widget first (Widget → Publish), then make the link.</p>}
+      {!target.live && <p className="up-hint">{target.key} isn’t on your site’s settings yet: press Update site in Widget first, then make the link.</p>}
       {targets.length === 1 && <p className="up-hint">Add your site in Widget → Where to make links for it.</p>}
       {link && (
         <div className="up-linkbox">
@@ -673,7 +692,7 @@ const CLEAR: Record<Clearable, { title: string; text: string; cloudOnly?: boolea
   reviewers: { title: 'Remove all reviewers', text: 'Everyone loses access to comment, and review links not used yet stop working. Comments are kept.', cloudOnly: true },
   links: { title: 'Revoke review links', text: 'Review and invite links not used yet stop working. Reviewers already in keep their access.', cloudOnly: true },
   reports: { title: 'Clear installation reports', text: 'The list of sites where the script was seen. It fills again as pages load.' },
-  research: { title: 'Clear research data', text: 'Every participant’s run: their clicks, pages, eye tracking, answers and results. The studies and their links stay.', cloudOnly: true },
+  research: { title: 'Clear research data and heatmaps', text: 'Every participant’s run in every study: their clicks, pages, eye tracking, answers and results, so every heatmap starts empty. The studies and their links stay. To clear one study, use Clear results on it.', cloudOnly: true },
 }
 
 /** Clearing a project's data, one kind at a time, after typing the project id. */

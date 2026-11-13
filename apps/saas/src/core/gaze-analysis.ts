@@ -101,12 +101,6 @@ export interface AoiStat { aoi: Aoi; viewers: number; people: number; ttff: numb
 
 const inside = (r: Rect, x: number, y: number, pad = 0) => x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad
 
-/** Which AOI each fixation falls in (the smallest one, when they nest), or null. */
-export function aoiOf(aois: Aoi[], f: Fixation, pad = 0): Aoi | null {
-  let best: Aoi | null = null
-  for (const a of aois) if (inside(a.rect, f.x, f.y, pad) && (!best || a.rect.w * a.rect.h < best.rect.w * best.rect.h)) best = a
-  return best
-}
 
 /**
  * Metrics per AOI over several people. `start` is when each person's task began (ms), so time

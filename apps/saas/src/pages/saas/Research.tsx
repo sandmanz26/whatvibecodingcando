@@ -1,14 +1,33 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Copy, ExternalLink, Flame, FlaskConical, Link2, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Copy, Download, Eraser, ExternalLink, Flame, FlaskConical, Link2, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal } from '../../components/ui'
 import { copyText, demoUrl } from '../../saas/snippet'
 import { liveOf, openAsReviewer } from '../../saas/widget'
 import { productOf } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
-import { deleteRun, deleteStudy, listStudies, projectSessions, revokeStudyLink, saveStudy, studyLink, studyResults, type EventRow, type RunRow, type StudyKind, type StudyRow } from '../../saas/cloud'
+import { clearStudyResults, deleteRun, deleteStudy, listStudies, projectSessions, revokeStudyLink, saveStudy, studyLink, studyResults, type EventRow, type RunRow, type StudyKind, type StudyRow } from '../../saas/cloud'
 import { ago, usePanel } from './Panel'
+import { download, toCsv } from '../../saas/stats'
+
+const fileName = (s: string) => s.replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'study'
+/** One row per participant: when, device, eye-tracking accuracy, and each task's outcome and time, or their answers. */
+function runsCsv(runs: RunRow[], studyOf?: (r: RunRow) => string) {
+  const taskIds = [...new Set(runs.flatMap((r) => (r.result.tasks ?? []).map((t) => t.id)))]
+  return toCsv(
+    [...(studyOf ? ['study'] : []), 'participant', 'started', 'finished', 'device', 'screen width', 'eye tracking accuracy (px)', ...taskIds.flatMap((_, i) => [`task ${i + 1} outcome`, `task ${i + 1} seconds`, `task ${i + 1} clicks`]), 'answers'],
+    runs.map((r, i) => [...(studyOf ? [studyOf(r)] : []), i + 1, r.started_at, r.finished_at ?? '', r.device ?? '', r.vw ?? '', r.gaze_accuracy ?? '',
+      ...taskIds.flatMap((id) => { const t = (r.result.tasks ?? []).find((x) => x.id === id); return t ? [t.outcome, Math.round(t.ms / 1000), t.clicks ?? ''] : ['', '', ''] }),
+      (r.result.answers ?? []).filter(Boolean).join(' | ')]))
+}
+/** One row per recorded event: clicks (with rage and dead clicks), page views, gaze and fake-door clicks. */
+function eventsCsv(runs: RunRow[], events: EventRow[]) {
+  const n = new Map(runs.map((r, i) => [r.id, i + 1]))
+  return toCsv(['participant', 'ms into the run', 'task', 'kind', 'page', 'element', 'selector', 'rage click', 'nothing clickable', 'on target'],
+    [...events].sort((a, b) => (n.get(a.run_id) ?? 0) - (n.get(b.run_id) ?? 0) || a.t - b.t)
+      .map((e) => [n.get(e.run_id) ?? '', e.t, e.task ?? '', e.kind, e.page, e.label ?? '', e.sel ?? '', e.rage ? 'yes' : '', e.dead ? 'yes' : '', e.hit == null ? '' : e.hit ? 'yes' : 'no']))
+}
 
 /**
  * Research (#/app/research): studies on the project's own site, with participants who agreed.
@@ -21,6 +40,14 @@ const KIND: Record<StudyKind, { label: string; product: string; help: string }> 
   fivesec: { label: '5-second test', product: 'fivesec', help: 'Show a page for a few seconds, then ask what people remember.' },
   browse: { label: 'Heatmap visit', product: 'heatmap', help: 'People use your site freely for a few minutes; their clicks build the heatmap.' },
 }
+/** Filters for the sidebar's Results links. */
+const FILTERS: { id: string; title: string; help: string; empty: string; has: (s: StudyRow) => boolean }[] = [
+  { id: 'usability', title: 'Usability tests', help: 'Tasks on your site: who succeeds, how long it takes, where people click.', empty: 'No usability tests yet. Make one with New study.', has: (s) => s.kind === 'usability' },
+  { id: 'fivesec', title: '5-second tests', help: 'What people remember after seeing a page for a few seconds.', empty: 'No 5-second tests yet. Make one with New study.', has: (s) => s.kind === 'fivesec' },
+  { id: 'browse', title: 'Heatmaps', help: 'Studies whose clicks build a heatmap. Open a study’s Results, then its heatmap buttons.', empty: 'No heatmap visits yet. Make one with New study → Heatmap visit.', has: (s) => s.kind === 'browse' || s.kind === 'usability' },
+  { id: 'eyes', title: 'Eye tracking', help: 'Studies that ask participants to turn on their webcam for eye tracking.', empty: 'No study uses eye tracking yet. Edit a usability test and turn on eye tracking.', has: (s) => s.eye_tracking },
+  { id: 'doors', title: 'Fake doors', help: 'Studies that offer a feature that doesn’t exist yet, to measure interest.', empty: 'No study has fake doors yet. Edit a study and add one under Fake doors.', has: (s) => Array.isArray(s.config.doors) && (s.config.doors as unknown[]).length > 0 },
+]
 interface TaskDraft { id: string; prompt: string; startPage: string; rule: 'none' | 'page' | 'element'; target: string; limitSec: number }
 const newTask = (n: number): TaskDraft => ({ id: `t${n}`, prompt: '', startPage: '/', rule: 'none', target: '', limitSec: 180 })
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '–')
@@ -41,7 +68,12 @@ export function Research() {
   const [editing, setEditing] = useState<StudyRow | 'new' | null>(null)
   const [link, setLink] = useState<{ id: string; url: string } | null>(null)
   const [confirm, setConfirm] = useState<StudyRow | null>(null)
-  const [tab, setTab] = useState<'studies' | 'sessions'>('studies')
+  const [clearing, setClearing] = useState<StudyRow | null>(null)
+  const [params, setParams] = useSearchParams()
+  // The sidebar's Results links: ?kind=usability|fivesec|browse|eyes|doors filters the studies, ?tab=sessions opens Sessions.
+  const tab: 'studies' | 'sessions' = params.get('tab') === 'sessions' ? 'sessions' : 'studies'
+  const setTab = (t: 'studies' | 'sessions') => setParams(t === 'sessions' ? { tab: 'sessions' } : {}, { replace: true })
+  const filter = FILTERS.find((f) => f.id === params.get('kind')) ?? null
   const moduleOn = useModuleOn()
   const load = () => { if (project && cloud) void listStudies(project.id).then(setRows).catch((e: Error) => { setRows([]); toast(`Couldn’t load studies: ${e.message}`, 'error') }) }
   useEffect(load, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -60,7 +92,7 @@ export function Research() {
   return (
     <div className="up-page">
       <div className="up-head">
-        <div><h1>Research</h1><p>Studies on your own site, with people who agree to take part. Visitors who didn’t open a study’s link are never recorded.</p></div>
+        <div><h1>{tab === 'sessions' ? 'Sessions' : filter?.title ?? 'Research'}</h1><p>{filter ? <>{filter.help} <Link to="/app/research">All studies</Link></> : 'Studies on your own site, with people who agree to take part. Visitors who didn’t open a study’s link are never recorded.'}</p></div>
         {cloud && <button className="lp-btn primary" onClick={() => setEditing('new')}><Plus size={14} /> New study</button>}
       </div>
       {cloud && <div className="seg rs-tabs" role="tablist"><button role="tab" aria-selected={tab === 'studies'} aria-pressed={tab === 'studies'} onClick={() => setTab('studies')}>Studies</button><button role="tab" aria-selected={tab === 'sessions'} aria-pressed={tab === 'sessions'} onClick={() => setTab('sessions')}>Session insights</button></div>}
@@ -75,18 +107,20 @@ export function Research() {
         </section>
       )}
       <ul className="rs-list">
-        {(rows ?? []).map((s) => (
+        {cloud && rows && rows.length > 0 && filter && !rows.some(filter.has) && <section className="up-card up-muted">{filter.empty}</section>}
+        {(rows ?? []).filter((s) => !filter || filter.has(s)).map((s) => (
           <li key={s.id} className="up-card">
             <div className="up-row">
               <span className="lp-grow"><b>{s.name}</b><small className="up-muted"> · {KIND[s.kind].label} · {s.runs} participant{s.runs === 1 ? '' : 's'} · {ago(s.created_at)}</small></span>
               <span className={`up-badge ${s.status === 'open' ? '' : 'pending'}`}>{s.status === 'open' ? 'Open' : 'Closed'}</span>
             </div>
-            {!moduleOn(s.kind) && <p className="up-warn"><TriangleAlert size={13} /> Participants’ links won’t open yet: turn on {productOf(KIND[s.kind].product)?.name ?? KIND[s.kind].label} in <Link to="/app/products">Products</Link>, then publish the widget.</p>}
+            {!moduleOn(s.kind) && <p className="up-warn"><TriangleAlert size={13} /> Participants’ links won’t open yet: turn on {productOf(KIND[s.kind].product)?.name ?? KIND[s.kind].label} in <Link to="/app/products">Products</Link>, then update your site from Widget.</p>}
             <div className="up-row wrap">
               <Link className="lp-btn sm primary" to={`/app/research/${s.id}`}>Results</Link>
               <button className="lp-btn sm" onClick={() => void linkFor(s)}><Link2 size={13} /> {s.has_link ? 'New participant link' : 'Participant link'}</button>
               {s.has_link && <button className="lp-btn sm ghost" onClick={() => void revokeStudyLink(s.id).then(() => { toast('Link revoked: it no longer opens the study'); load() })}>Revoke link</button>}
               <button className="lp-btn sm ghost" onClick={() => setEditing(s)}>Edit</button>
+              {s.runs > 0 && <button className="lp-btn sm ghost" onClick={() => setClearing(s)}><Eraser size={13} /> Clear results</button>}
               <button className="lp-btn sm ghost" onClick={() => void saveStudy(project.id, { ...s, status: s.status === 'open' ? 'closed' : 'open' }).then(load)}>{s.status === 'open' ? 'Close' : 'Reopen'}</button>
               <span className="lp-grow" />
               <button className="lp-btn sm ghost" onClick={() => setConfirm(s)} aria-label={`Delete ${s.name}`}><Trash2 size={13} /></button>
@@ -104,6 +138,10 @@ export function Research() {
       </ul>
       </>}
       {editing && <StudyEditor study={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
+      {clearing && (
+        <Modal title={`Clear the results of “${clearing.name}”?`} description={`${clearing.runs} participant${clearing.runs === 1 ? '’s' : 's’'} runs are deleted: tasks, answers, clicks and gaze, so its heatmap starts empty. The study and its link stay. This can’t be undone.`} onClose={() => setClearing(null)}
+          footer={<><button className="btn" onClick={() => setClearing(null)}>Keep them</button><button className="btn primary" onClick={() => void clearStudyResults(clearing.id).then(() => { toast('Results cleared'); setClearing(null); load() }).catch((e: Error) => toast(`Couldn’t clear: ${e.message}`, 'error'))}>Clear results</button></>} />
+      )}
       {confirm && (
         <Modal title={`Delete “${confirm.name}”?`} description="Its participant link, every participant’s run and their clicks are deleted. This can’t be undone." onClose={() => setConfirm(null)}
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Keep it</button><button className="btn primary" onClick={() => void deleteStudy(confirm.id).then(() => { toast('Study deleted'); setConfirm(null); load() })}>Delete</button></>} />
@@ -199,11 +237,11 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
           </>
         )}
         {kind !== 'fivesec' && (
-          <label className="up-check"><input type="checkbox" checked={eyes} onChange={(e) => setEyes(e.target.checked)} /> Ask participants for webcam eye tracking (they can say no; video stays in their browser, only where they look is saved){!gazeOn && ' · turn on Eye tracking in Products and publish'}</label>
+          <label className="up-check"><input type="checkbox" checked={eyes} onChange={(e) => setEyes(e.target.checked)} /> Ask participants for webcam eye tracking (they can say no; video stays in their browser, only where they look is saved){!gazeOn && ' · turn on Eye tracking in Products and update your site'}</label>
         )}
         <details className="wb-more" open={doors.length > 0}>
           <summary>Fake doors (optional)</summary>
-          <p className="up-muted">Offer a feature that doesn’t exist yet, to see who wants it. Participants who click it see that it’s coming soon. Only this study’s participants see the doors.{!doorsOn && ' Turn on Fake doors in Products and publish for them to show.'}</p>
+          <p className="up-muted">Offer a feature that doesn’t exist yet, to see who wants it. Participants who click it see that it’s coming soon. Only this study’s participants see the doors.{!doorsOn && ' Turn on Fake doors in Products and press Update site for them to show.'}</p>
           {doors.map((d, i) => (
             <div key={i} className="rs-task">
               <div className="up-row"><b>Door {i + 1}</b><span className="lp-grow" /><button className="lp-btn sm ghost" onClick={() => setDoors(doors.filter((_, j) => j !== i))} aria-label={`Remove door ${i + 1}`}><X size={13} /></button></div>
@@ -236,6 +274,7 @@ export function StudyResults() {
   const [study, setStudy] = useState<StudyRow | null>(null)
   const [data, setData] = useState<{ runs: RunRow[]; events: EventRow[] } | null>(null)
   const [open, setOpen] = useState<string | null>(null)
+  const [clearing, setClearing] = useState(false)
   const load = () => {
     if (!project || !id || !cloud) return
     void listStudies(project.id).then((l) => setStudy(l.find((s) => s.id === id) ?? null))
@@ -262,6 +301,16 @@ export function StudyResults() {
     <div className="up-page">
       <button className="lp-btn sm ghost" onClick={() => nav('/app/research')}><ArrowLeft size={14} /> Research</button>
       <div className="up-head"><div><h1>{study?.name ?? 'Study'}</h1><p>{study ? KIND[study.kind].label : ''} · {runs.length} participant{runs.length === 1 ? '' : 's'}, {done.length} finished{runs.some((r) => r.gaze_accuracy) ? ` · eye tracking for ${runs.filter((r) => r.gaze_accuracy).length} (median accuracy ${Math.round(median(runs.filter((r) => r.gaze_accuracy).map((r) => r.gaze_accuracy!)))} px)` : ''}</p></div></div>
+      {runs.length > 0 && data && (
+        <div className="up-row wrap rs-actions">
+          <button className="lp-btn sm" onClick={() => download(`${fileName(study?.name ?? 'study')}-participants.csv`, runsCsv(runs))}><Download size={13} /> Participants (CSV)</button>
+          <button className="lp-btn sm" onClick={() => download(`${fileName(study?.name ?? 'study')}-clicks-and-gaze.csv`, eventsCsv(runs, data.events))}><Download size={13} /> Clicks, pages and gaze (CSV)</button>
+          <span className="lp-grow" />
+          <button className="lp-btn sm ghost danger" onClick={() => setClearing(true)}><Eraser size={13} /> Clear results</button>
+        </div>
+      )}
+      {clearing && <Modal title="Clear this study’s results?" description={`All ${runs.length} participants’ runs are deleted: their tasks, answers, clicks and gaze, so the heatmap starts empty too. The study and its participant link stay. This can’t be undone.`} onClose={() => setClearing(false)}
+        footer={<><button className="btn" onClick={() => setClearing(false)}>Keep them</button><button className="btn primary" onClick={() => void clearStudyResults(id!).then(() => { toast('Results cleared'); setClearing(false); load() }).catch((e: Error) => toast(`Couldn’t clear: ${e.message}`, 'error'))}>Clear results</button></>} />}
       {!data ? <p className="up-muted">Loading…</p> : !runs.length ? <p className="up-muted">No participants yet. Send the participant link from Research.</p> : (
         <>
           {study?.kind === 'usability' && (
@@ -317,7 +366,7 @@ export function StudyResults() {
           })()}
           <section className="up-card">
             <h2><Flame size={16} /> Clicks by page</h2>
-            {!heatOn && <p className="up-warn"><TriangleAlert size={13} /> To see the heatmap over your page, turn on Heatmaps in Products and publish.</p>}
+            {!heatOn && <p className="up-warn"><TriangleAlert size={13} /> To see the heatmap over your page, turn on Heatmaps in Products and update your site.</p>}
             <table className="db-table">
               <thead><tr><th>Page</th><th>Clicks</th><th>Rage clicks</th><th>On nothing clickable</th><th /></tr></thead>
               <tbody>{pages.map(([p, [n, rage, dead]]) => <tr key={p}><td><code>{p}</code></td><td>{n}</td><td>{rage}</td><td>{dead}</td><td>{heatOn && <button className="lp-btn sm" onClick={() => openHeat(p)}>Heatmap <ExternalLink size={12} /></button>}</td></tr>)}</tbody>
@@ -387,6 +436,10 @@ function Sessions({ studies }: { studies: StudyRow[] }) {
   const list = data.runs.filter((r) => only === 'all' || frustrated(r.id))
   return (
     <>
+      <div className="up-row wrap rs-actions">
+        <button className="lp-btn sm" onClick={() => download('sessions.csv', runsCsv(data.runs, (r) => studyName((r as RunRow & { study_id: string }).study_id)))}><Download size={13} /> Sessions (CSV)</button>
+        <button className="lp-btn sm" onClick={() => download('sessions-clicks-and-pages.csv', eventsCsv(data.runs, data.events))}><Download size={13} /> Clicks and pages (CSV)</button>
+      </div>
       <div className="db-kpis">
         <div className="db-kpi"><span>Sessions</span><b>{data.runs.length}</b></div>
         <div className="db-kpi"><span>Pages per session</span><b>{pagesPer.length ? (pagesPer.reduce((a, b) => a + b, 0) / pagesPer.length).toFixed(1) : '–'}</b></div>

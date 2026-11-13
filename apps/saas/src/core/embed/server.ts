@@ -159,7 +159,6 @@ async function ensureSession(create: boolean): Promise<Session | null> {
   saveSession(await auth('signup', { data: {} }))
   return session
 }
-export const hasSession = () => !!session || hinted
 
 export class ServerError extends Error {}
 /** Calls a database function as this browser's reviewer (or anonymously, for the installation check). */

@@ -10,7 +10,7 @@ import { liveOf, setLiveOn } from '../../saas/widget'
 import { cloud } from '../../saas/supabase'
 import { listStudies, projectStats, type StudyRow } from '../../saas/cloud'
 import { statsOf, type Stats } from '../../saas/stats'
-import { AnonWarning, ago, openDemo, usePanel, useThreads } from './Panel'
+import { AnonWarning, ago, openDemo, openMySite, usePanel, useThreads } from './Panel'
 
 /**
  * The project's dashboard: is the widget on, what has come in, from where, and what to do next.
@@ -57,7 +57,7 @@ export function Dashboard() {
   }
   const total = st ? st.open + st.ongoing + st.completed : 0
   const steps = [
-    { done: !!live, label: 'Publish your widget settings', to: '/app/widget' },
+    { done: !!live, label: 'Put your widget settings on your site', to: '/app/widget' },
     { done: !!project.copiedSnippet, label: 'Copy your snippet into your site', to: '/app/install' },
     { done: !!st?.sites.length, label: 'See the script running on a site', to: '/app/install' },
     { done: cloud ? (st?.reviewers ?? 0) > 0 : total > 0, label: cloud ? 'Invite a reviewer' : 'Leave the first comment', to: cloud ? '/app/team' : '/app/install' },
@@ -83,10 +83,11 @@ export function Dashboard() {
       <section className={`up-card db-status ${on ? 'on' : 'off'}`}>
         <Power size={18} />
         <div className="lp-grow">
-          <b>{!live ? 'Not published yet' : on ? 'Widget on' : 'Widget off'}</b>
-          <small>{!live ? 'Publish the widget settings to control it from here.' : on ? `Live v${live.version} · ${live.config.audience === 'everyone' ? 'everyone visiting' : 'reviewers only'} · ${live.config.envs.filter((e) => e.on).length} environment${live.config.envs.filter((e) => e.on).length === 1 ? '' : 's'} on` : 'Hidden on every site. Comments are kept.'}</small>
+          <b>{!live ? 'Not on your site yet' : on ? 'Widget on' : 'Widget off'}</b>
+          <small>{!live ? 'Press Update site in Widget to control it from here.' : on ? `${live.config.audience === 'everyone' ? 'everyone visiting' : 'reviewers only'} · ${live.config.envs.filter((e) => e.on).length} environment${live.config.envs.filter((e) => e.on).length === 1 ? '' : 's'} on` : 'Hidden on every site. Comments are kept.'}</small>
         </div>
         {live && <Switch checked={on} onChange={() => (on ? setConfirmOff(true) : toggle(true))} label={on ? 'Turn the widget off' : 'Turn the widget on'} />}
+        {live && project.siteUrl && <button className="lp-btn sm" onClick={() => openMySite(project, toast)}>Open my site <ExternalLink size={12} /></button>}
         <Link to="/app/widget" className="lp-btn sm">Settings</Link>
       </section>
 

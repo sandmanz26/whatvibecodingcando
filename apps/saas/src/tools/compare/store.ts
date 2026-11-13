@@ -47,7 +47,6 @@ export interface Review {
   round?: number
 }
 export const statusOf = (r: Review) => (r.status === 'done' && r.decision ? 'done' : 'pending')
-export const pendingCount = (list = loadReviews()) => list.filter((r) => statusOf(r) === 'pending').length
 export const COMPARE_CHANGED = `${APP}:compare`
 /** Opens the compare panel from anywhere: the list, a new comparison, or one review. */
 export const COMPARE_OPEN = `${APP}:compare-open`

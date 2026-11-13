@@ -12,7 +12,8 @@ import { cloud } from '../../saas/supabase'
 
 /**
  * Widget: what the script shows on a project's sites, built here and published. Edits are a draft
- * (seen only in previews) until Publish; every publish is a numbered release that can be rolled back.
+ * (seen only in previews) until Update site; every update is kept in History and can be restored.
+ * Release numbers stay internal (the server orders by them); the owner sees times, not numbers.
  * The snippet on the site never changes.
  */
 export function WidgetBuilder() {
@@ -37,15 +38,15 @@ export function WidgetBuilder() {
   return (
     <div className="up-page">
       <div className="up-head">
-        <div><h1>Widget</h1><p>What the script shows on your sites, to whom and where. Changes are a draft until you publish; your snippet never changes.</p></div>
-        <span className={`wb-live ${live ? '' : 'none'}`}>{live ? <>Live: <b>v{live.version}</b> · {ago(live.at)}</> : 'Not published yet'}</span>
+        <div><h1>Widget</h1><p>What the script shows on your site, to whom and where. Edit freely: your site changes only when you press <b>Update site</b>. Your snippet never changes.</p></div>
+        <span className={`wb-live ${live ? '' : 'none'}`}>{live ? <>Site updated {ago(live.at)}</> : 'Not on your site yet'}</span>
       </div>
 
       <div className={`wb-bar ${dirty ? 'dirty' : ''}`} role="status">
-        {dirty ? <span><b>{live ? 'Unpublished changes.' : 'Not published yet.'}</b> {live ? `Your sites still show v${live.version}.` : 'Your sites use the old snippet options until you publish.'}</span> : <span>Your sites show these settings (v{live!.version}).</span>}
+        {dirty ? <span><b>{live ? 'You have changes that aren’t on your site yet.' : 'Not on your site yet.'}</b> {live ? 'Your site keeps the previous settings until you update it.' : 'Press Update site to put these settings on your site.'}</span> : <span>Your site is up to date with these settings.</span>}
         <span className="lp-grow" />
         {dirty && live && <button className="lp-btn sm ghost" onClick={() => setConfirm('discard')}>Discard changes</button>}
-        <button className="lp-btn sm primary" disabled={!dirty} onClick={() => setConfirm('publish')}><Rocket size={13} /> Publish v{(live?.version ?? 0) + 1}</button>
+        <button className="lp-btn sm primary" disabled={!dirty} onClick={() => setConfirm('publish')}><Rocket size={13} /> Update site</button>
       </div>
       <AnonWarning />
 
@@ -53,7 +54,7 @@ export function WidgetBuilder() {
         <div className="wb-form">
           <section className="up-card">
             <div className="up-row"><h2 className="lp-grow">Widget on</h2><Switch checked={draft.on} onChange={() => edit((c) => ({ ...c, on: !c.on }))} label="Widget on" /></div>
-            <p className="up-muted">The project’s off switch. Publishing it off hides the widget on every site at once, without touching your code.</p>
+            <p className="up-muted">The project’s off switch. Turning it off and updating your site hides the widget on every site at once, without touching your code.</p>
           </section>
 
           <section className="up-card">
@@ -82,7 +83,7 @@ export function WidgetBuilder() {
           {project.products.includes('versions') && (
             <section className="up-card">
               <h2>Version</h2>
-              <p className="up-muted">Your site’s current version. Comments made after you publish carry it, so feedback stays with the release it was about. Change it, and publish, when you deploy a new one.</p>
+              <p className="up-muted">Your site’s current version. Comments made after you update your site carry it, so feedback stays with the release it was about. Change it, and update your site, when you deploy a new one.</p>
               <input className="up-search" value={draft.version ?? ''} maxLength={20} placeholder="e.g. 1.4 or 2026-11-13" aria-label="Current version"
                 onChange={(e) => { const v = e.target.value.replace(/[^\w. -]/g, '').slice(0, 20); edit((c) => { const { version: _drop, ...rest } = c; void _drop; return v.trim() ? { ...rest, version: v } : rest }) }} />
             </section>
@@ -103,7 +104,7 @@ export function WidgetBuilder() {
                 </div>
               )
             })}
-            <p className="up-muted">Inspect, Design system check, Design tokens and Heatmap show as buttons beside Comments, for reviewers only. Usability tests, 5-second tests, heatmap visits and fake doors run for study participants who agreed (Research). Turning one on or off here also changes it in Products; publish to apply.</p>
+            <p className="up-muted">Inspect, Design system check, Design tokens and Heatmap show as buttons beside Comments, for reviewers only. Usability tests, 5-second tests, heatmap visits and fake doors run for study participants who agreed (Research). Turning one on or off here also changes it in Products; press Update site to apply.</p>
           </section>
 
           <section className="up-card">
@@ -147,33 +148,33 @@ export function WidgetBuilder() {
 
         <div className="wb-side">
           <Preview projectId={project.id} siteUrl={project.siteUrl} />
-          {warnings.length > 0 && <section className="up-card"><h2>Before you publish</h2><ul className="wb-warn">{warnings.map((w) => <li key={w}><TriangleAlert size={13} /> {w}</li>)}</ul></section>}
+          {warnings.length > 0 && <section className="up-card"><h2>Before you update your site</h2><ul className="wb-warn">{warnings.map((w) => <li key={w}><TriangleAlert size={13} /> {w}</li>)}</ul></section>}
         </div>
       </div>
 
       {confirm === 'publish' && (
-        <Modal title={`Publish v${(live?.version ?? 0) + 1}?`} description="Every site with your snippet follows these settings the next time a page loads. You can roll back to any earlier version." onClose={() => setConfirm(null)}
+        <Modal title="Update your site?" description="Every page with your snippet follows these settings the next time it loads (within a few minutes). The previous settings stay in History, so you can restore them." onClose={() => setConfirm(null)}
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Cancel</button><button className="btn primary" onClick={() => {
-            if (setProject((p) => publish(p, by))) toast(`Published v${(live?.version ?? 0) + 1}`)
-            else toast('Not published: this browser’s storage is full or blocked.', 'error')
+            if (setProject((p) => publish(p, by))) toast('Site updated')
+            else toast('Not saved: this browser’s storage is full or blocked.', 'error')
             setConfirm(null)
-          }}>Publish</button></>}>
+          }}>Update site</button></>}>
           {warnings.length > 0 && <ul className="wb-warn">{warnings.map((w) => <li key={w}><TriangleAlert size={13} /> {w}</li>)}</ul>}
         </Modal>
       )}
       {confirm === 'discard' && live && (
-        <Modal title="Discard your changes?" description={`The draft goes back to what is live (v${live.version}).`} onClose={() => setConfirm(null)}
+        <Modal title="Discard your changes?" description="Your edits go back to what your site shows now." onClose={() => setConfirm(null)}
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Keep editing</button><button className="btn primary" onClick={() => { setProject((p) => ({ ...p, config: live.config })); setConfirm(null); toast('Changes discarded') }}>Discard</button></>} />
       )}
       {confirm && typeof confirm === 'object' && (() => {
         const r = (project.releases ?? []).find((x) => x.version === confirm.rollback)
         if (!r) return null
         return (
-          <Modal title={`Roll back to v${r.version}?`} description={`Its settings are published again as v${(live?.version ?? 0) + 1}, and become your draft. Nothing is deleted from the history.`} onClose={() => setConfirm(null)}
+          <Modal title="Restore these settings?" description={`Your site goes back to the settings from ${ago(r.at)}, and they become what you edit. Nothing is deleted from History.`} onClose={() => setConfirm(null)}
             footer={<><button className="btn" onClick={() => setConfirm(null)}>Cancel</button><button className="btn primary" onClick={() => {
-              if (setProject((p) => publish(p, by, r.config))) toast(`Rolled back: v${r.version} is live again as v${(live?.version ?? 0) + 1}`)
+              if (setProject((p) => publish(p, by, r.config))) toast('Restored: your site uses those settings again')
               setConfirm(null)
-            }}>Roll back</button></>} />
+            }}>Restore</button></>} />
         )
       })()}
     </div>
@@ -219,7 +220,7 @@ function Website({ envs, onChange }: { envs: Env[]; onChange: (e: Env[], siteUrl
       </form>
       {!local && host && <label className="up-check"><input type="checkbox" checked={sub} onChange={(e) => setSub(e.target.checked)} /> Also its subdomains: <code>{apex}</code>, <code>www.{apex}</code>, <code>blog.{apex}</code>…</label>}
       {tried && problem && <p className="lp-error">{problem}</p>}
-      {dirty && !problem && main && <p className="up-hint">Not saved yet: press Save, then publish.</p>}
+      {dirty && !problem && main && <p className="up-hint">Not saved yet: press Save, then Update site.</p>}
       <details className="wb-more" open={envs.length > 1}>
         <summary>Staging or preview addresses (optional)</summary>
         {main ? <Environments envs={envs.slice(1)} onChange={(rest) => onChange([envs[0], ...rest])} bare /> : <p className="up-muted">Set your website first.</p>}
@@ -273,8 +274,8 @@ function Releases({ releases, live, onRollback }: { releases: { version: number;
       <ul className="wb-releases">
         {[...releases].reverse().slice(0, 10).map((r) => (
           <li key={r.version}>
-            <b>v{r.version}</b><span className="lp-grow up-muted">{ago(r.at)} · {r.by}</span>
-            {r.version === live ? <span className="up-badge">Live</span> : <button className="lp-btn sm ghost" onClick={() => onRollback(r.version)}><RotateCcw size={12} /> Roll back</button>}
+            <b>{new Date(r.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</b><span className="lp-grow up-muted">{ago(r.at)} · {r.by}</span>
+            {r.version === live ? <span className="up-badge">On your site</span> : <button className="lp-btn sm ghost" onClick={() => onRollback(r.version)}><RotateCcw size={12} /> Restore</button>}
           </li>
         ))}
       </ul>
@@ -308,9 +309,9 @@ function Preview({ projectId, siteUrl }: { projectId: string; siteUrl: string })
           ? <button className="lp-btn sm ghost" onClick={() => open(siteUrl)}>Preview on your site <ExternalLink size={12} /></button>
           : <button className="lp-btn sm ghost" onClick={() => openDemo(projectId, toast)}>Open as a reviewer <ExternalLink size={12} /></button>}
       </div>
-      <p className="up-muted">The preview shows your draft only to you{cloud ? '' : ', in this browser'}. Visitors keep the published version.</p>
+      <p className="up-muted">The preview shows your draft only to you{cloud ? '' : ', in this browser'}. Visitors keep what your site shows now.</p>
       {siteUrl && !cloud && <p className="up-note">Previewing on <code>{siteUrl.replace(/^https?:\/\//, '')}</code> itself needs the server: review links are checked by it. Until then they work on the demo site only.</p>}
-      {cloud && <p className="up-note">On your own site the preview needs the snippet installed and an environment switched on in Where. Publish first if this is your first version.</p>}
+      {cloud && <p className="up-note">On your own site the preview needs the snippet installed and an environment switched on in Where. Press Update site first if your site has no settings yet.</p>}
     </section>
   )
 }

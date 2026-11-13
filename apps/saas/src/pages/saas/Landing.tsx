@@ -42,6 +42,7 @@ export default function Landing() {
             <button onClick={() => jump('products')}>Products</button>
             <button onClick={() => jump('how')}>How it works</button>
             <button onClick={() => jump('pricing')}>Pricing</button>
+            <Link to="/guide">Guide</Link>
             <a href={demoUrl()} target="_blank" rel="noopener">Live demo</a>
           </nav>
           <span className="lp-grow" />
@@ -55,7 +56,7 @@ export default function Landing() {
         <div className="lp-hero-copy">
           <span className="lp-eyebrow"><Sparkles size={13} /> Free during the beta</span>
           <h1>Review what you vibe-coded, <em>together</em>, on the real thing.</h1>
-          <p>One script tag adds comments, usability research and design checks to any site you build, with Claude or by hand. Pick only the tools you need.</p>
+          <p>One script tag adds comments, usability research and design checks to any site you build, with an AI coding tool or by hand. Pick only the tools you need.</p>
           <div className="lp-row">
             <button className="lp-btn primary lg" onClick={() => jump('products')}>Pick your tools <ArrowRight size={16} /></button>
             <a className="lp-btn lg" href={demoUrl()} target="_blank" rel="noopener">See it on a demo site <ExternalLink size={15} /></a>
@@ -145,7 +146,7 @@ export default function Landing() {
           <div className="lp-head"><h2>Three steps, no rebuild</h2><p>Nothing to change in your code beyond one line.</p></div>
           <ol className="lp-steps">
             <li><b>1</b><h3>Pick</h3><p>Choose the tools for your project. You can change them any time in your panel.</p></li>
-            <li><b>2</b><h3>Paste one line</h3><p>Copy your snippet into your site’s HTML, or ask Claude to add it for you.</p><code>&lt;script src=".../vibe.js" data-project="my-app" defer&gt;&lt;/script&gt;</code></li>
+            <li><b>2</b><h3>Paste one line</h3><p>Copy your snippet into your site’s HTML, or ask your AI coding assistant to add it for you.</p><code>&lt;script src=".../vibe.js" data-project="my-app" defer&gt;&lt;/script&gt;</code></li>
             <li><b>3</b><h3>Review together</h3><p>Your team comments on the real screens, replies, and marks things done. Everything shows up in your panel.</p></li>
           </ol>
         </div>
@@ -198,6 +199,7 @@ export default function Landing() {
         <a href={demoUrl()} target="_blank" rel="noopener">Demo site</a>
         <Link to="/console/prompts">Prompts</Link>
         <Link to="/app">Your panel</Link>
+        <Link to="/guide">User guide</Link>
         <Link to="/privacy">Privacy</Link>
         <Link to="/terms">Terms</Link>
       </footer>

@@ -1,10 +1,4 @@
-import { layoutOf, type ClickEvent, type InsightEvent, type Layout, type ViewEvent } from './store'
-
-export interface Filters {
-  days: number | 'all'
-  page: string
-  layout: Layout | 'all'
-}
+import { type ClickEvent, type InsightEvent, type ViewEvent } from './store'
 
 const median = (a: number[]) => {
   if (!a.length) return 0
@@ -13,12 +7,6 @@ const median = (a: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
 }
 
-export function applyFilters(events: InsightEvent[], f: Filters, now = Date.now()) {
-  return events.filter((e) =>
-    (f.days === 'all' || now - new Date(e.t).getTime() <= f.days * 86_400_000) &&
-    (f.page === 'all' || e.page === f.page) &&
-    (f.layout === 'all' || layoutOf(e.vw) === f.layout))
-}
 
 /** Plain-language position of a tap: which third of the screen, across and down the page. */
 export function zoneOf(x: number, y: number, docH: number) {

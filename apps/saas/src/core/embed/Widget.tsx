@@ -3,6 +3,7 @@ import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil,
 import { audioUrl, uploadAudio } from './server'
 import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
 import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
+import { takeHint } from './hints'
 
 export interface Config {
   project: string
@@ -62,11 +63,8 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const [panel, setPanel] = useState(false)
   // The panel can open a tool on arrival (#vibe_tool=heatmap); the hint leaves the address at once.
   const [tool, setTool] = useState<ToolId | null>(() => {
-    const m = /(?:^#|&)vibe_tool=([a-z]+)/.exec(window.location.hash)
-    if (!m) return null
-    const rest = window.location.hash.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_tool=')).join('&')
-    try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
-    return config.tools.includes(m[1] as ToolId) ? (m[1] as ToolId) : null
+    const t = takeHint('tool', '[a-z]+')
+    return t && config.tools.includes(t as ToolId) ? (t as ToolId) : null
   })
   const [name, setNameState] = useState(readName)
   const [toast, setToast] = useState<{ text: string; error?: boolean } | null>(null)

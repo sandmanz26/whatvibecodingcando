@@ -11,6 +11,7 @@ import { drawHeat, LEGEND } from '../heat'
 import * as server from './server'
 import { deviceOf, prepare, type Device, type RawPt } from './heatmath'
 import { pageOf } from './research'
+import { takeHint } from './hints'
 
 export type ToolId = 'inspect' | 'dscheck' | 'tokens' | 'heatmap'
 export const TOOL_IDS: ToolId[] = ['inspect', 'dscheck', 'tokens', 'heatmap']
@@ -279,11 +280,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
   const [opacity, setOpacity] = useState(0.75)
   const [kind, setKind] = useState<'click' | 'gaze'>(() => {
     // The panel's "Gaze heatmap" opens it on where people looked (#vibe_heat=gaze); the hint leaves the address.
-    const h = window.location.hash
-    if (!/(?:^#|&)vibe_heat=gaze/.test(h)) return 'click'
-    const rest = h.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_heat=')).join('&')
-    try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
-    return 'gaze'
+    return takeHint('heat', 'gaze') ? 'gaze' : 'click'
   })
   const [page, setPage] = useState(pageOf(window.location.pathname))
   const [device, setDevice] = useState<Device>(deviceOf(window.innerWidth))

@@ -118,15 +118,22 @@ export default function Onboarding() {
           {step === 1 && (
             <>
               <h1>Your first project</h1>
-              <p className="lp-muted">A project is one site or app. Comments and settings belong to it.</p>
+              <p className="lp-muted">A project is one website or app you want feedback on. Its comments, studies and settings stay together. You can add more projects later.</p>
               <label className="lp-field">Project name
                 <input autoFocus value={project} onChange={(e) => setProject(e.target.value)} maxLength={60} placeholder="e.g. Shop website" aria-invalid={tried && !projectOk} />
-                {tried && !projectOk ? <span className="lp-error">Give the project a name with letters or digits.</span> : project && <span className="lp-hint">Project id: <code>{freeId(project, taken)}</code> (used in your snippet)</span>}
+                {tried && !projectOk ? <span className="lp-error">Give the project a name with letters or digits.</span>
+                  : <span className="lp-hint">Only you and your team see the name.{project && <> Its id, <code>{freeId(project, taken)}</code>, goes into your snippet.</>}</span>}
               </label>
-              <label className="lp-field">Site address <span className="lp-muted">(optional)</span>
-                <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. shop.example.com" inputMode="url" aria-invalid={!siteOk} />
-                {!siteOk ? <span className="lp-error">That doesn’t look like a web address.</span> : <span className="lp-hint">Used for “open on site” links and as the first allowed domain.</span>}
+              <label className="lp-field">Where is the site online? <span className="lp-muted">(optional)</span>
+                <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. shop.example.com" inputMode="url" autoComplete="url" aria-invalid={!siteOk} aria-describedby="site-help" />
+                {!siteOk ? <span className="lp-error">Type an address like <code>shop.example.com</code> or <code>https://my-app.vercel.app</code>.</span>
+                  : originOf(site) ? <span className="lp-hint" id="site-help">The widget will show on <code>{new URL(originOf(site)!).host}</code>. Comments get an “open on site” link to the right page.</span>
+                    : <span className="lp-hint" id="site-help">The address people open in their browser, with or without <code>https://</code>. The widget only shows on addresses you list, so other sites can’t use your snippet.</span>}
               </label>
+              <ul className="lp-hint lp-hintlist">
+                <li>Not online yet? Leave it empty: you can still try everything on our demo site, and add the address later in <b>Widget → Website</b>.</li>
+                <li>Staging, preview or <code>localhost</code> addresses are added there too.</li>
+              </ul>
             </>
           )}
           {step === 2 && (
@@ -143,7 +150,7 @@ export default function Onboarding() {
             </>
           )}
           {error && <p className="lp-error" role="alert">{error}</p>}
-          {failed && isOnboarded(state) && <p className="lp-hint">Your project was created. <button type="button" className="up-linkbtn" onClick={() => nav('/app/widget', { replace: true })}>Open your panel</button> and publish the widget from Widget.</p>}
+          {failed && isOnboarded(state) && <p className="lp-hint">Your project was created. <button type="button" className="up-linkbtn" onClick={() => nav('/app/widget', { replace: true })}>Open your panel</button> and press Update site in Widget.</p>}
           <div className="lp-row lp-form-foot">
             {step > 0 && <button type="button" className="lp-btn" onClick={() => setStep(step - 1)}><ArrowLeft size={15} /> Back</button>}
             <span className="lp-grow" />

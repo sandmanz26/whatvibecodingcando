@@ -163,8 +163,6 @@ export const idSuffix = () => Array.from(crypto.getRandomValues(new Uint8Array(3
 /* ---------- comments, reviewers and the installation check (panel side) ---------- */
 
 
-/** The project's database id, by its public id (null when it isn't on the server). */
-export const projectDbId = (publicId: string) => dbIds.get(publicId) ?? null
 
 interface ThreadRow {
   id: string; page: string; anchor: Thread['anchor']; author_name: string; text: string; created_at: string; edited_at: string | null
@@ -369,6 +367,8 @@ export async function studyResults(id: string): Promise<{ runs: RunRow[]; events
   return { runs: runs as RunRow[], events }
 }
 export async function deleteRun(id: string) { const { error } = await supabase!.from('runs').delete().eq('id', id); if (error) throw error }
+/** Clears a study's results (every participant's run, with their clicks, gaze and answers, so its heatmap too); the study and its link stay. */
+export async function clearStudyResults(id: string) { const { error } = await supabase!.from('runs').delete().eq('study_id', id); if (error) throw error }
 
 /** Every participant's run in the project (the latest 300), with their events (the latest 20,000): session insights. */
 export async function projectSessions(publicId: string): Promise<{ runs: (RunRow & { study_id: string })[]; events: EventRow[] }> {

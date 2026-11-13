@@ -41,7 +41,7 @@ export const PRODUCTS: Product[] = [
   { id: 'versions', name: 'Versions', tagline: 'Switch the product between releases and see what each one added; feedback stays with its version.', points: ['What changed, outlined', 'Comments per version', 'Compare releases'], category: 'Feedback', status: 'script', demo: 'embed-demo.html', icon: GitBranch, hue: '#2b8a3e' },
   { id: 'narration', name: 'Narration', tagline: 'Walk through the product talking; each screen becomes a chapter.', points: ['Voice per screen', 'Play from the screen', 'Audio stays local'], category: 'Feedback', status: 'script', demo: 'embed-demo.html', icon: Mic, hue: '#d6336c' },
   { id: 'report', name: 'Reports & insights', tagline: 'Turn all the research into ranked findings you can keep.', points: ['Generated report', 'Insight repository', 'Evidence links'], category: 'Reporting', status: 'panel', demo: '#/app/report', icon: FileText, hue: '#495057' },
-  { id: 'prompts', name: 'Prompts for Claude', tagline: 'Build any of these tools into your own codebase with Claude.', points: ['One prompt per tool', 'Fits your framework', 'Free'], category: 'Reporting', status: 'panel', demo: '#/app/prompts', icon: Sparkles, hue: '#e67700' },
+  { id: 'prompts', name: 'Build-it prompts', tagline: 'Build any of these tools into your own codebase with your AI coding assistant.', points: ['One prompt per tool', 'Fits your framework', 'Free'], category: 'Reporting', status: 'panel', demo: '#/app/prompts', icon: Sparkles, hue: '#e67700' },
 ]
 
 export const CATEGORIES: Category[] = ['Feedback', 'Research', 'Design', 'Reporting']

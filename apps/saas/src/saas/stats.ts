@@ -76,15 +76,14 @@ export function decodeLocalShare(token: string): SharedList | null {
 export const toShared = (t: Thread): SharedThread => ({ page: t.page, kind: t.kind ?? 'comment', version: t.version ?? null, author: t.author, text: t.text, createdAt: t.createdAt, editedAt: t.editedAt ?? null, resolved: t.resolved ?? null, replies: t.replies.map((r) => ({ author: r.author, text: r.text, at: r.at })) })
 export const keepFor = (filter: SharedList['filter']) => (t: { resolved?: unknown }) => filter === 'all' || (filter === 'open' ? !t.resolved : !!t.resolved)
 
-/** The list as CSV (for a spreadsheet). */
-export function threadsCsv(rows: SharedThread[]): string {
-  // Comments come from reviewers: a cell starting with = + - @ (or a tab/return) would run as a
-  // formula in Excel or Sheets, so it gets a leading apostrophe and stays text.
+/** Rows as CSV. Cells that would run as a spreadsheet formula (= + - @, tab, return) stay text. */
+export function toCsv(head: string[], rows: (string | number | boolean | null | undefined)[][]): string {
   const esc = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`
-  const lines = [['page', 'kind', 'version', 'status', 'author', 'comment', 'created', 'replies'].join(',')]
-  for (const t of rows) lines.push([t.page, t.kind ?? 'comment', t.version ?? '', t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')].map((v) => esc(String(v))).join(','))
-  return lines.join('\n')
+  return [head.join(','), ...rows.map((r) => r.map((v) => esc(v == null ? '' : String(v))).join(','))].join('\n')
 }
+/** The comment list as CSV (for a spreadsheet). */
+export const threadsCsv = (rows: SharedThread[]) => toCsv(['page', 'kind', 'version', 'status', 'author', 'comment', 'created', 'replies'],
+  rows.map((t) => [t.page, t.kind ?? 'comment', t.version ?? '', t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')]))
 export function download(name: string, text: string, type = 'text/csv') {
   const url = URL.createObjectURL(new Blob([text], { type }))
   Object.assign(document.createElement('a'), { href: url, download: name }).click()

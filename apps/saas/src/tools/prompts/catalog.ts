@@ -1,19 +1,17 @@
 /**
- * Prompts a visitor can copy into their own Claude (Claude Code in their project, or claude.ai)
- * to build the research tools shown in this demo. Each prompt has two forms:
- * - with the ux-research-kit skill installed: short, the skill carries the details;
- * - without it: self-contained, with the behaviour, states and privacy rules spelled out,
- *   so Claude builds the same logic rather than guessing.
+ * Prompts a visitor can copy into their own AI coding assistant, opened in their project, to build
+ * the research tools shown in this demo. Each prompt is self-contained: the behaviour, states and
+ * privacy rules are spelled out, so the assistant builds the same logic rather than guessing.
  */
 
 export type Framework = 'react' | 'next' | 'vue' | 'svelte' | 'plain' | 'unsure'
 export type Routing = 'hash' | 'history' | 'unsure'
-export interface PromptContext { framework: Framework; routing: Routing; skill: boolean }
+export interface PromptContext { framework: Framework; routing: Routing }
 
 export const FRAMEWORKS: Record<Framework, string> = {
-  react: 'React (Vite)', next: 'Next.js', vue: 'Vue', svelte: 'Svelte / SvelteKit', plain: 'Plain HTML + JS', unsure: 'Not sure — let Claude check',
+  react: 'React (Vite)', next: 'Next.js', vue: 'Vue', svelte: 'Svelte / SvelteKit', plain: 'Plain HTML + JS', unsure: 'Not sure: let the assistant check',
 }
-export const ROUTINGS: Record<Routing, string> = { hash: 'Hash URLs (#/page)', history: 'Normal URLs (/page)', unsure: 'Not sure — let Claude check' }
+export const ROUTINGS: Record<Routing, string> = { hash: 'Hash URLs (#/page)', history: 'Normal URLs (/page)', unsure: 'Not sure: let the assistant check' }
 
 const stack = (c: PromptContext) => {
   const fw = c.framework === 'unsure' ? 'Find out which framework this project uses.' : `The app uses ${FRAMEWORKS[c.framework]}.`
@@ -43,8 +41,6 @@ export interface PromptEntry {
   group: 'Research' | 'Feedback' | 'Design' | 'Reporting' | 'Everything'
   summary: string
   needs: string[]
-  /** short ask when the ux-research-kit skill is installed */
-  skill: string
   /** the behaviour to build, spelled out */
   spec: string
 }
@@ -54,7 +50,6 @@ export const PROMPTS: PromptEntry[] = [
     id: 'sessions', title: 'Click tracking & sessions', group: 'Research',
     summary: 'Records screen views and taps per session, and replays each tap on the real screen.',
     needs: ['Frontend only'],
-    skill: 'Add click tracking with sessions and tap replay.',
     spec: `Build click tracking with sessions and a replay view.
 
 Record:
@@ -77,7 +72,6 @@ Research console screen "Sessions":
     id: 'heatmap', title: 'Heatmaps', group: 'Research',
     summary: 'Tap dots and per-element boxes drawn on the real screen, filtered by page and layout.',
     needs: ['Click tracking', 'Frontend only'],
-    skill: 'Add tap heatmaps (dots and per-element counts) with a screen viewer in the research console.',
     spec: `Build tap heatmaps on top of the click data (build click tracking first if it doesn't exist).
 
 - An overlay activated by ?heatmap (dots) or ?heatmap=elements on any screen URL.
@@ -90,7 +84,6 @@ Research console screen "Sessions":
     id: 'usability', title: 'Usability tests', group: 'Research',
     summary: 'Timed tasks for participants, with success, time, first-tap and a task heatmap.',
     needs: ['Frontend only'],
-    skill: 'Add timed, task-based usability tests with a participant link and results.',
     spec: `Build task-based usability tests.
 
 - A test is a name, an intro, and tasks. Each task has a prompt, a start page, a time limit, and a success rule: reach a page (a trailing * accepts sub-pages), or tap an element picked on the real screen.
@@ -103,7 +96,6 @@ Research console screen "Sessions":
     id: 'fivesec', title: '5-second test', group: 'Research',
     summary: 'Shows a screen for five seconds and records the first click and how fast.',
     needs: ['Frontend only'],
-    skill: 'Add 5-second (first-click) tests with a participant link and results.',
     spec: `Build 5-second (first-click) tests.
 
 - A test is a name, a question, a screen, a duration (3–15 s), and an optional "right answer" element picked on the real screen.
@@ -115,7 +107,6 @@ Research console screen "Sessions":
     id: 'doors', title: 'Fake doors', group: 'Research',
     summary: 'A button for something not built yet; counts who saw it and who tried it.',
     needs: ['Frontend only'],
-    skill: 'Add fake-door tests with a research console screen for their numbers.',
     spec: `Build fake-door tests.
 
 - A door is either an existing element (picked on the real screen) or a new button added after one. The new button copies its neighbour's classes so it looks native, and is put back if the framework re-renders.
@@ -127,7 +118,6 @@ Research console screen "Sessions":
     id: 'gaze', title: 'Eye tracking (webcam)', group: 'Research',
     summary: 'Webcam eye tracking per usability task: fixations, scanpaths and areas of interest.',
     needs: ['Camera', '@mediapipe/tasks-vision (Apache-2.0)'],
-    skill: 'Add webcam eye tracking with calibration, an accuracy check and a gaze heatmap.',
     spec: `Build webcam eye tracking with MediaPipe Face Landmarker (@mediapipe/tasks-vision, Apache-2.0, runs in the browser). Don't use WebGazer (GPL-3.0).
 
 - Consent first, in plain language: video stays in the browser and is never saved or sent; only the estimated point on the page is kept; stop any time. The camera starts only after "Turn on the camera".
@@ -148,7 +138,6 @@ Research console screen "Sessions":
     id: 'comments', title: 'Comments with replies & voice notes', group: 'Feedback',
     summary: 'Reviewers drop comments anywhere, write or record, reply, and set them as completed.',
     needs: ['Microphone for voice notes', 'Frontend only'],
-    skill: 'Add on-screen comments with a draft → post flow, replies, voice notes, completion and status filters.',
     spec: `Build on-screen comments for reviewers. Work out the states first; the flow must follow them.
 
 1. Placing: a "Comment" button (and the C key, ignored inside fields) turns on a crosshair; one click anywhere drops a pin there (not tied to an element). Esc cancels.
@@ -170,7 +159,6 @@ Research console screen "Sessions":
     id: 'compare', title: 'Component review (A vs B)', group: 'Feedback',
     summary: 'Pick two components from the real screens, compare their rendered styles side by side, and keep notes.',
     needs: ['Frontend only'],
-    skill: 'Add a component review: pick two components from the real screens, compare their rendered styles side by side, and keep notes about A, B or both.',
     spec: `Build a component review screen in the research console. Work out the states first; the flow must follow them.
 
 1. New review (a draft, NOT saved yet): two slots, A and B, and an optional title. Each slot has "Pick component".
@@ -187,7 +175,6 @@ Research console screen "Sessions":
     id: 'narration', title: 'Narrated walkthroughs', group: 'Feedback',
     summary: 'Explain screens out loud while browsing; each screen becomes a playable chapter.',
     needs: ['Microphone', 'Frontend only'],
-    skill: 'Add narrated walkthroughs: record my voice while I go through the screens, chaptered per screen.',
     spec: `Build narrated walkthroughs.
 
 - A microphone button (in the research tools' floating controls) starts recording with MediaRecorder. A bar at the top shows elapsed time, a level meter, the current screen and Stop. Warn before the page is closed while recording.
@@ -204,7 +191,6 @@ Research console screen "Sessions":
     id: 'design-tokens', title: 'Design tokens & UI-library looks', group: 'Design',
     summary: 'Edit tokens as JSON, upload token files and compare two sets side by side, or try a Material / Ant / shadcn / Bootstrap look.',
     needs: ['Frontend only'],
-    skill: 'Add a design-token simulator with live preview and Material 3 / Ant Design / shadcn/ui / Bootstrap 5 looks.',
     spec: `Build a design-token simulator in the research console.
 
 - Read the app's own tokens from its stylesheets (the :root block for light, the dark-mode block for dark) into W3C design-token JSON: a token is an object with $value, its name (the last key) is the CSS variable it sets, and top-level keys "light" and "dark" say where it applies.
@@ -224,7 +210,6 @@ Research console screen "Sessions":
     id: 'ds-check', title: 'Design system check', group: 'Design',
     summary: 'Scans every screen for colours, radii, fonts and sizes that aren’t design tokens.',
     needs: ['Frontend only'],
-    skill: 'Add a design system check that scans each screen for off-token colours, radii, fonts and font sizes.',
     spec: `Build a design system check in the research console.
 
 - Open each chosen screen in a hidden same-origin iframe (off-screen, not visibility:hidden, so styles compute), wait for it to render and for fonts, then walk every visible element and read its computed styles.
@@ -242,7 +227,6 @@ Research console screen "Sessions":
     id: 'report', title: 'Research report', group: 'Reporting',
     summary: 'A one-page summary of all research data, with findings ranked by impact and evidence.',
     needs: ['Other research tools'],
-    skill: 'Add a research report that summarises all the research data into ranked findings with evidence.',
     spec: `Build a one-page research report generated from the research tools' data. Use fixed rules, not an AI model, so the same data always gives the same report and every finding says what it rests on.
 
 - Sections:
@@ -269,7 +253,6 @@ Research console screen "Sessions":
     id: 'repo', title: 'Insight repository', group: 'Reporting',
     summary: 'Keep findings, tag them, track what happens to them, and jump to the screen.',
     needs: ['Frontend only'],
-    skill: 'Add an insight repository for kept findings, with tags, status, search and links to the screen.',
     spec: `Build an insight repository in the research console.
 
 - An insight: title, what it means, evidence, source (report, design check, usability test, … or added by hand), impact (high/medium/low), status (New, Being worked on, Done, Won't act), tags, and optionally the screen and element it's about.
@@ -280,7 +263,6 @@ Research console screen "Sessions":
     id: 'everything', title: 'The whole research console', group: 'Everything',
     summary: 'All of the above, separate from your product, with a floating research dock.',
     needs: ['Camera & microphone for some tools'],
-    skill: 'Set up the whole research console: click tracking and sessions, heatmaps, usability tests, 5-second tests, fake doors, eye tracking, comments with voice, component review, narration, design tokens, design system check, research report and insight repository.',
     spec: `Set up a full UX research console around this app.
 
 - The tools: click tracking with sessions and replay, heatmaps, usability tests, 5-second tests, fake doors, webcam eye tracking, comments with a draft → post flow and voice notes, a component review (A vs B with notes), narrated walkthroughs, a design-token simulator with UI-library looks, a design system check, a research report and an insight repository.
@@ -291,19 +273,8 @@ Research console screen "Sessions":
   },
 ]
 
-export const SKILL_INSTALL = `/plugin marketplace add sandmanz26/whatvibecodingcando
-/plugin install ux-research-kit@whatvibecodingcando`
-
 /** The text a visitor copies. */
 export function promptFor(p: PromptEntry, c: PromptContext): string {
-  if (c.skill) {
-    return [
-      `Use the ux-research-kit skill. ${p.skill}`,
-      '',
-      stack(c),
-      'Follow the skill\'s privacy rules, keep the research tools apart from the product, and run its verification checklist before telling me it works.',
-    ].join('\n')
-  }
   // The all-in-one prompt carries every tool's spec, so it stands on its own.
   const body = p.id === 'everything'
     ? [p.spec, ...PROMPTS.filter((x) => x.id !== 'everything').flatMap((x) => ['', `## ${x.title}`, '', x.spec])].join('\n')
@@ -315,7 +286,7 @@ export function allMarkdown(c: PromptContext) {
   const head = [
     '# Prompts for UX research tools',
     '',
-    c.skill ? `These prompts use the ux-research-kit skill. Install it in Claude Code first:\n\n\`\`\`\n${SKILL_INSTALL}\n\`\`\`` : 'Paste a prompt into Claude Code, opened in your project (or into claude.ai).',
+    'Paste a prompt into your AI coding assistant, opened in your project.',
     '',
   ]
   return [...head, ...PROMPTS.flatMap((p) => [`## ${p.title}`, '', p.summary, '', '```text', promptFor(p, c), '```', ''])].join('\n')

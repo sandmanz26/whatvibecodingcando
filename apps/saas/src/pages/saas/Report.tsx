@@ -6,7 +6,7 @@ import { copyText } from '../../saas/snippet'
 import { download } from '../../saas/stats'
 import { listStudies, projectSessions, type EventRow, type RunRow, type StudyRow } from '../../saas/cloud'
 import { statusOf } from '../../core/embed/store'
-import { FRAMEWORKS, PROMPTS, ROUTINGS, SKILL_INSTALL, allMarkdown, promptFor, type Framework, type PromptContext, type Routing } from '../../tools/prompts/catalog'
+import { FRAMEWORKS, PROMPTS, ROUTINGS, allMarkdown, promptFor, type Framework, type PromptContext, type Routing } from '../../tools/prompts/catalog'
 import { usePanel, useThreads } from './Panel'
 
 /**
@@ -106,16 +106,16 @@ export function Report() {
   )
 }
 
-/** Prompts for Claude (#/app/prompts): build any of these tools into your own codebase, with Claude. */
+/** Build-it prompts (#/app/prompts): build any of these tools into your own codebase, with an AI coding assistant. */
 export function Prompts() {
   const { toast } = useStore()
-  const [c, setC] = useState<PromptContext>({ framework: 'react', routing: 'history', skill: false })
+  const [c, setC] = useState<PromptContext>({ framework: 'react', routing: 'history' })
   const [open, setOpen] = useState<string | null>(null)
   const copy = (text: string, what: string) => void copyText(text).then((ok) => toast(ok ? `${what} copied` : 'Copy failed', ok ? undefined : 'error'))
   return (
     <div className="up-page">
       <div className="up-head">
-        <div><h1>Prompts for Claude</h1><p>Prefer the tools inside your own code? Paste a prompt into Claude Code in your project (or claude.ai) and it builds the tool, with the same privacy rules.</p></div>
+        <div><h1>Build-it prompts</h1><p>Prefer the tools inside your own code? Paste a prompt into your AI coding assistant, opened in your project, and it builds the tool with the same privacy rules.</p></div>
         <button className="lp-btn" onClick={() => download('vibe-collab-prompts.md', allMarkdown(c), 'text/markdown')}><Download size={14} /> All as .md</button>
       </div>
       <section className="up-card">
@@ -123,8 +123,6 @@ export function Prompts() {
           <label className="lp-field">Your framework<select className="up-select" value={c.framework} onChange={(e) => setC({ ...c, framework: e.target.value as Framework })}>{Object.entries(FRAMEWORKS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
           <label className="lp-field">Your URLs<select className="up-select" value={c.routing} onChange={(e) => setC({ ...c, routing: e.target.value as Routing })}>{Object.entries(ROUTINGS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         </div>
-        <label className="up-check"><input type="checkbox" checked={c.skill} onChange={(e) => setC({ ...c, skill: e.target.checked })} /> I have the ux-research-kit skill installed (shorter prompts)</label>
-        {c.skill && <><p className="up-muted">Install it in Claude Code first:</p><pre className="up-code">{SKILL_INSTALL}</pre></>}
       </section>
       <ul className="rs-list">
         {PROMPTS.map((p) => (

@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Copy, Check, ChevronDown, ChevronUp, Download, ArrowUpRight } from 'lucide-react'
 import { useStore } from '../store/store'
-import { Switch } from '../components/ui'
 import { APP, readJSON, writeJSON } from '../tools/shared'
-import { FRAMEWORKS, PROMPTS, ROUTINGS, SKILL_INSTALL, allMarkdown, promptFor, type Framework, type PromptContext, type PromptEntry, type Routing } from '../tools/prompts/catalog'
+import { FRAMEWORKS, PROMPTS, ROUTINGS, allMarkdown, promptFor, type Framework, type PromptContext, type PromptEntry, type Routing } from '../tools/prompts/catalog'
 
 const KEY = `${APP}.prompts.ctx`
 const GROUPS = ['All', 'Research', 'Feedback', 'Design', 'Reporting', 'Everything'] as const
@@ -59,7 +58,7 @@ function Card({ p, ctx, onCopied }: { p: PromptEntry; ctx: PromptContext; onCopi
 
 export default function Prompts() {
   const { toast } = useStore()
-  const [ctx, setCtx] = useState<PromptContext>(() => readJSON<PromptContext>(KEY, { framework: 'react', routing: 'unsure', skill: false }))
+  const [ctx, setCtx] = useState<PromptContext>(() => readJSON<PromptContext>(KEY, { framework: 'react', routing: 'unsure' }))
   const [group, setGroup] = useState<(typeof GROUPS)[number]>('All')
   useEffect(() => writeJSON(KEY, ctx), [ctx])
   const list = useMemo(() => PROMPTS.filter((p) => group === 'All' || p.group === group), [group])
@@ -75,16 +74,16 @@ export default function Prompts() {
       <div className="page-head">
         <div>
           <h1>Use these tools in your own project</h1>
-          <p>Every research tool in this demo, as a prompt you can give your own Claude. Each prompt spells out how the tool should behave — its states, what happens on cancel, and what it must never record — so Claude builds the same logic instead of guessing.</p>
+          <p>Every research tool in this demo, as a prompt for your own AI coding assistant. Each prompt spells out how the tool should behave (its states, what happens on cancel, and what it must never record), so the assistant builds the same logic instead of guessing.</p>
         </div>
         <div className="actions"><button className="btn" onClick={download}><Download size={14} /> Download all (.md)</button></div>
       </div>
 
       <section className="card card-body prompt-how">
         <ol>
-          <li><b>Open your project in Claude Code</b><span className="muted">The prompts work best there, because Claude can read and change your code. You can also paste one into claude.ai to get the code to add yourself.</span></li>
+          <li><b>Open your project in your AI coding assistant</b><span className="muted">The prompts work best in an assistant that can read and change your code. A chat assistant works too: it gives you the code to add yourself.</span></li>
           <li><b>Tell the prompt about your app</b><span className="muted">Pick your framework and routing below; every prompt updates.</span></li>
-          <li><b>Copy a prompt and paste it</b><span className="muted">Claude reads your project, tells you its plan, builds, then tests in a browser and says what it couldn’t test.</span></li>
+          <li><b>Copy a prompt and paste it</b><span className="muted">The assistant reads your project, tells you its plan, builds, then tests in a browser and says what it couldn’t test.</span></li>
         </ol>
       </section>
 
@@ -101,18 +100,6 @@ export default function Prompts() {
             {(Object.keys(ROUTINGS) as Routing[]).map((r) => <option key={r} value={r}>{ROUTINGS[r]}</option>)}
           </select>
         </div>
-        <div className="field">
-          <label>Use the ux-research-kit skill</label>
-          <span className="row" style={{ gap: 8, fontSize: 13 }}><Switch checked={ctx.skill} onChange={() => setCtx({ ...ctx, skill: !ctx.skill })} label="Use the ux-research-kit skill" /> {ctx.skill ? 'Short prompts; the skill carries the details' : 'Full prompts; nothing to install'}</span>
-        </div>
-        {ctx.skill && (
-          <div className="prompt-install">
-            <b>Install the skill once, in Claude Code:</b>
-            <pre className="code">{SKILL_INSTALL}</pre>
-            <button className="btn sm" onClick={() => void copyText(SKILL_INSTALL).then((ok) => ok && toast('Install commands copied'))}><Copy size={13} /> Copy</button>
-            <span className="muted" style={{ fontSize: 12.5 }}>Or copy its folder into ~/.claude/skills/. Without the skill, switch this off and use the full prompts.</span>
-          </div>
-        )}
       </section>
 
       <div className="row wrap mt-16" style={{ gap: 6, marginBottom: 12 }}>
@@ -123,7 +110,7 @@ export default function Prompts() {
         {list.map((p) => <Card key={p.id} p={p} ctx={ctx} onCopied={(t) => toast(`Copied: ${t}`)} />)}
       </div>
 
-      <p className="muted" style={{ fontSize: 12.5, marginTop: 16 }}>These prompts describe the tools as they behave in this demo. Your Claude will adapt them to your codebase, so review its plan before it starts, and check the result in your own browser.</p>
+      <p className="muted" style={{ fontSize: 12.5, marginTop: 16 }}>These prompts describe the tools as they behave in this demo. Your assistant will adapt them to your codebase, so review its plan before it starts, and check the result in your own browser.</p>
     </main>
   )
 }

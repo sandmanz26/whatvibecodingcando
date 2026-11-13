@@ -35,6 +35,7 @@ import { Prompts as PanelPrompts, Report as PanelReport } from './pages/saas/Rep
 import { Dashboard } from './pages/saas/Dashboard'
 import SharePage from './pages/saas/SharePage'
 import { Privacy, Terms } from './pages/saas/Legal'
+import { Guide } from './pages/saas/Guide'
 import { PanelLayout, Products, Install as PanelInstall, Comments, Team, SettingsPage } from './pages/saas/Panel'
 import { NarrationRecorder } from './tools/voice/Narrator'
 import { Inspector } from './tools/inspect/Inspector'
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="landingpage" element={<Landing />} />
           <Route path="privacy" element={<Privacy />} />
           <Route path="terms" element={<Terms />} />
+          <Route path="guide" element={<Guide />} />
           <Route path="share/:token" element={<SharePage />} />
           <Route path="app/register" element={<Register />} />
           <Route path="app/login" element={<Login />} />
@@ -122,7 +124,7 @@ export default function App() {
 /** Research tools sit around the marketplace and its console; never on the hosted product's own pages. */
 function ResearchTools() {
   const { pathname } = useLocation()
-  if (pathname === '/landingpage' || pathname === '/privacy' || pathname === '/terms' || pathname.startsWith('/share/') || pathname === '/app' || pathname.startsWith('/app/')) return null
+  if (pathname === '/landingpage' || pathname === '/privacy' || pathname === '/terms' || pathname === '/guide' || pathname.startsWith('/share/') || pathname === '/app' || pathname.startsWith('/app/')) return null
   return (
     <>
       <DesignLayer />

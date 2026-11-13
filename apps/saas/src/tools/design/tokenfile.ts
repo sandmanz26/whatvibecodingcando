@@ -14,7 +14,7 @@
  */
 import { APP, readJSON } from '../shared'
 import { baseline, flatten, merge, type DesignDoc, type Scope } from './tokens'
-import { PRESETS, presetOf } from './presets'
+import { PRESETS } from './presets'
 import { LOOKS } from './looks'
 
 export type Kind = 'color' | 'radius' | 'size' | 'font' | 'shadow' | 'other'
@@ -249,7 +249,6 @@ export function choices(sets: TokenSet[]): Choice[] {
     ...sets.map((s) => ({ id: `set:${s.id}`, name: s.name, kind: 'upload' as const, preset: 'wireframe', doc: merge(base, docOf(s)) })),
   ]
 }
-export const presetName = (id: string) => presetOf(id).name
 
 export interface Row { scope: Scope; name: string; kind: Kind; a?: string; b?: string; same: boolean }
 /** Token by token, the two looks' values in light and dark mode. */

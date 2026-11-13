@@ -310,12 +310,11 @@ Rules for those endpoints:
 
 ## Prompts for visitors
 
-`#/console/prompts` ("Prompts" in the console bar) lists every research tool as a prompt a visitor can paste into their own Claude, ideally Claude Code in their project.
+`#/console/prompts` ("Prompts" in the console bar) lists every research tool as a prompt a visitor can paste into their own AI coding assistant, opened in their project.
 
 - **Personalised:** pick a framework (React, Next.js, Vue, Svelte, plain JS, not sure) and routing (hash, normal URLs, not sure). Every prompt updates. The choice is remembered in `market.prompts.ctx`.
 - **Two modes:**
   - **Full prompts** (default, nothing to install) spell out each tool's states, cancel and edge paths, and privacy rules (never record typed text or field values), plus the ground rules and verification steps. The ground rules are: read the project and show a plan first, keep research tools apart from the product, and stay frontend-only. The verification steps are: typecheck, build, and a browser test of the cancel paths, then report what wasn't tested.
-  - **Skill mode** gives short prompts that lean on the ux-research-kit skill (below) and shows the install commands.
 - Each card has **Copy prompt**, **Show prompt**, and **Try it here** (opens the tool in this demo). **Download all (.md)** saves every prompt in one file.
 - The prompts live in `src/tools/prompts/catalog.ts`. When a tool's behaviour changes, update its prompt too.
 
@@ -405,7 +404,12 @@ Everything else is the project's **published configuration**, built in the panel
   - *Versions:* Widget → Version is the site's current version; comments made after publishing carry it (set by the server). The widget's list and the panel's inbox filter by version.
   - *Component review:* the dock's A vs B button: click two elements, pick a verdict (A is better, B is better, both need work), add a note. Saved as a comment of kind `compare` with both anchors.
   - *Narration:* the dock's voice note button records up to two minutes in the reviewer's browser; it is uploaded to the project's private bucket only when posted, and played with a ten-minute signed link. Deleting the comment deletes the audio.
-- **Reports & insights, Prompts for Claude** are panel features (`status: 'panel'`, "In your panel"): `#/app/report` (`src/pages/saas/Report.tsx`) pulls comments and studies into ranked key findings (low task success, where people got stuck, the page with most open comments, fake door interest), with copy as Markdown, download and print; `#/app/prompts` lists the prompts to build each tool into your own code with Claude. They show in the panel's menu when their product is on.
+- **Reports & insights, Build-it prompts** are panel features (`status: 'panel'`, "In your panel"): `#/app/report` (`src/pages/saas/Report.tsx`) pulls comments and studies into ranked key findings (low task success, where people got stuck, the page with most open comments, fake door interest), with copy as Markdown, download and print; `#/app/prompts` lists the prompts to build each tool into your own code with an AI coding assistant. They show in the panel's menu when their product is on.
+- **The panel's sidebar** (`src/pages/saas/Nav.tsx`) has two levels so it stays short however many tools are on: Overview; **Setup** (Products, Install, Widget, Build-it prompts); **Results**, one entry per tool that collects data and only for tools that are on (Comments, Component reviews and Voice notes are `#/app/comments?kind=…`; Usability tests, 5-second tests, Heatmaps, Eye tracking and Fake doors are `#/app/research?kind=…`; Sessions is `#/app/research?tab=sessions`; Report); then Team, Settings and the User guide. Groups fold, remember it, and open by themselves on the page you're on; on a phone they flatten into one scrolling row.
+- **Updating the site, not "publishing versions".** The builder's button is **Update site**; it says whether the site is up to date, and History lists earlier settings by date with **Restore**. Release numbers still exist (the server orders and syncs by them) but the owner never sees them.
+- **Seeing it on your own site.** With the default audience (reviewers only), opening the site normally shows nothing, even to its owner. **Open my site** on Install (a card that explains this) and on Overview opens the site with a review token, so the owner's browser becomes a reviewer. The installation check offers the same button when it last saw the widget hidden for that reason.
+- **Deleting and downloading results.** Comments: the bin on one, or **Delete these/all** for the filtered list (with the voice notes' audio on the server); `?kind=compare|voice` filters to component reviews or voice notes. Studies: **Clear results** on a study (its runs, so its heatmap too; the study and link stay), the bin on one participant, **Participants (CSV)** and **Clicks, pages and gaze (CSV)** on its results, and the same two files for all Sessions. Settings → Data clears everything of one kind. Every CSV goes through `toCsv` in `src/saas/stats.ts`, which keeps cells starting with `= + - @` as text so they can't run as spreadsheet formulas.
+- **User guide** at `#/guide` (`src/pages/saas/Guide.tsx`), public like the legal pages and linked from the website and the panel: getting started, concepts, reviewers, comments, design tools, studies, heatmaps and eye tracking, where results are, privacy, troubleshooting. Keep it in step with the product when a flow changes.
 - **Heatmap quality** (`src/core/embed/heatmath.ts`, `core/heat.ts`): one device at a time (default: the reviewer's); each person counts the same (option, on); gaze turned into fixations (I-DT sized to each person's accuracy) weighted by duration, eye tracking worse than 220 px left out by default, blob size from the accuracy; the colour scale at the 95th percentile; gaze points kept relative to the element looked at. Page paths fold ids (`/product/123` → `/product/:id`) so pages of one kind share a map and ids aren't kept.
 - **Reviewer sessions** live in our session frame (`/embed/session.html`, `src/core/embed/frame.ts`), loaded hidden only for reviewers. It signs up (with Turnstile CAPTCHA when `VITE_TURNSTILE_SITE_KEY` is set), keeps the refresh token on our domain, per asking site, and gives the page only the short-lived access token. Database calls still come from the page, so the server keeps checking its real Origin. Where a site's CSP blocks the frame, the page keeps the session itself, as before.
 - **Who sees what.** Widget → *Who sees it* (default: reviewers only) is for Comments. The design tools are always for people who came in through a review link (or the panel's preview), even when Comments are open to every visitor.
@@ -474,7 +478,7 @@ Everything else is the project's **published configuration**, built in the panel
     - On the server, the numbers come from one `project_stats` call, counted in the database.
   - **Products:** turn tools on or off per project; early-access ones count as requested.
   - **Install:**
-    - the project's snippet (script and project only) and where to paste it (HTML, Vite, Next.js, CMS, or a prompt for Claude);
+    - the project's snippet (script and project only) and where to paste it (HTML, Vite, Next.js, CMS, or a prompt for an AI coding assistant);
     - an **Installation check** (last seen, shown or why not);
     - developer notes: CSP, own buttons and API, `data-disabled`, environments.
   - **Widget:** the widget builder (see "Widget settings").
@@ -492,13 +496,6 @@ Everything else is the project's **published configuration**, built in the panel
 - **Inbox without a backend.** The inbox reads comments through the script's `Backend` interface, so it shows those saved on this domain. Open `embed-demo.html?project=<id>` (the panel links to it) to see comments arrive in the panel.
 - **Code and storage.** Data is in `vibe.saas` (localStorage) and the code in `src/saas/` and `src/pages/saas/`. The research dock and tools are not mounted on these pages.
 
-## Installable skill: ux-research-kit
+## Reusable research modules
 
-The research tools are also packaged as a Claude Code skill for other projects, in `plugins/ux-research-kit/`: framework-agnostic TypeScript modules (tracking and sessions, heatmaps and replay, 5-second tests, fake doors, eye tracking, design tokens and UI-library palettes), specs per module, the privacy rules, and a verification checklist. Claude copies what a project needs, wires it to its router, and builds the console screens in that project's own components.
-
-```
-/plugin marketplace add sandmanz26/whatvibecodingcando
-/plugin install ux-research-kit@whatvibecodingcando
-```
-
-Or copy `plugins/ux-research-kit/skills/ux-research-kit/` into `~/.claude/skills/`. The modules were checked in a separate vanilla TypeScript app (strict typecheck, build, and a browser run of every module).
+The research tools are also packaged for other projects in `plugins/ux-research-kit/` at the repository root (outside this app): framework-agnostic TypeScript modules (tracking and sessions, heatmaps and replay, 5-second tests, fake doors, eye tracking, design tokens and UI-library palettes), specs per module, the privacy rules, and a verification checklist. That folder's README says how to add them to a project.

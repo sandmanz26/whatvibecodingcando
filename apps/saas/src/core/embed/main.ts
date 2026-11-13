@@ -17,6 +17,7 @@ import * as server from './server'
 import { envFor } from './config'
 import { NS } from './store'
 import { VERSION } from './version'
+import { peekHint } from './hints'
 
 declare global { interface Window { __vibeCollabLoader?: boolean; __vibeCollabApp?: { boot: (s: HTMLScriptElement | null) => Promise<void> } } }
 
@@ -56,7 +57,8 @@ async function main() {
   if (d.disabled !== undefined && d.disabled !== 'false') return
   if (!server.hasServer) return app()
   const project = /^[\w-]{1,64}$/.test(d.project ?? '') ? d.project! : (window.location.hostname || 'local').replace(/[^\w-]/g, '-')
-  if (/(?:^#|&)vibe_(t|r|tool)=/.test(window.location.hash)) return app()
+  // Also when the site redirected on load and dropped the hash (hints.ts).
+  if (peekHint('t') || peekHint('r') || peekHint('tool')) return app()
   const has = (store: () => Storage, k: string) => { try { return store().getItem(k) !== null } catch { return false } }
   if (has(() => localStorage, `${NS}reviewer:${project}`) || has(() => localStorage, `${NS}session:${project}`) || has(() => sessionStorage, `${NS}run:${project}`)) return app()
   const file = await server.fetchSettings(project)

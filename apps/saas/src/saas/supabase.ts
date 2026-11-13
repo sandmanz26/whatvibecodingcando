@@ -25,7 +25,6 @@ export const supabase: SupabaseClient | null = URL_ && KEY
   : null
 /** Accounts, workspaces and projects live on the server (true) or only in this browser (false). */
 export const cloud = !!supabase
-export const supabaseUrl = URL_ ?? ''
 
 /**
  * A CAPTCHA token for Supabase Auth, when the build has a Turnstile site key (else undefined and

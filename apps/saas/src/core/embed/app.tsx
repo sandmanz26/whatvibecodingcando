@@ -36,6 +36,7 @@ interface Api { version: string; project: string; open: (what?: OpenWhat) => voi
 declare global { interface Window { __vibeCollab?: { version: string; project: string; server?: boolean }; VibeCollab?: Api | { q?: unknown[][] } } }
 
 import { VERSION } from './version'
+import { takeHint } from './hints'
 
 /**
  * The host element's own box, set inline with !important: that beats even !important rules in the
@@ -271,15 +272,8 @@ export async function boot(given?: HTMLScriptElement | null) {
   const SESSION_EVENT = 'vibe-collab:session'
 
   // The review link's token, taken off the address at once (so it isn't left in history or shared on).
-  const takeToken = (): string | null => {
-    const h = window.location.hash
-    const m = /(?:^#|&)vibe_t=([0-9a-f]{32,64})/.exec(h)
-    if (!m) return null
-    const rest = h.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_t=')).join('&')
-    try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
-    return m[1]
-  }
-  const token = takeToken()
+  // Read from the address the browser first opened too, for sites that redirect on load (hints.ts).
+  const token = takeHint('t', '[0-9a-f]{32,64}')
 
   // A study's participant (#vibe_r=… and "I agree"): the study runs instead of the widget, for this tab.
   const studyToken = takeStudyToken()
@@ -395,7 +389,7 @@ export async function boot(given?: HTMLScriptElement | null) {
 
   // A review link opened on a page that is already open changes only the address's hash.
   window.addEventListener('hashchange', () => {
-    const t = takeToken()
+    const t = takeHint('t', '[0-9a-f]{32,64}')
     if (t) void m.useToken(t).then(() => host.dispatchEvent(new Event(SESSION_EVENT)))
   })
 

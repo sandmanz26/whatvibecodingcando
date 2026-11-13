@@ -12,6 +12,7 @@
  */
 import * as server from './server'
 import { NS, selectorFor } from './store'
+import { takeHint } from './hints'
 
 export type StudyKind = 'usability' | 'fivesec' | 'browse'
 export type Rule = { kind: 'page'; page: string } | { kind: 'element'; sel: string; label?: string } | { kind: 'none' }
@@ -55,14 +56,7 @@ export function saveRun(project: string, s: RunState | null) {
 }
 
 /** A participant link's token, taken off the address at once (it isn't left in history or shared on). */
-export function takeStudyToken(): string | null {
-  const h = window.location.hash
-  const m = /(?:^#|&)vibe_r=([0-9a-f]{32,64})/.exec(h)
-  if (!m) return null
-  const rest = h.replace(/^#/, '').split('&').filter((x) => !x.startsWith('vibe_r=')).join('&')
-  try { history.replaceState(history.state, '', `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ''}`) } catch { /* ignore */ }
-  return m[1]
-}
+export const takeStudyToken = (): string | null => takeHint('r', '[0-9a-f]{32,64}')
 
 /* ---------- checking what the study sends (it is data from the server, still checked here) ---------- */
 
