@@ -110,7 +110,8 @@ export function sha256Hex(text: string): string {
 }
 /** A site's name as the public file carries it: a hash, keyed by the project so one name gives a different hash in every project. */
 export const hostKey = (project: string, host: string) => `#${sha256Hex(`vibe-collab:${project}:${host.trim().toLowerCase()}`)}`
-const HASHED = /^#[0-9a-f]{64}$/
+/** "#<hash>": one site; "#*<hash>": a site and all its subdomains (from "*.example.com"). */
+const HASHED = /^#\*?[0-9a-f]{64}$/
 
 /**
  * The settings as the public file on the CDN carries them: exact site names become hashes and
@@ -119,10 +120,25 @@ const HASHED = /^#[0-9a-f]{64}$/
  * no single site. The database keeps the full settings for the panel and the server's checks.
  */
 export function publicConfig(project: string, c: WidgetConfig): WidgetConfig {
-  return { ...c, envs: c.envs.map((e, i) => ({ id: `e${i + 1}`, name: '', on: e.on, host: e.host.includes('*') || HASHED.test(e.host) ? e.host : hostKey(project, e.host) })) }
+  const hide = (h: string) => {
+    if (HASHED.test(h)) return h
+    if (!h.includes('*')) return hostKey(project, h)
+    // "*.example.com": the domain is hashed too, and matched against every parent of the page's host.
+    if (/^\*\.[^*]+$/.test(h)) return `#*${hostKey(project, h.slice(2)).slice(1)}`
+    return h
+  }
+  return { ...c, envs: c.envs.map((e, i) => ({ id: `e${i + 1}`, name: '', on: e.on, host: hide(e.host) })) }
 }
 
-export const envFor = (c: WidgetConfig, host: string, project = '') => c.envs.find((e) => (HASHED.test(e.host) ? !!project && e.host === hostKey(project, host) : hostMatches(e.host, host))) ?? null
+function hashedMatch(pattern: string, host: string, project: string) {
+  if (!project) return false
+  if (!pattern.startsWith('#*')) return pattern === hostKey(project, host)
+  // The domain itself (example.com) or one level below it (shop.example.com), as the server matches "*.example.com".
+  const parts = host.toLowerCase().split('.')
+  for (let i = 0; i <= Math.min(1, parts.length - 2); i++) if (`#*${hostKey(project, parts.slice(i).join('.')).slice(1)}` === pattern) return true
+  return false
+}
+export const envFor = (c: WidgetConfig, host: string, project = '') => c.envs.find((e) => (HASHED.test(e.host) ? hashedMatch(e.host, host, project) : hostMatches(e.host, host))) ?? null
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 /** A configuration from storage or the network, checked field by field. Null when it can't be trusted. */

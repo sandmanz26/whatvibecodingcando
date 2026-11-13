@@ -152,7 +152,9 @@ export function originOf(s: string): string | null {
   if (!t) return null
   try {
     const u = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`)
-    return u.hostname.includes('.') || u.hostname === 'localhost' ? u.origin : null
+    // A local address is http (a dev server rarely has a certificate).
+    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return `http://${u.host}`
+    return u.hostname.includes('.') ? u.origin : null
   } catch { return null }
 }
 /** A project id that isn't taken yet: "shop", "shop-2", … */
@@ -169,7 +171,7 @@ export function newProject(name: string, siteUrl: string, products: string[], ta
   return {
     id: freeId(name, taken), name: name.trim(), siteUrl: origin ?? '', products,
     widget: { position: 'right', shortcut: true, color: '#e8590c' },
-    domains: origin ? [new URL(origin).hostname] : [], createdAt: new Date().toISOString(),
+    domains: origin ? [new URL(origin).host] : [], createdAt: new Date().toISOString(),
   }
 }
 

@@ -50,7 +50,7 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
       .filter((x): x is Release => !!x.config)
       .sort((a, b) => a.version - b.version)
     const draft = parseConfig(r.draft)
-    const host = r.site_url ? new URL(r.site_url).hostname : ''
+    const host = r.site_url ? new URL(r.site_url).host : ''
     return {
       id: r.public_id, name: r.name, siteUrl: r.site_url, products: r.products ?? [],
       widget: { position: 'right', shortcut: true, color: '#e8590c' }, domains: host ? [host] : [],

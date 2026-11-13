@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2 } from 'lucide-react'
+import { LayoutDashboard, Boxes, Code2, MessagesSquare, Users, Settings, Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, SlidersHorizontal, Radar, Download, Share2, ChevronsUpDown } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, PRODUCTS, productOf } from '../../saas/products'
@@ -101,14 +101,7 @@ export function PanelLayout() {
     <div className="up">
       <aside className="up-side">
         <Link to="/landingpage" className="lp-logo sm"><span className="lp-mark" aria-hidden><MousePointer2 size={13} /></span>{BRAND}</Link>
-        <label className="up-proj">
-          <span>Project</span>
-          <select value={project?.id ?? ''} onChange={(e) => (e.target.value === '__new' ? setCreating(true) : update((x) => ({ ...x, current: e.target.value })))} aria-label="Project">
-            {s.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            {!s.projects.length && <option value="">No project</option>}
-            <option value="__new">+ New project…</option>
-          </select>
-        </label>
+        <ProjectSwitcher projects={s.projects} current={project} onPick={(id) => update((x) => ({ ...x, current: id }))} onNew={() => setCreating(true)} />
         <nav className="up-nav" aria-label="Panel">
           {LINKS.map(({ to, end, icon: Icon, label }) => <NavLink key={to} to={to} end={end}><Icon size={16} /> {label}</NavLink>)}
         </nav>
@@ -149,6 +142,44 @@ function NewProject({ taken, onClose, onCreate }: { taken: string[]; onClose: ()
         <p className="hint">Starts with Comments on. Change products after.</p>
       </div>
     </Modal>
+  )
+}
+
+/** The panel's project menu: the current project, the others, and a new one. */
+function ProjectSwitcher({ projects, current, onPick, onNew }: { projects: Project[]; current: Project | null | undefined; onPick: (id: string) => void; onNew: () => void }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const out = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false) }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', out)
+    document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('pointerdown', out); document.removeEventListener('keydown', key) }
+  }, [open])
+  const host = (p: Project) => p.siteUrl.replace(/^https?:\/\//, '')
+  return (
+    <div className="up-proj" ref={box}>
+      <span className="up-proj-label">Project</span>
+      <button type="button" className={`up-proj-btn ${open ? 'open' : ''}`} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} aria-label={`Project: ${current?.name ?? 'none'}`}>
+        <span className="up-proj-dot" aria-hidden>{(current?.name ?? '?')[0]?.toUpperCase()}</span>
+        <span className="up-proj-name"><b>{current?.name ?? 'No project'}</b>{current?.siteUrl && <small>{host(current)}</small>}</span>
+        <ChevronsUpDown size={15} aria-hidden />
+      </button>
+      {open && (
+        <div className="up-proj-menu" role="menu">
+          {projects.map((p) => (
+            <button key={p.id} type="button" role="menuitemradio" aria-checked={p.id === current?.id} className={p.id === current?.id ? 'on' : ''} onClick={() => { onPick(p.id); setOpen(false) }}>
+              <span className="up-proj-dot sm" aria-hidden>{p.name[0]?.toUpperCase()}</span>
+              <span className="up-proj-name"><b>{p.name}</b><small>{p.siteUrl ? host(p) : 'no website yet'}</small></span>
+              {p.id === current?.id && <Check size={15} aria-hidden />}
+            </button>
+          ))}
+          <hr />
+          <button type="button" role="menuitem" className="up-proj-new" onClick={() => { setOpen(false); onNew() }}><Plus size={15} /> New project</button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -396,14 +427,12 @@ export function SettingsPage() {
   const [name, setName] = useState(s.account!.name)
   const [email, setEmail] = useState(s.account!.email)
   const [pname, setPname] = useState(project?.name ?? '')
-  const [site, setSite] = useState(project?.siteUrl ?? '')
   const [confirm, setConfirm] = useState<'project' | 'account' | null>(null)
   const [typed, setTyped] = useState('')
-  useEffect(() => { setPname(project?.name ?? ''); setSite(project?.siteUrl ?? '') }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPname(project?.name ?? '') }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const accountDirty = name.trim() !== s.account!.name || email.trim() !== s.account!.email
   const accountOk = !!name.trim() && validEmail(email)
-  const siteOk = !site.trim() || !!originOf(site)
-  const projectDirty = !!project && (pname.trim() !== project.name || (originOf(site) ?? '') !== project.siteUrl)
+  const projectDirty = !!project && pname.trim() !== project.name
 
   return (
     <div className="up-page">
@@ -426,13 +455,11 @@ export function SettingsPage() {
           <h2>Project</h2>
           <div className="up-grid2">
             <label className="lp-field">Name<input value={pname} maxLength={60} onChange={(e) => setPname(e.target.value)} aria-invalid={!pname.trim()} /></label>
-            <label className="lp-field">Site address<input value={site} onChange={(e) => setSite(e.target.value)} placeholder="shop.example.com" aria-invalid={!siteOk} />{!siteOk && <span className="lp-error">That doesn’t look like a web address.</span>}</label>
+            <div className="lp-field">Website<span className="up-static">{project.siteUrl ? project.siteUrl.replace(/^https?:\/\//, '') : 'Not set'} · <Link to="/app/widget">change in Widget → Website</Link></span></div>
           </div>
           <p className="up-muted">Project id <code>{project.id}</code> can’t change: your snippet and the comments already made are tied to it.</p>
-          <div className="up-row"><button className="lp-btn primary sm" disabled={!projectDirty || !pname.trim() || !siteOk} onClick={() => { if (setProject((p) => ({ ...p, name: pname.trim(), siteUrl: originOf(site) ?? '' }))) toast('Saved') }}>Save</button>
-            {projectDirty && <button className="lp-btn sm ghost" onClick={() => { setPname(project.name); setSite(project.siteUrl) }}>Cancel</button>}</div>
-          <h3 className="up-sub">Where it runs</h3>
-          <p className="up-muted">The sites the widget may show on (production, staging, previews) are its environments: <Link to="/app/widget">Widget → Where</Link>.</p>
+          <div className="up-row"><button className="lp-btn primary sm" disabled={!projectDirty || !pname.trim()} onClick={() => { if (setProject((p) => ({ ...p, name: pname.trim() }))) toast('Saved') }}>Save</button>
+            {projectDirty && <button className="lp-btn sm ghost" onClick={() => setPname(project.name)}>Cancel</button>}</div>
         </section>
       )}
       {project && <DataCard project={project} />}
@@ -554,7 +581,7 @@ export function reviewTargets(project: Project): { key: string; label: string; u
   const out: { key: string; label: string; url: string; live: boolean }[] = []
   for (const e of draftOf(project).envs) {
     if (e.host.includes('*') || out.some((x) => x.key === e.host)) continue
-    out.push({ key: e.host, label: `${e.name && e.name !== e.host ? `${e.name} · ` : ''}${e.host}`, url: urlFor(e.host), live: liveEnvs.some((x) => x.host === e.host && x.on) })
+    out.push({ key: e.host, label: `${e.name && e.name !== e.host && e.name !== 'Website' ? `${e.name} · ` : ''}${e.host}`, url: urlFor(e.host), live: liveEnvs.some((x) => x.host === e.host && x.on) })
   }
   if (site && !out.some((x) => x.key === site.host)) out.push({ key: site.host, label: `${site.host} (site address)`, url: site.href, live: liveEnvs.some((x) => x.host === site.host && x.on) })
   out.push({ key: 'demo', label: 'The hosted demo site', url: demoUrl(project.id), live: true })

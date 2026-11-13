@@ -69,7 +69,7 @@ export function WidgetBuilder() {
             </div>
           </section>
 
-          <Environments envs={draft.envs} onChange={(envs) => edit((c) => ({ ...c, envs }))} />
+          <Website envs={draft.envs} onChange={(envs, siteUrl) => { if (!setProject((p) => ({ ...p, ...(siteUrl !== undefined ? { siteUrl } : {}), config: { ...draftOf(p), envs } }))) toast('Not saved: this browser’s storage is full or blocked.', 'error') }} />
 
           {cloud && (
             <section className="up-card">
@@ -171,7 +171,55 @@ export function WidgetBuilder() {
   )
 }
 
-function Environments({ envs, onChange }: { envs: Env[]; onChange: (e: Env[]) => void }) {
+const isLocal = (h: string) => /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(h)
+/** "https://www.Shop.com/about" → "www.shop.com"; a host with a port stays as it is. */
+const hostOf = (v: string) => v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '')
+
+/**
+ * One project, one website: the first environment is the site (with or without its subdomains), and
+ * Settings' site address follows it. Staging and preview addresses are optional, below.
+ */
+function Website({ envs, onChange }: { envs: Env[]; onChange: (e: Env[], siteUrl?: string) => void }) {
+  const main = envs[0]
+  const base = main ? main.host.replace(/^\*\./, '') : ''
+  const [val, setVal] = useState(base)
+  const [sub, setSub] = useState(!!main?.host.startsWith('*.'))
+  const [tried, setTried] = useState(false)
+  useEffect(() => { setVal(base); setSub(!!main?.host.startsWith('*.')) }, [main?.host]) // eslint-disable-line react-hooks/exhaustive-deps
+  const host = hostOf(val)
+  const local = isLocal(host)
+  // With subdomains, www.shop.com means shop.com and all of it (www included).
+  const apex = host.replace(/^www\./, '')
+  const next = sub && !local ? `*.${apex}` : host
+  const problem = !host ? 'Enter your website’s address.' : hostProblem(next) || (envs.slice(1).some((e) => e.host === next) ? 'That address is already below.' : '')
+  const dirty = next !== (main?.host ?? '')
+  const save = () => {
+    setTried(true)
+    if (problem || !dirty) return
+    onChange([{ id: main?.id ?? 'site', name: 'Website', host: next, on: main?.on ?? true }, ...envs.slice(1)], `${local ? 'http' : 'https'}://${sub ? apex : host}`)
+    setTried(false)
+  }
+  return (
+    <section className="up-card">
+      <h2>Website</h2>
+      <p className="up-muted">The site this project is for. Every page of it works (<code>/about</code>, <code>/checkout</code>…): put the snippet once in your layout. The hosted demo site always works too.</p>
+      <form className="wb-site" onSubmit={(e) => { e.preventDefault(); save() }} noValidate>
+        <input className="up-search grow" value={val} onChange={(e) => setVal(e.target.value)} placeholder="yourshop.com" aria-label="Website address" aria-invalid={tried && !!problem} />
+        {main && <Switch checked={main.on} onChange={() => onChange(envs.map((x, i) => (i === 0 ? { ...x, on: !x.on } : x)))} label="Widget on for the website" />}
+        <button className="lp-btn sm" type="submit" disabled={!dirty}>{main ? 'Save' : 'Set'}</button>
+      </form>
+      {!local && host && <label className="up-check"><input type="checkbox" checked={sub} onChange={(e) => setSub(e.target.checked)} /> Also its subdomains: <code>{apex}</code>, <code>www.{apex}</code>, <code>blog.{apex}</code>…</label>}
+      {tried && problem && <p className="lp-error">{problem}</p>}
+      {dirty && !problem && main && <p className="up-hint">Not saved yet: press Save, then publish.</p>}
+      <details className="wb-more" open={envs.length > 1}>
+        <summary>Staging or preview addresses (optional)</summary>
+        {main ? <Environments envs={envs.slice(1)} onChange={(rest) => onChange([envs[0], ...rest])} bare /> : <p className="up-muted">Set your website first.</p>}
+      </details>
+    </section>
+  )
+}
+
+function Environments({ envs, onChange, bare = false }: { envs: Env[]; onChange: (e: Env[]) => void; bare?: boolean }) {
   const [name, setName] = useState('')
   const [host, setHost] = useState('')
   const [tried, setTried] = useState(false)
@@ -183,10 +231,11 @@ function Environments({ envs, onChange }: { envs: Env[]; onChange: (e: Env[]) =>
     onChange([...envs, { id: Math.random().toString(36).slice(2, 10), name: name.trim().slice(0, 40) || h, host: h, on: true }])
     setName(''); setHost(''); setTried(false)
   }
+  const Wrap = bare ? 'div' : 'section'
   return (
-    <section className="up-card">
-      <h2>Where</h2>
-      <p className="up-muted">The sites the widget may show on. One snippet everywhere; turn each environment on or off here. The hosted demo site always works.</p>
+    <Wrap className={bare ? 'wb-envs-more' : 'up-card'}>
+      {!bare && <><h2>Where</h2>
+      <p className="up-muted">The sites the widget may show on. One snippet everywhere; turn each environment on or off here. The hosted demo site always works.</p></>}
       <ul className="wb-envs">
         {envs.map((e) => (
           <li key={e.id}>
@@ -195,7 +244,7 @@ function Environments({ envs, onChange }: { envs: Env[]; onChange: (e: Env[]) =>
             <button className="lp-btn sm ghost" onClick={() => onChange(envs.filter((x) => x.id !== e.id))} aria-label={`Remove ${e.name}`}><X size={13} /></button>
           </li>
         ))}
-        {!envs.length && <li className="up-muted">None yet.</li>}
+        {!envs.length && <li className="up-muted">{bare ? 'None. Add one for a staging site or Vercel previews.' : 'None yet.'}</li>}
       </ul>
       <form className="wb-add" onSubmit={(e) => { e.preventDefault(); add() }} noValidate>
         <input className="up-search" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (Staging)" aria-label="Environment name" maxLength={40} />
@@ -203,7 +252,7 @@ function Environments({ envs, onChange }: { envs: Env[]; onChange: (e: Env[]) =>
         <button className="lp-btn sm" type="submit"><Plus size={13} /> Add</button>
       </form>
       {tried && problem ? <p className="lp-error">{problem}</p> : <p className="up-muted">Patterns: <code>*.example.com</code>, or for previews <code>shop-git-*.vercel.app</code>. Wildcards over shared hosts (<code>*.vercel.app</code>) are refused: they’d match other people’s sites.</p>}
-    </section>
+    </Wrap>
   )
 }
 
