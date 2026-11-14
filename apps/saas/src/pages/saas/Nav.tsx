@@ -20,11 +20,10 @@ const RESULTS: { product: string; label: string; to: string }[] = [
   { product: 'fivesec', label: '5-second tests', to: '/app/research?kind=fivesec' },
   { product: 'heatmap', label: 'Heatmaps', to: '/app/research?kind=browse' },
   { product: 'gaze', label: 'Eye tracking', to: '/app/research?kind=eyes' },
-  { product: 'doors', label: 'Fake doors', to: '/app/research?kind=doors' },
   { product: 'insights', label: 'Participant paths', to: '/app/research?tab=sessions' },
   { product: 'report', label: 'Report', to: '/app/report' },
 ]
-const STUDY_TOOLS = ['usability', 'fivesec', 'heatmap', 'gaze', 'doors', 'insights']
+const STUDY_TOOLS = ['usability', 'fivesec', 'heatmap', 'gaze', 'insights']
 
 export function groupsFor(project: Project | null): Group[] {
   const on = (id: string) => !!project?.products.includes(id)

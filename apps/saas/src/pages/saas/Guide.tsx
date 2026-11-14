@@ -122,7 +122,7 @@ export function Guide() {
                   <li><b>Heatmap visit:</b> people use the site freely for a few minutes; their clicks build a heatmap.</li>
                 </ul>
               </li>
-              <li>Optional: <b>eye tracking</b> (webcam) and <b>fake doors</b> (a button for a feature that doesn’t exist yet, to measure interest).</li>
+              <li>Optional: <b>eye tracking</b> (webcam, Labs). <b>Fake doors</b> (a button for a feature you haven’t built, shown to your real visitors) is coming soon.</li>
               <li>Press <i>Participant link</i> and send it. Each participant sees a consent screen first and can say no. A link works for 30 days, up to the number of people you set.</li>
               <li>Open <i>Results</i> on the study: success rate and time per task, where people got stuck, answers, where people looked, and each participant’s run.</li>
             </ol>
@@ -147,7 +147,7 @@ export function Guide() {
             <p>In your panel, <i>Results</i> lists one page per tool that collects data, and only for the tools that are on:</p>
             <ul>
               <li><b>Comments</b>, <b>Component reviews</b>, <b>Voice notes</b>: what reviewers left.</li>
-              <li><b>Usability tests</b>, <b>5-second tests</b>, <b>Heatmaps</b>, <b>Eye tracking</b>, <b>Fake doors</b>: the studies of that kind, each with its results.</li>
+              <li><b>Usability tests</b>, <b>5-second tests</b>, <b>Heatmaps</b>, <b>Eye tracking</b>: the studies of that kind, each with its results.</li>
               <li><b>Participant paths</b>: each participant’s way through the site, step by step.</li>
               <li><b>Report</b>: comments and studies turned into ranked findings you can copy or download.</li>
             </ul>

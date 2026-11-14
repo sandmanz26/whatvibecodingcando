@@ -165,7 +165,7 @@ export function Dashboard() {
           <div className="up-row"><h2 className="lp-grow">Tools on</h2><Link to="/app/products" className="lp-btn sm">Change</Link></div>
           <div className="up-chips">
             {project.products.length === 0 && <span className="up-muted">None. Turn on at least Comments to use the script.</span>}
-            {project.products.map((id) => { const p = productOf(id); if (!p) return null; const Icon = p.icon; return <span key={id} className="up-chip"><span className="lp-icon xs" style={{ background: p.hue }}><Icon size={12} /></span>{p.name}{p.status === 'console' && <small>early access</small>}</span> })}
+            {project.products.map((id) => { const p = productOf(id); if (!p || p.soon) return null; const Icon = p.icon; return <span key={id} className="up-chip"><span className="lp-icon xs" style={{ background: p.hue }}><Icon size={12} /></span>{p.name}{p.status === 'console' && <small>early access</small>}</span> })}
           </div>
         </section>
       </div>

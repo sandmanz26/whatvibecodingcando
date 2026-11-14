@@ -109,14 +109,15 @@ export default function Landing() {
                 <article key={p.id} className={`lp-card ${on ? 'on' : ''}`}>
                   <div className="lp-card-top">
                     <span className="lp-icon" style={{ background: p.hue }}><Icon size={18} /></span>
-                    <span className={`lp-status ${p.status}`}>{statusLabel(p.status)}</span>
+                    {p.soon ? <span className="lp-status soon">Coming soon</span> : <span className={`lp-status ${p.status}`}>{statusLabel(p.status)}</span>}
                   </div>
                   <h3>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</h3>
                   <p>{p.tagline}</p>
                   <ul>{p.points.map((x) => <li key={x}><Check size={13} /> {x}</li>)}</ul>
                   <div className="lp-card-foot">
+                    {p.soon ? <span className="lp-muted lp-small">Coming soon</span> : <>
                     <button className={`lp-btn sm ${on ? 'dark' : ''}`} onClick={() => toggle(p.id)} aria-pressed={on}>{on ? <><Check size={14} /> Added</> : <><Plus size={14} /> Add</>}</button>
-                    <a className="lp-try" href={p.demo.startsWith('#') ? p.demo : demoUrl()} target="_blank" rel="noopener">Try it <ArrowRight size={13} /></a>
+                    <a className="lp-try" href={p.demo.startsWith('#') ? p.demo : demoUrl()} target="_blank" rel="noopener">Try it <ArrowRight size={13} /></a></>}
                   </div>
                 </article>
               )
@@ -174,7 +175,7 @@ export default function Landing() {
             <h3>Pro</h3>
             <b className="lp-big">$2<small> / site / month</small></b>
             <p>Everything, for every site you add. Rp 29.000 in Indonesia.</p>
-            <ul><li><Check size={14} /> Usability tests, 5-second tests, heatmaps</li><li><Check size={14} /> Eye tracking (Labs), fake doors, participant paths</li><li><Check size={14} /> Reports, CSV downloads, share links</li><li><Check size={14} /> Unlimited reviewers · 100 participants a month</li></ul>
+            <ul><li><Check size={14} /> Usability tests, 5-second tests, heatmaps</li><li><Check size={14} /> Eye tracking (Labs), participant paths</li><li><Check size={14} /> Reports, CSV downloads, share links</li><li><Check size={14} /> Unlimited reviewers · 100 participants a month</li></ul>
             <Link to={signedIn ? '/app' : hasAccount ? '/app/login' : '/app/register'} className="lp-btn dark full">{signedIn ? 'Open your panel' : 'Get Pro free during the beta'}</Link>
           </div>
         </div>

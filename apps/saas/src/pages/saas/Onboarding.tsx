@@ -106,9 +106,9 @@ export default function Onboarding() {
                   const Icon = p.icon
                   const on = products.includes(p.id)
                   return (
-                    <button type="button" key={p.id} className={`lp-check ${on ? 'on' : ''}`} onClick={() => toggle(p.id)} aria-pressed={on}>
+                    <button type="button" key={p.id} className={`lp-check ${on ? 'on' : ''} ${p.soon ? 'soon' : ''}`} onClick={() => !p.soon && toggle(p.id)} aria-pressed={on} disabled={p.soon}>
                       <span className="lp-icon sm" style={{ background: p.hue }}><Icon size={15} /></span>
-                      <span className="lp-grow"><b>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</b><small>{statusLabel(p.status)}</small></span>
+                      <span className="lp-grow"><b>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</b><small>{p.soon ? 'Coming soon' : statusLabel(p.status)}</small></span>
                       <span className="lp-tick">{on && <Check size={13} />}</span>
                     </button>
                   )

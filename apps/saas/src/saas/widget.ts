@@ -5,6 +5,7 @@
  */
 import { DEFAULT_CONFIG, modulesOf, newHandoff, serve, unserve, type Env, type Release, type WidgetConfig } from '../core/embed/config'
 import { cloud } from './supabase'
+import { productOf } from './products'
 import { createReviewLink } from './cloud'
 import type { Project } from './account'
 
@@ -27,7 +28,7 @@ export const liveOf = (p: Project): Release | null => p.releases?.[p.releases.le
  * can also be switched off in the builder; the other script products follow Products.
  */
 export const releasable = (p: Project, c: WidgetConfig): WidgetConfig => ({
-  ...c, modules: modulesOf((id) => (id === 'comments' ? c.modules.comments : true) && p.products.includes(id)),
+  ...c, modules: modulesOf((id) => (id === 'comments' ? c.modules.comments : true) && p.products.includes(id) && (id === 'comments' || productOf(id)?.soon !== true)),
 })
 
 export function publish(p: Project, by: string, config = draftOf(p)): Project {

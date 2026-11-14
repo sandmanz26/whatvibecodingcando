@@ -215,14 +215,14 @@ export function Products() {
             <article key={p.id} className={`up-product ${on ? 'on' : ''}`}>
               <span className="lp-icon" style={{ background: p.hue }}><Icon size={17} /></span>
               <div className="lp-grow">
-                <h3>{p.name}{p.labs && <span className="lp-labs">Labs</span>} <span className={`lp-status ${p.status}`}>{statusLabel(p.status, 'panel')}</span></h3>
+                <h3>{p.name}{p.labs && <span className="lp-labs">Labs</span>} {p.soon ? <span className="lp-status soon">Coming soon</span> : <span className={`lp-status ${p.status}`}>{statusLabel(p.status, 'panel')}</span>}</h3>
                 <p>{p.tagline}</p>
                 {p.demo.startsWith('#') ? <a href={p.demo} target="_blank" rel="noopener" className="up-link">Try it <ExternalLink size={11} /></a> : <button className="up-link up-linkbtn" onClick={() => openDemo(project.id, toast)}>Try it <ExternalLink size={11} /></button>}
               </div>
-              <span className="up-toggle">
+              {p.soon ? <span className="up-toggle"><small>Coming soon</small></span> : <span className="up-toggle">
                 <Switch checked={on} onChange={() => toggle(p.id)} label={`${p.name} for ${project.name}`} />
                 <small>{on ? (p.status !== 'console' ? 'On' : 'Requested') : 'Off'}</small>
-              </span>
+              </span>}
             </article>
           )
         })}

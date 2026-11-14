@@ -91,7 +91,7 @@ export function WidgetBuilder() {
 
           <section className="up-card">
             <h2>Modules</h2>
-            {PRODUCTS.filter((p) => (SCRIPT_MODULES as readonly string[]).includes(p.id)).map((p) => {
+            {PRODUCTS.filter((p) => (SCRIPT_MODULES as readonly string[]).includes(p.id) && !p.soon).map((p) => {
               const on = project.products.includes(p.id)
               const toggle = () => {
                 if (p.id === 'comments') { if (on) edit((c) => ({ ...c, modules: { ...c.modules, comments: !c.modules.comments } })); return }

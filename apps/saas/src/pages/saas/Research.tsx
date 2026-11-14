@@ -46,7 +46,6 @@ const FILTERS: { id: string; title: string; help: string; empty: string; has: (s
   { id: 'fivesec', title: '5-second tests', help: 'What people remember after seeing a page for a few seconds.', empty: 'No 5-second tests yet. Make one with New study.', has: (s) => s.kind === 'fivesec' },
   { id: 'browse', title: 'Heatmaps', help: 'Studies whose clicks build a heatmap. Open a study’s Results, then its heatmap buttons.', empty: 'No heatmap visits yet. Make one with New study → Heatmap visit.', has: (s) => s.kind === 'browse' || s.kind === 'usability' },
   { id: 'eyes', title: 'Eye tracking', help: 'Studies that ask participants to turn on their webcam for eye tracking.', empty: 'No study uses eye tracking yet. Edit a usability test and turn on eye tracking.', has: (s) => s.eye_tracking },
-  { id: 'doors', title: 'Fake doors', help: 'Studies that offer a feature that doesn’t exist yet, to measure interest.', empty: 'No study has fake doors yet. Edit a study and add one under Fake doors.', has: (s) => Array.isArray(s.config.doors) && (s.config.doors as unknown[]).length > 0 },
 ]
 interface TaskDraft { id: string; prompt: string; startPage: string; rule: 'none' | 'page' | 'element'; target: string; limitSec: number }
 const newTask = (n: number): TaskDraft => ({ id: `t${n}`, prompt: '', startPage: '/', rule: 'none', target: '', limitSec: 180 })
@@ -70,7 +69,7 @@ export function Research() {
   const [confirm, setConfirm] = useState<StudyRow | null>(null)
   const [clearing, setClearing] = useState<StudyRow | null>(null)
   const [params, setParams] = useSearchParams()
-  // The sidebar's Results links: ?kind=usability|fivesec|browse|eyes|doors filters the studies, ?tab=sessions opens Sessions.
+  // The sidebar's Results links: ?kind=usability|fivesec|browse|eyes filters the studies, ?tab=sessions opens Sessions.
   const tab: 'studies' | 'sessions' = params.get('tab') === 'sessions' ? 'sessions' : 'studies'
   const setTab = (t: 'studies' | 'sessions') => setParams(t === 'sessions' ? { tab: 'sessions' } : {}, { replace: true })
   const filter = FILTERS.find((f) => f.id === params.get('kind')) ?? null
@@ -239,6 +238,7 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
         {kind !== 'fivesec' && (
           <label className="up-check"><input type="checkbox" checked={eyes} onChange={(e) => setEyes(e.target.checked)} /> Ask participants for webcam eye tracking (they can say no; video stays in their browser, only where they look is saved){!gazeOn && ' · turn on Eye tracking in Products and update your site'}</label>
         )}
+{doorsOn && (
         <details className="wb-more" open={doors.length > 0}>
           <summary>Fake doors (optional)</summary>
           <p className="up-muted">Offer a feature that doesn’t exist yet, to see who wants it. Participants who click it see that it’s coming soon. Only this study’s participants see the doors.{!doorsOn && ' Turn on Fake doors in Products and press Update site for them to show.'}</p>
@@ -256,6 +256,7 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
           ))}
           {doors.length < 5 && <button className="lp-btn sm" onClick={() => setDoors([...doors, { page: '', sel: '', mode: 'add', label: '', message: '' }])}><Plus size={13} /> Add a fake door</button>}
         </details>
+        )}
         <label className="lp-field">Participants at most<input type="number" min={1} max={1000} value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))} /></label>
         <p className="up-muted">Participants first see what is recorded (clicks, pages, time) and what never is (what they type into your site, video), and choose to agree.</p>
         {problem && <p className="lp-error">{problem}</p>}
