@@ -195,7 +195,7 @@ function Toolbox() {
               <p>{cur.what}</p>
             </div>
             <Preview id={sel} />
-            <p className="fine on-blue">An animated preview of the flow, not a recording of the product.</p>
+            <p className="fine on-blue">The clip is an AI-made illustration and the screen an animated preview. Neither is a recording of the product.</p>
           </div>
         </div>
         <div className="stackbar" aria-live="polite">

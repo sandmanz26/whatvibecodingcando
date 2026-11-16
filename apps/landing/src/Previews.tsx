@@ -1,12 +1,14 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { IcCheck, IcMic, IcSpark, WDock, WPin } from './Widget'
 
 /**
  * The toolbox's preview screen: pick a tool and a short loop shows how it works, in three steps
  * (the way a game's skill list plays a clip of the move you have selected).
  *
- * These are animated drawings of each flow, built from the same widget drawing as the rest of the
- * page. They are not recordings of the product, and the screen says so.
+ * Two things play side by side: a short clip of the tool's layer (public/clips, AI-made in the
+ * style of the scroll film) and an animated drawing of the flow on a site, built from the same
+ * widget drawing as the rest of the page. Neither is a recording of the product, and the screen
+ * says so.
  */
 export type PreviewId = 'comments' | 'prompt' | 'compare' | 'narration' | 'usability' | 'fivesec' | 'heatmap' | 'insights' | 'gaze' | 'report' | 'inspect' | 'dscheck' | 'tokens'
 
@@ -152,7 +154,10 @@ function Scene({ id, ph }: { id: PreviewId; ph: number }) {
 export default function Preview({ id }: { id: PreviewId }) {
   const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   const [ph, setPh] = useState(calm ? 2 : 0)
+  const clip = useRef<HTMLVideoElement | null>(null)
   useEffect(() => { setPh(calm ? 2 : 0) }, [id, calm])
+  // Autoplay can be refused or paused by the browser; ask again whenever the tool changes.
+  useEffect(() => { if (!calm) void clip.current?.play().catch(() => undefined) }, [id, calm])
   useEffect(() => {
     if (calm) return
     const t = window.setTimeout(() => setPh((p) => (p + 1) % 3), ph === 2 ? 2600 : 1500)
@@ -160,7 +165,13 @@ export default function Preview({ id }: { id: PreviewId }) {
   }, [ph, id, calm])
   return (
     <div className="pv" data-ph={ph}>
-      <div className="pv-screen" key={id} aria-hidden><Scene id={id} ph={ph} /></div>
+      <div className="pv-stage">
+        <div className="pv-clip" data-id={id} aria-hidden>
+          <video ref={clip} key={id} src={`./clips/${id}.mp4`} poster={`./clips/${id}.webp`} muted loop playsInline autoPlay={!calm} preload="metadata" />
+          <span>the move</span>
+        </div>
+        <div className="pv-screen" key={id} aria-hidden><Scene id={id} ph={ph} /><span className="pv-label">on your site</span></div>
+      </div>
       <ol className="pv-steps">
         {STEPS[id].map((s, i) => <li key={s} className={i === ph ? 'on' : i < ph ? 'past' : ''}><i>{i + 1}</i>{s}</li>)}
       </ol>
