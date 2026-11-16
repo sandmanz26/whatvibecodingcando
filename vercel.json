@@ -11,6 +11,11 @@
       "permanent": false
     },
     {
+      "source": "/landing",
+      "destination": "/landing/",
+      "permanent": false
+    },
+    {
       "source": "/saas",
       "destination": "/",
       "permanent": false

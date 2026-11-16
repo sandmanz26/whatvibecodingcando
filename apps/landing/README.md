@@ -1,15 +1,24 @@
 # Landing page (apps/landing)
 
-Folder for the marketing landing page of Vibe Collab. Scaffold only: the brief is still to come.
+The standalone landing page for Vibe Collab, made for the proposal. React + Vite, front end only, no backend, English only. Served at `/landing/` (built into `dist/landing`).
 
-## Rules from the repository (CLAUDE.md)
+- **Run:** `npm run dev:landing` at the root, or `npm run dev` here.
+- **Nothing is shared.** Own `package.json`, lockfile and `node_modules`; no imports from `apps/saas` or `apps/content`. Links to the product are absolute (`LINKS` in `src/content.ts`).
 
-- Nothing is shared: this folder gets its own code, `package.json`, lockfile and `node_modules` when it needs them. No imports from `apps/saas` or `apps/content`, no workspaces.
-- Not wired into the root `build`, `typecheck`, `install:all` or `vercel.json` yet. Decide where it is served first (see below).
-- Never claim a product runs in the script unless its status is `script`; say "no server" only where it is true.
+## The story, top to bottom
 
-## Reference (read, do not import)
+| Sheet | What the visitor learns |
+|---|---|
+| Start | The thesis: AI output always *looks* finished. The headline is reviewed live to show the product in five seconds. |
+| The problem | Six problems, each named by the sentence people say when it happens, with what it costs. One cause: the review happens somewhere other than the product. |
+| The layer | One script tag. Three layers over the live site (Feedback, Research, Design QA); each says which problems it answers and which tools it has. |
+| The loop | Paste, send a link, review, copy the fix as a prompt, ship again. |
+| Try it | The page itself can be commented on (press C). Notes stay in memory; nothing is stored or sent. |
+| The spec | Why it is safe on a real site, as facts. |
+| Pricing | Free, and Pro at $2 a site; free during the beta. |
 
-- Current website: `apps/saas/src/pages/saas/Landing.tsx` (`#/landingpage`), styles in `apps/saas/src/saas/saas.css` (scoped under `.lp`).
-- Look today: warm paper `#f6f2ea`, ink `#16130f`, accent orange `#e8590c`, Inter, 1.5px ink borders with hard offset shadows, lo-fi wireframe hero.
-- Products and honest status: `apps/saas/src/saas/products.ts`. Pricing: Free, Pro $2 / site / month (Rp 29.000 in Indonesia), free during the beta.
+## Rules
+
+- All copy is in `src/content.ts`. No invented customers, numbers or testimonials. A product claim must match `apps/saas/src/saas/products.ts` and the SaaS README.
+- Look (`src/styles.css`): cobalt blueprint = the product, marker yellow = the review, heat orange only for pins and heatmaps. Type: Archivo (wide, heavy) for display and body, Shantell Sans for what people say, Martian Mono for labels.
+- Keep it working at phone width, with keyboard focus visible and reduced motion respected.

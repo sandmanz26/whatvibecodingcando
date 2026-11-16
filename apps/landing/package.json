@@ -1,0 +1,27 @@
+{
+  "name": "vibe-collab-landing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The standalone landing page for Vibe Collab (proposal). Front end only; shares nothing with apps/saas or apps/content.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.2.0",
+    "@fontsource-variable/martian-mono": "^5.2.0",
+    "@fontsource-variable/shantell-sans": "^5.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}
