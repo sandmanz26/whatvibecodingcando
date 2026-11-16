@@ -10,6 +10,8 @@ const LIVE = 'https://whatvibecodingcando.vercel.app/'
 export const LINKS = {
   demo: `${LIVE}embed-demo.html`,
   start: `${LIVE}#/app/register`,
+  /** Sign-up with these products picked (the live site reads `?products=`). */
+  startWith: (ids: string[]) => `${LIVE}#/app/register${ids.length ? `?products=${ids.join(',')}` : ''}`,
   login: `${LIVE}#/app/login`,
   guide: `${LIVE}#/guide`,
   privacy: `${LIVE}#/privacy`,
@@ -22,6 +24,7 @@ export const BRAND = 'Vibe Collab'
 export const PROBLEMS = [
   {
     quote: 'Which button? On which page?',
+    who: 'Developer · team chat',
     title: 'Feedback gets cut off from the product.',
     body: 'It arrives as a cropped screenshot in a chat, without the page, the element, the screen size or the version it was about. Someone has to ask before anyone can fix.',
     cost: 'A round of questions before every fix',
@@ -29,6 +32,7 @@ export const PROBLEMS = [
   },
   {
     quote: 'I told the AI that twice already.',
+    who: 'Founder · 23:40',
     title: 'Every note is retyped as a prompt.',
     body: 'You become the translator between the people reviewing and the tool building. Each note is rewritten by hand with its context, and a detail is lost on every pass.',
     cost: 'Hours of copy, paste and explain',
@@ -36,6 +40,7 @@ export const PROBLEMS = [
   },
   {
     quote: 'It worked when I tried it.',
+    who: 'Developer · launch day',
     title: 'Nobody new has ever used it.',
     body: 'AI-built screens look finished on day one, so nobody checks whether a first-time user can get through them. The first real usability test is the launch.',
     cost: 'Problems found by your customers',
@@ -43,6 +48,7 @@ export const PROBLEMS = [
   },
   {
     quote: 'I just feel the button should be bigger.',
+    who: 'Client · review call',
     title: 'Opinions decide, because nothing is measured.',
     body: 'Without evidence the loudest voice wins. The team argues about taste for a week and still doesn’t know where people click or where they give up.',
     cost: 'Decisions made on taste',
@@ -50,6 +56,7 @@ export const PROBLEMS = [
   },
   {
     quote: 'Why do we have nine different blues?',
+    who: 'Designer · team chat',
     title: 'The design drifts with every prompt.',
     body: 'Each prompt invents its own colours, spacing and font sizes. The design system erodes one hard-coded value at a time, and nobody sees it happen.',
     cost: 'A product that stops looking like yours',
@@ -57,6 +64,7 @@ export const PROBLEMS = [
   },
   {
     quote: 'That’s three more tools and three more bills.',
+    who: 'Founder · planning',
     title: 'Reviewing properly needs a stack of its own.',
     body: 'Comments in one tool, heatmaps in another, user tests in a third. Each has its own script, its own login and a price per seat, so small teams skip all of it.',
     cost: 'The review never happens',
@@ -116,7 +124,8 @@ export const LAYERS: {
   title: string
   body: string
   answers: string[]
-  tools: { name: string; what: string; tag?: string }[]
+  /** `id` is the product's id on the live site; a tool without one comes with Comments. */
+  tools: { id?: string; name: string; what: string; tag?: string }[]
 }[] = [
   {
     id: 'feedback',
@@ -126,10 +135,10 @@ export const LAYERS: {
     body: 'Reviewers click the thing they mean. The comment keeps its page, element, screen size and version, so nobody has to ask. When it’s time to fix, copy it as a prompt for your AI coding tool.',
     answers: ['Which button? On which page?', 'I told the AI that twice already.'],
     tools: [
-      { name: 'Comments', what: 'Pins that stick to the element, with replies, voice notes and a done state.' },
+      { id: 'comments', name: 'Comments', what: 'Pins that stick to the element, with replies, voice notes and a done state.' },
       { name: 'Copy fix prompt', what: 'One comment or the whole open list, written out for your AI coding tool.' },
-      { name: 'Component review', what: 'Two components side by side, with the style differences listed.' },
-      { name: 'Narration', what: 'Talk through the product; each screen becomes a chapter.' },
+      { id: 'compare', name: 'Component review', what: 'Two components side by side, with the style differences listed.' },
+      { id: 'narration', name: 'Narration', what: 'Talk through the product; each screen becomes a chapter.' },
     ],
   },
   {
@@ -140,12 +149,12 @@ export const LAYERS: {
     body: 'Send a link, give a task, and see what happens on the real product, not on a prototype. You get success rates, times and heatmaps where there used to be opinions.',
     answers: ['It worked when I tried it.', 'I just feel the button should be bigger.'],
     tools: [
-      { name: 'Usability tests', what: 'A task, a timer, and where each person got lost.' },
-      { name: '5-second tests', what: 'Show a screen for five seconds and learn what sticks.' },
-      { name: 'Heatmaps', what: 'Where people click during a task, per screen and per device.' },
-      { name: 'Participant paths', what: 'Each participant’s pages and clicks, with rage and dead clicks marked.' },
-      { name: 'Eye tracking', what: 'Webcam gaze heatmaps. The video never leaves the device.', tag: 'Labs' },
-      { name: 'Reports', what: 'The research as ranked findings, each linked to its evidence.' },
+      { id: 'usability', name: 'Usability tests', what: 'A task, a timer, and where each person got lost.' },
+      { id: 'fivesec', name: '5-second tests', what: 'Show a screen for five seconds and learn what sticks.' },
+      { id: 'heatmap', name: 'Heatmaps', what: 'Where people click during a task, per screen and per device.' },
+      { id: 'insights', name: 'Participant paths', what: 'Each participant’s pages and clicks, with rage and dead clicks marked.' },
+      { id: 'gaze', name: 'Eye tracking', what: 'Webcam gaze heatmaps. The video never leaves the device.', tag: 'Labs' },
+      { id: 'report', name: 'Reports', what: 'The research as ranked findings, each linked to its evidence.' },
     ],
   },
   {
@@ -156,9 +165,9 @@ export const LAYERS: {
     body: 'Point at anything to see its real colours, type and spacing, and whether each one is a design token or a value somebody’s prompt made up.',
     answers: ['Why do we have nine different blues?'],
     tools: [
-      { name: 'Inspect', what: 'Hover any element: its styles, and token or hard-coded for each.' },
-      { name: 'Design system check', what: 'Scans a page for off-system values and suggests the nearest token.' },
-      { name: 'Design tokens', what: 'Upload token files, preview them live and compare two sets.' },
+      { id: 'inspect', name: 'Inspect', what: 'Hover any element: its styles, and token or hard-coded for each.' },
+      { id: 'dscheck', name: 'Design system check', what: 'Scans a page for off-system values and suggests the nearest token.' },
+      { id: 'tokens', name: 'Design tokens', what: 'Upload token files, preview them live and compare two sets.' },
     ],
   },
 ]

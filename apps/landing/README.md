@@ -26,8 +26,16 @@ The standalone landing page for Vibe Collab, made for the proposal. React + Vite
 
 ## The scroll film
 
-`src/Showcase.tsx` pins a stage and plays `public/frames/f-001…134.webp` on a canvas as the page scrolls. The frames come from one 8-second AI video (Higgsfield: two key images made with GPT Image, animated between them with Kling 3.0), cut to images with ffmpeg so it scrubs smoothly in every browser:
+`src/Showcase.tsx` pins a stage and plays `public/frames/f-000…150.webp` on a canvas as the page scrolls. The frames were made once with Higgsfield:
 
-`ffmpeg -ss 1.3 -i film.mp4 -vf "fps=20,scale=1280:-2" -c:v libwebp -quality 60 public/frames/f-%03d.webp`
+- Six key images (GPT Image): the site alone, then one more layer each (Comments, Voice notes, Heatmaps, Copy fix prompt, Design system check). The full stack was made first and the others are edits of it, so they line up.
+- Five 3-second clips (Kling 3.0), each from one key image to the next, so the layers always arrive in order.
+- Every 30th frame (`HOLD` in `Showcase.tsx`) is the key image itself at 1440 px, so the film is sharp whenever it rests; the 29 frames between are taken from the clip at 960 px.
 
-`KEYS` in `Showcase.tsx` says where in the film each feature's layer has settled; change it with `FRAMES` if the film is replaced. The film is atmosphere only: what a feature really looks like is the coded demo beside it.
+To replace the film, keep that layout (`PER` frames per step) or change `PER` and `HOLD`. The film is atmosphere only: what a feature really looks like is the demo beside it.
+
+## Product UI on the page
+
+`src/Widget.tsx` is a drawing of the product's widget (dock, pin, new-comment card, thread), written here from scratch in the product's own colours; nothing is imported from `apps/saas`. It is used in the hero, the five demos (`src/Demos.tsx`), the loop, the visitor/reviewer flip (`src/Audience.tsx`) and the page's own comment mode (`src/Notes.tsx`). If the real widget's look changes, update `Widget.tsx` and the `.w-` rules to match.
+
+Everything interactive is a demo and says so where it could mislead: comments stay in the tab, the voice note uses no microphone, the heatmap is example data. The toolbox switches only build the sign-up link (`?products=`).

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { BRAND, LAYERS, LINKS, LOOP, PRICES, PROBLEMS, SHEETS, SPEC } from './content'
 import Notes from './Notes'
 import Showcase from './Showcase'
+import Audience from './Audience'
+import { IcLock, IcSpark, WDock, WPin, WThread } from './Widget'
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -87,7 +89,7 @@ function Hero() {
         <p className="eyebrow on-blue">The review layer for AI-built products</p>
         <h1>
           <span className="h1-a">It looks <span className="pinned">finished.
-            <span className="pin hero-pin" aria-hidden>1</span>
+            <WPin n={1} className="hero-pin" />
             <span className="cursor" aria-hidden>
               <svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 2l15 7.5-6.5 2L9 18z" fill="#e4ff54" stroke="#070d3a" strokeWidth="1.4" strokeLinejoin="round" /></svg>
               <i>Rani</i>
@@ -107,9 +109,7 @@ function Hero() {
           </div>
 
           <aside className="thread" aria-label="An example review comment on the headline">
-            <div className="thread-head"><span className="pin sm" aria-hidden>1</span><span>on <b>h1</b> · this page · 1440 px</span></div>
-            <div className="msg m1"><b>Rani</b><p>It <em>looks</em> finished. Has anyone outside the team actually tried it?</p></div>
-            <div className="msg m2"><b>Budi</b><p>Not yet. Sending a test link to five people now.</p></div>
+            <WThread n={1} author="Rani" time="just now" meta="on h1 · this page" text="It looks finished. Has anyone outside the team actually tried it?" replies={step >= 4 ? [{ author: 'Budi', text: 'Not yet. Sending a test link to five people now.' }] : []} />
           </aside>
         </div>
       </div>
@@ -129,7 +129,7 @@ function Problem() {
         <ul className="problems">
           {PROBLEMS.map((p, n) => (
             <Reveal as="li" key={p.quote} delay={n % 2 ? 80 : 0}>
-              <p className="quote"><span>“{p.quote}”</span></p>
+              <div className="chat"><span className="chat-who">{p.who}</span><p className="quote">{p.quote}</p></div>
               <div className="problem-body">
                 <h3>{p.title}</h3>
                 <p>{p.body}</p>
@@ -148,13 +148,17 @@ function Problem() {
 
 /** Everything else the same script carries, grouped by the layer it belongs to. */
 function Toolbox() {
+  const all = LAYERS.flatMap((l) => l.tools).filter((t) => t.id)
+  const [on, setOn] = useState<string[]>(['comments', 'heatmap', 'dscheck'])
+  const toggle = (id: string) => setOn((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
+  const picked = all.filter((t) => on.includes(t.id!))
   return (
     <section id="tools" className="sheet paper">
       <div className="wrap">
         <div className="head">
           <p className="eyebrow">The toolbox</p>
-          <h2>Those were five. <span className="dim">The same script carries the rest.</span></h2>
-          <p className="sub">Three layers, one install. Turn on only what you need for this project and add the others when you want them.</p>
+          <h2>Those were five. <span className="dim">Switch on the rest.</span></h2>
+          <p className="sub">The same script carries {all.length} tools in three layers. Turn on only what this project needs; the switches below work the way they do in your panel.</p>
         </div>
         <div className="boxes">
           {LAYERS.map((l, n) => (
@@ -162,12 +166,29 @@ function Toolbox() {
               <p className="eyebrow">{l.label} · {l.verb}</p>
               <h3>{l.title}</h3>
               <ul>
-                {l.tools.map((t) => (
-                  <li key={t.name}><b>{t.name}{t.tag && <em>{t.tag}</em>}</b><span>{t.what}</span></li>
-                ))}
+                {l.tools.map((t) => {
+                  const id = t.id
+                  const active = id ? on.includes(id) : on.includes('comments')
+                  return (
+                    <li key={t.name} className={active ? 'on' : ''}>
+                      <span><b>{t.name}{t.tag && <em>{t.tag}</em>}</b><span>{t.what}</span></span>
+                      {id
+                        ? <button className="sw" role="switch" aria-checked={active} aria-label={t.name} onClick={() => toggle(id)}><i /></button>
+                        : <small className="with">with Comments</small>}
+                    </li>
+                  )
+                })}
               </ul>
             </Reveal>
           ))}
+        </div>
+        <div className="stackbar" aria-live="polite">
+          <div className="stackbar-list">
+            <span className="stackbar-n">{picked.length}</span>
+            <p><b>{picked.length === 1 ? 'tool' : 'tools'} in your script</b><span>{picked.length ? picked.map((t) => t.name).join(' · ') : 'Nothing on yet. Flip a switch.'}</span></p>
+          </div>
+          <div className="stackbar-price"><span>Free in the beta, then</span><b>$2 a site</b></div>
+          <a className="btn marker" href={LINKS.startWith(on)}>Start with {picked.length === 1 ? 'this one' : 'these'} <Arrow /></a>
         </div>
       </div>
     </section>
@@ -189,6 +210,12 @@ function Loop() {
               <span className="num">{n + 1}</span>
               <h3>{s.title}</h3>
               <p>{s.body}</p>
+              <div className="loop-ui" aria-hidden>
+                {n === 0 && <code className="lu-code">&lt;script src="…/vibe.js"<br />data-project="my-app" defer&gt;</code>}
+                {n === 1 && <span className="lu-link"><IcLock size={12} /><span>your-app.com/#vibe_r=…</span><b>Copy</b></span>}
+                {n === 2 && <span className="lu-site"><i /><i /><i /><WPin n={1} /><WPin n={2} /><WDock count={2} /></span>}
+                {n === 3 && <span className="w-btn spark"><IcSpark size={13} /> Copy 2 open as AI prompt</span>}
+              </div>
             </Reveal>
           ))}
         </ol>
@@ -230,6 +257,7 @@ function Spec() {
           <h2>Safe to put on a real site.</h2>
           <p className="sub">It runs on your production pages, so these are the parts that matter. No claims here, only how it is built.</p>
         </div>
+        <Audience />
         <Reveal>
           <dl className="titleblock">
             {SPEC.map((s) => (
