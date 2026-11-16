@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { BRAND, LAYERS, LINKS, LOOP, PRICES, PROBLEMS, SHEETS, SPEC, type LayerId } from './content'
+import { BRAND, LAYERS, LINKS, LOOP, PRICES, PROBLEMS, SHEETS, SPEC } from './content'
 import Notes from './Notes'
+import Showcase from './Showcase'
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -145,102 +146,28 @@ function Problem() {
   )
 }
 
-/** The exploded drawing: your site at the bottom, one clear film per layer above it. */
-function Stack({ active }: { active: LayerId | null }) {
-  const cls = (id: LayerId) => `film film-${id} ${active === null || active === id ? 'on' : 'off'}`
+/** Everything else the same script carries, grouped by the layer it belongs to. */
+function Toolbox() {
   return (
-    <div className={`stack ${active ? `is-${active}` : 'is-all'}`} aria-hidden>
-      <div className="stack-3d">
-        <div className="film film-site">
-          <i className="s-nav" /><i className="s-h1" /><i className="s-h2" /><i className="s-btn" />
-          <i className="s-card c1" /><i className="s-card c2" /><i className="s-card c3" />
-          <i className="s-line l1" /><i className="s-line l2" />
-          <b className="film-tag">Your live site</b>
-        </div>
-        <div className={cls('feedback')}>
-          <span className="pin p1">1</span><span className="pin p2">2</span><span className="pin p3">3</span>
-          <span className="note">should say “per seat”</span>
-          <b className="film-tag">Feedback</b>
-        </div>
-        <div className={cls('research')}>
-          <i className="heat h1" /><i className="heat h2" /><i className="heat h3" />
-          <svg viewBox="0 0 300 380" className="path"><path d="M40 40 C120 60 90 150 150 170 S230 220 205 300" /><circle cx="40" cy="40" r="5" /><circle cx="150" cy="170" r="5" /><circle cx="205" cy="300" r="5" /></svg>
-          <b className="film-tag">Research</b>
-        </div>
-        <div className={cls('design')}>
-          <i className="box b1"><em>--radius-md ✓</em></i>
-          <i className="box b2 bad"><em>#2b4bff ✕ not a token</em></i>
-          <i className="box b3"><em>--space-4 ✓</em></i>
-          <b className="film-tag">Design QA</b>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Layer() {
-  const [active, setActive] = useState<LayerId | null>(null)
-  const refs = useRef<Record<string, HTMLElement | null>>({})
-  useEffect(() => {
-    const onScroll = () => {
-      const mid = window.innerHeight * 0.5
-      let cur: LayerId | null = null
-      for (const l of LAYERS) {
-        const r = refs.current[l.id]?.getBoundingClientRect()
-        if (r && r.top < mid && r.bottom > mid * 0.5) cur = l.id
-      }
-      setActive(cur)
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  return (
-    <section id="layer" className="sheet night">
+    <section id="tools" className="sheet paper">
       <div className="wrap">
         <div className="head">
-          <p className="eyebrow on-blue">The product</p>
-          <h2>So put the review <span className="hl">on the product.</span></h2>
-          <p className="sub">One line in your site’s HTML adds a clear layer over the real thing. Your team works on that layer; your code and your visitors never notice it.</p>
+          <p className="eyebrow">The toolbox</p>
+          <h2>Those were five. <span className="dim">The same script carries the rest.</span></h2>
+          <p className="sub">Three layers, one install. Turn on only what you need for this project and add the others when you want them.</p>
         </div>
-        <Reveal className="snippet">
-          <span className="snippet-label">The whole install</span>
-          <code><span className="c-dim">&lt;</span>script src=<span className="c-str">"…/embed/vibe.js"</span> data-project=<span className="c-str">"my-app"</span> defer<span className="c-dim">&gt;&lt;/</span>script<span className="c-dim">&gt;</span></code>
-        </Reveal>
-
-        <div className="layers">
-          <div className="layers-stage">
-            <Stack active={active} />
-            <ol className="legend" aria-hidden>
-              {LAYERS.map((l) => <li key={l.id} className={active === l.id ? 'on' : ''}>{l.label}</li>)}
-            </ol>
-          </div>
-          <div className="chapters">
-            {LAYERS.map((l) => (
-              <article key={l.id} ref={(el) => { refs.current[l.id] = el }} className={`chapter ${active === l.id ? 'on' : ''}`}>
-                <p className="eyebrow on-blue">{l.label} layer · {l.verb}</p>
-                <h3>{l.title}</h3>
-                <p className="chapter-body">{l.body}</p>
-                <p className="answers">{l.answers.map((a) => <span key={a}>“{a}”</span>)}</p>
-                <ul className="tools">
-                  {l.tools.map((t) => (
-                    <li key={t.name}><b>{t.name}{t.tag && <em>{t.tag}</em>}</b><span>{t.what}</span></li>
-                  ))}
-                </ul>
-                {l.id === 'feedback' && (
-                  <div className="prompt" aria-label="Example of a copied fix prompt">
-                    <span className="snippet-label">Copy fix prompt gives your AI tool this</span>
-                    <pre>{`Fix this on /pricing
-Element   .plan:nth-child(2) .price
-Screen    390 × 844, mobile
-Version   14
-Feedback  “The middle plan should say per seat.”`}</pre>
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
+        <div className="boxes">
+          {LAYERS.map((l, n) => (
+            <Reveal as="article" key={l.id} className="box-col" delay={n * 90}>
+              <p className="eyebrow">{l.label} · {l.verb}</p>
+              <h3>{l.title}</h3>
+              <ul>
+                {l.tools.map((t) => (
+                  <li key={t.name}><b>{t.name}{t.tag && <em>{t.tag}</em>}</b><span>{t.what}</span></li>
+                ))}
+              </ul>
+            </Reveal>
+          ))}
         </div>
       </div>
     </section>
@@ -374,7 +301,8 @@ export default function App() {
       <main>
         <Hero />
         <Problem />
-        <Layer />
+        <Showcase />
+        <Toolbox />
         <Loop />
         <TryIt onStart={() => setCommenting(true)} />
         <Spec />

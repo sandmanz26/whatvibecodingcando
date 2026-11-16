@@ -64,7 +64,50 @@ export const PROBLEMS = [
   },
 ] as const
 
-export type LayerId = 'feedback' | 'research' | 'design'
+/**
+ * The five features the page puts on stage, in the order their layers rise in the scroll film
+ * (public/frames). `answers` is the sentence people say when they need it.
+ */
+export type FeatureId = 'comments' | 'voice' | 'heatmap' | 'prompt' | 'dscheck'
+export const FEATURES: { id: FeatureId; name: string; title: string; body: string; answers: string }[] = [
+  {
+    id: 'comments',
+    name: 'Comments',
+    title: 'Point at it. Say it there.',
+    body: 'Reviewers click the element they mean and write. The pin stays on that element at every screen size, with replies and a done state, so a comment never needs a screenshot.',
+    answers: 'Which button? On which page?',
+  },
+  {
+    id: 'voice',
+    name: 'Voice notes',
+    title: 'Too long to type? Say it.',
+    body: 'Record up to two minutes on any comment or reply. The tone and the detail survive, and the recording stays attached to the element it is about.',
+    answers: 'It’s easier if I just explain it.',
+  },
+  {
+    id: 'heatmap',
+    name: 'Heatmaps',
+    title: 'See where they really clicked.',
+    body: 'Give people a task on your real product and get a heatmap of every click, per screen and per device. The argument ends where the map starts.',
+    answers: 'I just feel the button should be bigger.',
+  },
+  {
+    id: 'prompt',
+    name: 'Copy fix prompt',
+    title: 'From feedback to fix in one paste.',
+    body: 'One comment, or the whole open list, becomes a prompt for your AI coding tool, with the page, element, device and version already written in.',
+    answers: 'I told the AI that twice already.',
+  },
+  {
+    id: 'dscheck',
+    name: 'Design system check',
+    title: 'Find every value the AI made up.',
+    body: 'Scan a page for colours, radii, font sizes and fonts that aren’t your design tokens. Each finding names the nearest token and shows you where it is.',
+    answers: 'Why do we have nine different blues?',
+  },
+]
+
+type LayerId = 'feedback' | 'research' | 'design'
 
 export const LAYERS: {
   id: LayerId
@@ -160,7 +203,8 @@ export const PRICES = [
 export const SHEETS = [
   { id: 'top', name: 'Start' },
   { id: 'problem', name: 'The problem' },
-  { id: 'layer', name: 'The layer' },
+  { id: 'layer', name: 'The product' },
+  { id: 'tools', name: 'The toolbox' },
   { id: 'loop', name: 'The loop' },
   { id: 'try', name: 'Try it' },
   { id: 'spec', name: 'The spec' },
