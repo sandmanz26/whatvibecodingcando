@@ -3,6 +3,7 @@ import { BRAND, LAYERS, LINKS, LOOP, PRICES, PROBLEMS, SHEETS, SPEC } from './co
 import Notes from './Notes'
 import Showcase from './Showcase'
 import Audience from './Audience'
+import Preview, { type PreviewId } from './Previews'
 import { IcLock, IcSpark, WDock, WPin, WThread } from './Widget'
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -148,39 +149,54 @@ function Problem() {
 
 /** Everything else the same script carries, grouped by the layer it belongs to. */
 function Toolbox() {
-  const all = LAYERS.flatMap((l) => l.tools).filter((t) => t.id)
+  const rows = LAYERS.flatMap((l) => l.tools.map((t) => ({ ...t, key: (t.id ?? 'prompt') as PreviewId, layer: l.label })))
   const [on, setOn] = useState<string[]>(['comments', 'heatmap', 'dscheck'])
+  const [sel, setSel] = useState<PreviewId>('comments')
   const toggle = (id: string) => setOn((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
-  const picked = all.filter((t) => on.includes(t.id!))
+  const picked = rows.filter((t) => t.id && on.includes(t.id))
+  const cur = rows.find((r) => r.key === sel) ?? rows[0]
   return (
     <section id="tools" className="sheet paper">
       <div className="wrap">
         <div className="head">
           <p className="eyebrow">The toolbox</p>
-          <h2>Those were five. <span className="dim">Switch on the rest.</span></h2>
-          <p className="sub">The same script carries {all.length} tools in three layers. Turn on only what this project needs; the switches below work the way they do in your panel.</p>
+          <h2>Those were five. <span className="dim">Here are all {rows.length}.</span></h2>
+          <p className="sub">Point at a tool to watch how it works. Switch on the ones this project needs; the same script carries them all.</p>
         </div>
-        <div className="boxes">
-          {LAYERS.map((l, n) => (
-            <Reveal as="article" key={l.id} className="box-col" delay={n * 90}>
-              <p className="eyebrow">{l.label} · {l.verb}</p>
-              <h3>{l.title}</h3>
-              <ul>
-                {l.tools.map((t) => {
-                  const id = t.id
-                  const active = id ? on.includes(id) : on.includes('comments')
-                  return (
-                    <li key={t.name} className={active ? 'on' : ''}>
-                      <span><b>{t.name}{t.tag && <em>{t.tag}</em>}</b><span>{t.what}</span></span>
-                      {id
-                        ? <button className="sw" role="switch" aria-checked={active} aria-label={t.name} onClick={() => toggle(id)}><i /></button>
-                        : <small className="with">with Comments</small>}
-                    </li>
-                  )
-                })}
-              </ul>
-            </Reveal>
-          ))}
+        <div className="skills">
+          <div className="skill-list">
+            {LAYERS.map((l) => (
+              <div className="skill-group" key={l.id}>
+                <p className="eyebrow">{l.label} · {l.verb}</p>
+                <ul>
+                  {l.tools.map((t) => {
+                    const key = (t.id ?? 'prompt') as PreviewId
+                    const id = t.id
+                    const active = id ? on.includes(id) : on.includes('comments')
+                    return (
+                      <li key={t.name} className={`${sel === key ? 'sel' : ''} ${active ? 'on' : ''}`} onMouseEnter={() => setSel(key)}>
+                        <button className="skill-name" onClick={() => setSel(key)} onFocus={() => setSel(key)} aria-pressed={sel === key}>
+                          <i aria-hidden />{t.name}{t.tag && <em>{t.tag}</em>}
+                        </button>
+                        {id
+                          ? <button className="sw" role="switch" aria-checked={active} aria-label={`${t.name} in your script`} onClick={() => toggle(id)}><i /></button>
+                          : <small className="with">with Comments</small>}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <div className="skill-view">
+            <div className="skill-head">
+              <p className="eyebrow on-blue">{cur.layer} · how it works</p>
+              <h3>{cur.name}{cur.tag && <em>{cur.tag}</em>}</h3>
+              <p>{cur.what}</p>
+            </div>
+            <Preview id={sel} />
+            <p className="fine on-blue">An animated preview of the flow, not a recording of the product.</p>
+          </div>
         </div>
         <div className="stackbar" aria-live="polite">
           <div className="stackbar-list">

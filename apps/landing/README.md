@@ -38,4 +38,6 @@ To replace the film, keep that layout (`PER` frames per step) or change `PER` an
 
 `src/Widget.tsx` is a drawing of the product's widget (dock, pin, new-comment card, thread), written here from scratch in the product's own colours; nothing is imported from `apps/saas`. It is used in the hero, the five demos (`src/Demos.tsx`), the loop, the visitor/reviewer flip (`src/Audience.tsx`) and the page's own comment mode (`src/Notes.tsx`). If the real widget's look changes, update `Widget.tsx` and the `.w-` rules to match.
 
+The toolbox is a skill list with a preview screen (`src/Previews.tsx`): pointing at, focusing or tapping a tool plays a three-step loop of how it works, the way a game's skill menu plays a clip of the selected move. Each of the 13 tools has a scene and three step captions (`STEPS`). They are animated drawings, not recordings, and the screen says so; a new tool needs a scene and its steps there.
+
 Everything interactive is a demo and says so where it could mislead: comments stay in the tab, the voice note uses no microphone, the heatmap is example data. The toolbox switches only build the sign-up link (`?products=`).
