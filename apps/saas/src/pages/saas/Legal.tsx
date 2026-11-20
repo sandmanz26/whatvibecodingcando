@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, MousePointer2, TriangleAlert } from 'lucide-react'
 import { BRAND, inScript, WEBSITE } from '../../saas/products'
+import { analyticsOn } from '../../lib/analytics'
 import '../../saas/saas.css'
 
 /**
@@ -49,12 +50,14 @@ export function Privacy() {
       <h2>What we don’t collect</h2>
       <ul>
         <li>The script never reads what visitors type into your site’s fields, and doesn’t record visitors who aren’t reviewers.</li>
-        <li>No advertising or tracking cookies. The browser stores sessions and settings in its own storage only to keep you signed in and the widget working.</li>
+        <li>No advertising cookies. The browser stores sessions and settings in its own storage to keep you signed in and the widget working.{analyticsOn && ' On this website and in the app (never on your site, and never in the script), one first-party analytics cookie with a random id counts visits and the steps people complete, such as signing up or installing the snippet.'}</li>
+        <li>Nothing from the script on your site goes to analytics: your visitors, reviewers and participants are never counted by it.</li>
       </ul>
       <h2>Who processes it for us</h2>
       <ul>
         <li><b>Supabase</b>: database, authentication and file storage.</li>
         <li><b>Vercel</b>: hosting of this website and the script.</li>
+        {analyticsOn && <li><b>PostHog</b>: product analytics for this website and the app: which pages are opened and which steps are completed (sign-up, onboarding, installing, the first comment), with your account’s id when you’re signed in. No session recordings, no comment text, field values, emails or names; addresses are cleaned of private links before they are sent.</li>}
         <li><b>Our email provider</b>: sends account emails (confirmation, password reset).</li>
       </ul>
       <h2>How long, and your choices</h2>

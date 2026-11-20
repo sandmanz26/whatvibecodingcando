@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { HashRouter, useLocation } from 'react-router-dom'
 import { StoreProvider } from './store/store'
+import { pageview } from './lib/analytics'
 
 /**
  * Two areas, each its own download: the hosted product (website pages, sign-in, the user panel) and
@@ -25,5 +26,7 @@ export default function App() {
 
 function Area() {
   const { pathname } = useLocation()
+  // One page view per screen (the app routes by hash, so the browser's own page views miss them).
+  useEffect(() => { pageview() }, [pathname])
   return <Suspense fallback={<div className="boot" aria-busy="true" />}>{isHosted(pathname) ? <HostedApp /> : <DemoApp />}</Suspense>
 }

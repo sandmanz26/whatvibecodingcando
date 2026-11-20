@@ -5,6 +5,10 @@ The standalone landing page for Vibe Collab, made for the proposal. React + Vite
 - **Run:** `npm run dev:landing` at the root, or `npm run dev` here.
 - **Nothing is shared.** Own `package.json`, lockfile and `node_modules`; no imports from `apps/saas` or `apps/content`.
 
+## Analytics
+
+`src/analytics.ts`: PostHog, off unless the build has `VITE_POSTHOG_KEY` (`phc_…`, host `VITE_POSTHOG_HOST`). Loads after the page; one page view and the funnel's first clicks (`get_started_clicked` with the tools picked, `login_clicked`, `demo_opened`, each with the section). No autocapture or recording; a first-party cookie carries the anonymous id into the app at `/app`.
+
 ## The story, top to bottom
 
 | Sheet | What the visitor learns |

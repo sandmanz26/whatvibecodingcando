@@ -11,6 +11,7 @@ import { cloud } from '../../saas/supabase'
 import { listStudies, projectStats, type StudyRow } from '../../saas/cloud'
 import { statsOf, type Stats } from '../../saas/stats'
 import { AnonWarning, ago, openDemo, openMySite, usePanel, useThreads } from './Panel'
+import { trackOnce } from '../../lib/analytics'
 
 /**
  * The project's dashboard: is the widget on, what has come in, from where, and what to do next.
@@ -56,6 +57,7 @@ export function Dashboard() {
     setConfirmOff(false)
   }
   const total = st ? st.open + st.ongoing + st.completed : 0
+  if (total > 0) trackOnce('first_comment_received', project.id)
   const steps = [
     { done: !!live, label: 'Put your widget settings on your site', to: '/app/widget' },
     { done: !!project.copiedSnippet, label: 'Copy your snippet into your site', to: '/app/install' },

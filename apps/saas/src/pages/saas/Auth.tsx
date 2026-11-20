@@ -7,6 +7,7 @@ import {
   passwordProblem, passwordScore, resetValid, sameEmail, useSaas, validEmail,
 } from '../../saas/account'
 import '../../saas/saas.css'
+import { track } from '../../lib/analytics'
 
 /**
  * Register, log in, forgot password and reset password. There is no server yet: the account lives
@@ -105,6 +106,7 @@ export function Register() {
       const password = await hashPassword(pw)
       const ok = update(() => ({ account: { name: name.trim(), email: email.trim(), createdAt: new Date().toISOString(), password }, projects: [], current: null, invites: [], signedIn: true, onboarded: false }))
       if (!ok) { setBusy(false); setError('This browser’s storage is full or blocked, so the account couldn’t be saved.'); return }
+      track('signup_completed', { mode: 'demo', products: products.length })
       nav(onboarding, { replace: true })
     } catch {
       setBusy(false); setError('The password couldn’t be protected in this browser. Try another browser.')
@@ -166,6 +168,7 @@ export function Login() {
     const ok = !!acc?.password && sameEmail(acc.email, email) && await checkPassword(pw, acc.password).catch(() => false)
     if (ok) {
       update((x) => ({ ...x, signedIn: true, lock: undefined }))
+      track('login_completed')
       nav(next, { replace: true })
       return
     }

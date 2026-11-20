@@ -10,6 +10,7 @@ import { cloud } from '../../saas/supabase'
 import { clearStudyResults, deleteRun, deleteStudy, listStudies, projectSessions, revokeStudyLink, saveStudy, studyLink, studyResults, type EventRow, type RunRow, type StudyKind, type StudyRow } from '../../saas/cloud'
 import { ago, usePanel } from './Panel'
 import { download, toCsv } from '../../saas/stats'
+import { track } from '../../lib/analytics'
 
 const fileName = (s: string) => s.replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'study'
 /** One row per participant: when, device, eye-tracking accuracy, and each task's outcome and time, or their answers. */
@@ -180,6 +181,7 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
         : { intro: intro.trim(), page: cleanPath(page), prompt: prompt.trim(), minutes: Math.min(30, Math.max(1, minutes)) }
     config.doors = doors.filter((d) => d.sel.trim()).slice(0, 5).map((d, i) => ({ id: `d${i + 1}`, page: d.page.trim() ? cleanPath(d.page) : '', sel: d.sel.trim().slice(0, 400), mode: d.mode, label: d.label.trim().slice(0, 60) || 'New', message: d.message.trim().slice(0, 300) }))
     setBusy(true)
+    if (!study?.id) track('study_created', { kind, eye_tracking: kind !== 'fivesec' && eyes })
     try { await saveStudy(project.id, { id: study?.id, kind, name, config, status: study?.status, eye_tracking: kind !== 'fivesec' && eyes, max_runs: Math.min(1000, Math.max(1, maxRuns)) }); toast(study ? 'Study saved' : 'Study created'); onSaved() }
     catch (e) { toast(`Not saved: ${(e as Error).message}`, 'error') }
     finally { setBusy(false) }

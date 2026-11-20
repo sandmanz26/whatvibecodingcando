@@ -15,6 +15,7 @@
     "@mediapipe/tasks-vision": "1.1.0",
     "@supabase/supabase-js": "2.118.0",
     "lucide-react": "^1.61.0",
+    "posthog-js": "1.453.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.4"

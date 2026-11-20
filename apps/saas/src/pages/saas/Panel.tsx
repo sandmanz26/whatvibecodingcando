@@ -16,6 +16,7 @@ import { PanelNav } from './Nav'
 import { download, fixPrompt, threadsCsv, toShared } from '../../saas/stats'
 import { LocalBackend, NS, STATUS_LABEL, deviceLine, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
+import { resetAnalytics, track, trackOnce } from '../../lib/analytics'
 
 export interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
 export const usePanel = () => useOutletContext<Ctx>()
@@ -38,6 +39,7 @@ export const openDemo = (projectId: string, toast: (t: string, k?: 'error') => v
 export const openMySite = (p: Project, toast: (t: string, k?: 'error') => void) => {
   if (!p.siteUrl) { toast('Add your site’s address in Widget → Website first.', 'error'); return }
   if (!liveOf(p)) { toast('Press Update site in Widget first: your site has no settings yet.', 'error'); return }
+  track('open_my_site')
   void openAsReviewer(p.id, p.siteUrl).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })
 }
 /** "x min ago" for the panel. */
@@ -91,7 +93,7 @@ export function PanelLayout() {
   if (!isSignedIn(s)) return <Navigate to={`/app/login?next=${encodeURIComponent(pathname)}`} replace />
   if (!isOnboarded(s)) return <Navigate to="/app/onboarding" replace />
   const leave = (to: string, change: () => void) => { setExit(to); change() }
-  const logOut = () => leave('/app/login', () => update((x) => ({ ...x, signedIn: false })))
+  const logOut = () => leave('/app/login', () => { update((x) => ({ ...x, signedIn: false })); resetAnalytics() })
   const project = s.projects.find((p) => p.id === s.current) ?? s.projects[0] ?? null
   const setProject = (fn: (p: Project) => Project) => {
     if (!project) return false
@@ -202,7 +204,7 @@ export function Products() {
     <div className="up-page">
       <div className="up-head"><div><h1>Products</h1><p>Turn tools on or off for “{project.name}”. Early-access tools are built and usable in the demo; they switch on in your script as they move into it.</p></div></div>
       {pending && <p className="up-warn"><TriangleAlert size={14} /> Your site still has the old set of tools. <button className="lp-btn sm primary" onClick={() => {
-        if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) toast('Site updated: it follows on its next page load')
+        if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) { track('site_updated', { where: 'products' }); toast('Site updated: it follows on its next page load') }
         else toast('Not published: this browser’s storage is full or blocked.', 'error')
       }}>Update site</button> Only the tools change; other edits in <Link to="/app/widget">Widget</Link> wait until you update from there. The snippet stays the same.</p>}
       {CATEGORIES.map((cat) => <div key={cat}>
@@ -250,7 +252,8 @@ export function Install() {
   useEffect(() => {
     if (!project) return
     // On the server: what the script on any of the project's sites last reported.
-    const read = () => (cloud ? void latestInstall(project.id).then(setSeen).catch(() => { /* retried */ }) : setSeen(lastSeen(project.id)))
+    const seenNow = (x: typeof seen) => { setSeen(x); if (x) trackOnce('script_detected', project.id, { shown: x.shown }) }
+    const read = () => (cloud ? void latestInstall(project.id).then(seenNow).catch(() => { /* retried */ }) : seenNow(lastSeen(project.id)))
     read()
     const t = window.setInterval(read, cloud ? 15000 : 3000)
     return () => window.clearInterval(t)
@@ -262,6 +265,7 @@ export function Install() {
   const copy = async (text: string, what: string, mark: boolean) => {
     if (!(await copyText(text))) { toast('Copy failed. Select the text and copy it by hand.', 'error'); return }
     if (mark) setProject((p) => ({ ...p, copiedSnippet: code }))
+    if (what === 'Snippet' || mark) track('snippet_copied', { where: 'install' })
     toast(`${what} copied`)
   }
   const live = liveOf(project)
@@ -351,7 +355,7 @@ export function Comments() {
     .filter((t) => !q.trim() || `${t.text} ${t.author} ${t.page} ${t.replies.map((r) => r.text).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const count = (v: Status | 'all') => ofKind.filter((t) => v === 'all' || statusOf(t) === v).length
-  const copyPrompt = async (list: Thread[]) => { const ok = await copyText(fixPrompt(list, project.siteUrl)); toast(ok ? `Copied: paste it into your AI coding tool (${list.length} ${list.length === 1 ? 'comment' : 'comments'})` : 'Copy failed', ok ? undefined : 'error') }
+  const copyPrompt = async (list: Thread[]) => { const ok = await copyText(fixPrompt(list, project.siteUrl)); if (ok) track('fix_prompt_copied', { count: list.length }); toast(ok ? `Copied: paste it into your AI coding tool (${list.length} ${list.length === 1 ? 'comment' : 'comments'})` : 'Copy failed', ok ? undefined : 'error') }
   const save = async (t: Thread, msg: string) => { try { await backend.upsert(t); reload(); toast(msg) } catch { toast('Not saved: storage is blocked.', 'error') } }
   // Comments made on the demo site live on this domain; others on the project's own site.
   // Only ever a page of the project's own site (or the demo): a page key that would lead elsewhere gets no link.
@@ -360,7 +364,7 @@ export function Comments() {
     <div className="up-page">
       <div className="up-head"><div><h1>{kind === 'compare' ? 'Component reviews' : kind === 'voice' ? 'Voice notes' : 'Comments'}</h1><p>{kind === 'compare' ? 'A vs B comparisons your reviewers made' : kind === 'voice' ? 'Spoken notes your reviewers recorded' : 'Everything your reviewers left'} on “{project.name}”.{kind && <> <Link to="/app/comments">See all comments</Link></>}</p></div>
         <span className="up-row">
-          <button className="lp-btn" disabled={!threads.length} onClick={() => download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(toShared)))}><Download size={14} /> CSV</button>
+          <button className="lp-btn" disabled={!threads.length} onClick={() => { track('comments_exported'); download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(toShared))) }}><Download size={14} /> CSV</button>
           <button className="lp-btn primary" onClick={() => setSharing(true)}><Share2 size={14} /> Share list</button>
         </span></div>
       {cloud
@@ -625,7 +629,7 @@ export function ReviewLinkMaker({ onMade }: { onMade?: () => void }) {
   const make = async () => {
     if (!name.trim() || busy || !target.live) return
     setBusy(true)
-    try { setLink({ name: name.trim(), url: await inviteLink(project.id, target.url, name.trim()), where: target.label }); setName(''); onMade?.() }
+    try { setLink({ name: name.trim(), url: await inviteLink(project.id, target.url, name.trim()), where: target.label }); setName(''); onMade?.(); track('review_link_created') }
     catch (e) { toast(`Couldn’t make the link: ${(e as Error).message}`, 'error') }
     finally { setBusy(false) }
   }

@@ -9,6 +9,7 @@ import { draftOf, liveOf, openAsReviewer, publish, releasable, reviewerUrl } fro
 import { MAX_ENVS, MAX_LABEL, SCRIPT_MODULES, anyModule, hostProblem, sameConfig, type Env, type ModuleId, type WidgetConfig } from '../../core/embed/config'
 import { AnonWarning, ReviewLinkMaker, ago, openDemo, usePanel } from './Panel'
 import { cloud } from '../../saas/supabase'
+import { track } from '../../lib/analytics'
 
 /**
  * Widget: what the script shows on a project's sites, built here and published. Edits are a draft
@@ -155,7 +156,7 @@ export function WidgetBuilder() {
       {confirm === 'publish' && (
         <Modal title="Update your site?" description="Every page with your snippet follows these settings the next time it loads (within a few minutes). The previous settings stay in History, so you can restore them." onClose={() => setConfirm(null)}
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Cancel</button><button className="btn primary" onClick={() => {
-            if (setProject((p) => publish(p, by))) toast('Site updated')
+            if (setProject((p) => publish(p, by))) { toast('Site updated'); track('site_updated', { where: 'widget' }) }
             else toast('Not saved: this browser’s storage is full or blocked.', 'error')
             setConfirm(null)
           }}>Update site</button></>}>

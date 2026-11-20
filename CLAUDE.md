@@ -16,6 +16,7 @@
 - Everything built before the split (embed, landing, panel, research tools) is part of the SaaS too; the owner wants it there.
 - Before pushing: `npm run typecheck && npm run build` at the root must pass (after `npm run install:all`).
 - **Scale rules (SaaS):** Supabase returns at most 1,000 rows per request: any list that can be longer is read with `paged()` in `src/saas/cloud.ts`, with a stable order. Lists sent to the widget are bounded in SQL (`list_threads`: the 1,000 newest). Polling only while the tab is visible. New tables get an index for every query that filters them by project.
+- **Analytics:** PostHog on the website (`apps/landing/src/analytics.ts`) and the app at `/app` (`apps/saas/src/lib/analytics.ts`), only when `VITE_POSTHOG_KEY` is set. Never in the script on customers' sites, never autocapture or session recording, never comment text, field values, emails or names; named funnel events only.
 - **Two download areas (SaaS):** `src/App.tsx` loads `HostedApp.tsx` (website pages, sign-in, panel) or `DemoApp.tsx` (demo shop, research console, its tools) by address; never import demo or console code into hosted pages.
 
 ## Each app

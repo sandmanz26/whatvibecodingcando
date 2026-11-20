@@ -7,6 +7,7 @@ import { copyText, demoUrl, installSnippet } from '../../saas/snippet'
 import { publish } from '../../saas/widget'
 import { cloud } from '../../saas/supabase'
 import '../../saas/saas.css'
+import { resetAnalytics, track } from '../../lib/analytics'
 
 const STEPS = ['Tools', 'Project', 'Install']
 
@@ -67,6 +68,7 @@ export default function Onboarding() {
     if (cloud) setSaving(true)
     const ok = update((x) => ({ ...x, projects: [...x.projects, p], current: p.id, onboarded: true }))
     if (!ok) { setSaving(false); setFinished(false); setError('This browser’s storage is full or blocked, so the workspace couldn’t be saved.'); return }
+    track('onboarding_completed', { products: products.length, site: !!site.trim(), copied: copied === code })
     if (cloud) void settled().then(() => setSaving(false))
   }
   const next = () => {
@@ -77,10 +79,10 @@ export default function Onboarding() {
     else finish()
   }
   const copy = async () => {
-    if (await copyText(code)) setCopied(code)
+    if (await copyText(code)) { setCopied(code); track('snippet_copied', { where: 'onboarding' }) }
     else setError('Copy failed. Select the snippet and copy it by hand.')
   }
-  const logOut = () => { update((x) => ({ ...x, signedIn: false })); nav('/app/login', { replace: true }) }
+  const logOut = () => { update((x) => ({ ...x, signedIn: false })); resetAnalytics(); nav('/app/login', { replace: true }) }
   const first = state.account.name.split(' ')[0]
 
   return (

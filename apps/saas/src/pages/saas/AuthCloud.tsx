@@ -6,6 +6,7 @@ import { isOnboarded, isSignedIn, passwordProblem, refreshCloud, useSaas, useSaa
 import { authMessage, authReturnUrl, captcha, supabase } from '../../saas/supabase'
 import { PasswordField, Shell, Strength, safeNext } from './Auth'
 import '../../saas/saas.css'
+import { track } from '../../lib/analytics'
 
 /**
  * Register, log in, forgot and reset password against Supabase Auth: real accounts, emails for
@@ -59,6 +60,7 @@ export function CloudRegister() {
     const { data, error: e } = await sb().auth.signUp({ email: email.trim(), password: pw, options: { data: { name: name.trim().slice(0, 40), onboarded: false }, emailRedirectTo: authReturnUrl('signup'), captchaToken: await captcha() } })
     setBusy(false)
     if (e) { setError(authMessage(e)); return }
+    track('signup_completed', { mode: 'server', products: products.length })
     // With email confirmation off, the account is signed in at once; otherwise it waits for the link.
     if (data.session) { await refreshCloud(); return }
     setSent(true)
@@ -114,6 +116,7 @@ export function CloudLogin() {
     const { error: e } = await sb().auth.signInWithPassword({ email: email.trim(), password: pw, options: { captchaToken: await captcha() } })
     if (e) { setBusy(false); setPw(''); setError(authMessage(e)); return }
     await refreshCloud()
+    track('login_completed')
     nav(next, { replace: true })
   }
   return (

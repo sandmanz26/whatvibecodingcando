@@ -16,6 +16,7 @@ import { parseConfig, publicConfig, type Release, type Seen } from '../core/embe
 import type { Backend, Thread } from '../core/embed/store'
 import type { Stats, SharedList, ShareRow } from './stats'
 import type { Invite, Project, SaasState } from './account'
+import { identify } from '../lib/analytics'
 
 const BUCKET = 'widget-config'
 /** The project's database id, by its public id (the snippet's data-project). */
@@ -30,6 +31,7 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
   const { data: u } = await supabase.auth.getUser()
   const user = u.user
   if (!user) { dbIds.clear(); workspaceId = null; return null }
+  identify(user.id)
   const meta = (user.user_metadata ?? {}) as { name?: string; onboarded?: boolean }
   const account = { name: (meta.name || user.email?.split('@')[0] || 'You').slice(0, 40), email: user.email ?? '', createdAt: user.created_at }
 
