@@ -6,13 +6,28 @@
   "outputDirectory": "dist",
   "redirects": [
     {
-      "source": "/content",
-      "destination": "/content/",
+      "source": "/landing",
+      "destination": "/",
       "permanent": false
     },
     {
-      "source": "/landing",
-      "destination": "/landing/",
+      "source": "/landing/",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/app/",
+      "destination": "/app",
+      "permanent": false
+    },
+    {
+      "source": "/app.html",
+      "destination": "/app",
+      "permanent": false
+    },
+    {
+      "source": "/content",
+      "destination": "/content/",
       "permanent": false
     },
     {
@@ -43,11 +58,49 @@
   ],
   "rewrites": [
     {
+      "source": "/app",
+      "destination": "/app.html"
+    },
+    {
       "source": "/content/__reset",
       "destination": "/content/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains"
+        }
+      ]
+    },
+    {
+      "source": "/((?!embed/).*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        }
+      ]
+    },
     {
       "source": "/embed/(.*)",
       "headers": [
@@ -58,6 +111,46 @@
         {
           "key": "Cross-Origin-Resource-Policy",
           "value": "cross-origin"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/landing/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/content/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/landing/(frames|clips)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
     }

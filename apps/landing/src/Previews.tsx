@@ -167,7 +167,7 @@ export default function Preview({ id }: { id: PreviewId }) {
     <div className="pv" data-ph={ph}>
       <div className="pv-stage">
         <div className="pv-clip" data-id={id} aria-hidden>
-          <video ref={clip} key={id} src={`./clips/${id}.mp4`} poster={`./clips/${id}.webp`} muted loop playsInline autoPlay={!calm} preload="metadata" />
+          <video ref={clip} key={id} src={`${import.meta.env.BASE_URL}clips/${id}.mp4`} poster={`${import.meta.env.BASE_URL}clips/${id}.webp`} muted loop playsInline autoPlay={!calm} preload="metadata" />
           <span>the move</span>
         </div>
         <div className="pv-screen" key={id} aria-hidden><Scene id={id} ph={ph} /><span className="pv-label">on your site</span></div>

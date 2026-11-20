@@ -9,6 +9,9 @@
 import type { LucideIcon } from 'lucide-react'
 import { MessageSquarePlus, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Columns2, Palette, ScanSearch, Mic, FileText, Flame, SquareDashedMousePointer } from 'lucide-react'
 
+/** The website (apps/landing, served at the site's root); the panel links back to it. */
+export const WEBSITE = '/'
+
 /** Working name, kept in one place so it is easy to change. */
 export const BRAND = 'Vibe Collab'
 

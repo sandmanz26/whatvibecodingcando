@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { MousePointer2, Download, CornerDownRight, Printer } from 'lucide-react'
-import { BRAND } from '../../saas/products'
+import { BRAND, WEBSITE } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
 import { getShareCloud } from '../../saas/cloud'
 import { LOCAL_SHARE_PREFIX, decodeLocalShare, download, threadsCsv, type SharedList, type SharedThread } from '../../saas/stats'
@@ -69,7 +69,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   return (
     <div className="lp sp">
       <header className="lp-wrap lp-signup-head">
-        <Link to="/landingpage" className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</Link>
+        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</a>
       </header>
       <main className="lp-wrap sp-main">{children}</main>
     </div>

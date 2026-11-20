@@ -12,8 +12,8 @@
   <body>
     <div id="root"></div>
     <script>
-      // The hosted product opens on its website; the demo shop and console stay reachable by URL.
-      if (!location.hash || location.hash === "#/") location.replace(location.pathname + location.search + "#/landingpage")
+      // /app opens on the panel (the website is the site's root); the demo shop and console stay reachable by URL.
+      if (!location.hash || location.hash === "#/") location.replace(location.pathname + location.search + "#/app")
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>

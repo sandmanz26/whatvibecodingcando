@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, MousePointer2 } from 'lucide-react'
-import { BRAND } from '../../saas/products'
+import { BRAND, WEBSITE } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
 import '../../saas/saas.css'
 
@@ -40,8 +40,8 @@ export function Guide() {
   return (
     <div className="lp lp-legal">
       <header className="lp-wrap lp-signup-head">
-        <Link to="/landingpage" className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</Link>
-        <span className="lp-row"><Link to="/app" className="lp-btn sm">Open your panel</Link><Link to="/landingpage" className="lp-btn ghost sm"><ArrowLeft size={14} /> Website</Link></span>
+        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</a>
+        <span className="lp-row"><Link to="/app" className="lp-btn sm">Open your panel</Link><a href={WEBSITE} className="lp-btn ghost sm"><ArrowLeft size={14} /> Website</a></span>
       </header>
       <div className="lp-wrap gd">
         <nav className="gd-toc" aria-label="Contents">

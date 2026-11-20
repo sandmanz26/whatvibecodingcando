@@ -2,16 +2,16 @@
   "name": "vibecoding",
   "private": true,
   "version": "0.1.0",
-  "description": "Three separate systems in one repository: apps/content, apps/saas and apps/landing. Each has its own code, dependencies and lockfile; nothing is shared.",
+  "description": "Three separate systems in one repository: apps/landing (the website, at /), apps/saas (the product: panel at /app, script at /embed) and apps/content (/content/). Each has its own code, dependencies and lockfile; nothing is shared.",
   "scripts": {
     "install:all": "npm ci --prefix apps/content && npm ci --prefix apps/saas && npm ci --prefix apps/landing",
     "dev": "npm run dev --prefix apps/content",
     "dev:saas": "npm run dev --prefix apps/saas",
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && npm run build --prefix apps/content && npm run build --prefix apps/saas && npm run build --prefix apps/landing",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && npm run build --prefix apps/content && npm run build --prefix apps/saas && npm run build --prefix apps/landing && node -e \"require('fs').copyFileSync('dist/landing/index.html','dist/index.html')\"",
     "build:content": "npm run build --prefix apps/content",
     "build:saas": "npm run build --prefix apps/saas",
     "typecheck": "npm run typecheck --prefix apps/content && npm run typecheck --prefix apps/saas && npm run typecheck --prefix apps/landing",
-    "preview": "cd apps/content && npx vite preview --outDir ../../dist --port 4173",
+    "preview": "npx vite preview --outDir dist --port 4173",
     "dev:landing": "npm run dev --prefix apps/landing",
     "build:landing": "npm run build --prefix apps/landing"
   }

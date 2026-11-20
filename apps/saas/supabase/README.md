@@ -66,6 +66,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
   - `post_thread` takes a kind and a voice note's audio (which must be the caller's own upload in the project); `versions_of` counts comments per version.
 - **`migrations/20261115000000_heatmap_quality.sql`**: `heatmap_points` also returns, per point, a participant number (within the answer, no ids), the time in their run, their device and eye-tracking accuracy, for a better heatmap.
 - **`migrations/20261116000000_comment_context.sql`**: `post_thread` records the site version whenever the published settings have one (no Versions module needed), and refuses an anchor that isn't a JSON object or is over 4,000 characters (it now carries the reviewer's browser and window size).
+- **`migrations/20261120000000_scale.sql`**: indexes for large projects (participant paths, heatmaps, rate-limit cleanup), housekeeping without pg_cron (`take_rate` now and then clears old rate-limit rows and expired one-time links, in bounded batches), and `list_threads` returns the newest 1,000 comments.
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.
@@ -75,7 +76,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 1. **Plan and region.** Pro (Free pauses when idle and has no daily backups). Region Southeast Asia (Singapore) for users in Indonesia.
 2. **Run the migrations, in order.** SQL Editor → paste each file in `migrations/` (oldest first) → Run. Or with the Supabase CLI: `supabase link --project-ref <ref>`, then `supabase db push`.
 3. **Auth → URL Configuration.**
-   - Site URL: `https://whatvibecodingcando.vercel.app/`.
+   - Site URL: `https://whatvibecodingcando.vercel.app/app` (the app lives at `/app`; the website at `/` forwards old links there).
    - Redirect URLs: `https://whatvibecodingcando.vercel.app/**` and `http://localhost:5174/**` for development.
 4. **Auth → Sign In / Providers → allow anonymous sign-ins.** Reviewers on customers' sites need it (they have no account). Also set **Auth → Rate Limits** for anonymous sign-ins (for example 30 an hour per IP).
    - **CAPTCHA (Cloudflare Turnstile), when you are ready.** It works for both the panel and reviewers, because reviewers sign in through our session frame (`/embed/session.html`) on our own domain, never on customers' sites. In this order:
@@ -86,9 +87,9 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 5. **Database → Extensions → pg_cron** (optional, before running the third migration): enables the hourly cleanup.
 6. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
 7. **Auth → Email Templates.** So links work on any device (the default links only work in the browser that asked), set the link in two templates. Keep the rest of the text as you like.
-   - **Confirm signup:** `<a href="https://whatvibecodingcando.vercel.app/#/app/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>`
-   - **Reset Password:** `<a href="https://whatvibecodingcando.vercel.app/#/app/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>`
-   - The default `{{ .ConfirmationURL }}` links also work, but only when opened in the same browser (they come back as `/?auth=…&code=…`).
+   - **Confirm signup:** `<a href="https://whatvibecodingcando.vercel.app/app#/app/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>`
+   - **Reset Password:** `<a href="https://whatvibecodingcando.vercel.app/app#/app/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>`
+   - The default `{{ .ConfirmationURL }}` links also work, but only when opened in the same browser (they come back as `/app?auth=…&code=…`; links already sent to `/` still work, the website forwards them).
 8. **Keys.**
    - The project URL and the anon (publishable) key are public by design and go into the app's build.
      - Set them as `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` in Vercel, or connect Vercel's Supabase integration: the build also reads its `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `NEXT_PUBLIC_…` names (`apps/saas/vite.config.ts`).

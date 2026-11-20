@@ -1,9 +1,9 @@
 # Landing page (apps/landing)
 
-The standalone landing page for Vibe Collab, made for the proposal. React + Vite, front end only, no backend, English only. Served at `/landing/` (built into `dist/landing`).
+The standalone landing page for Vibe Collab, made for the proposal. React + Vite, front end only, no backend, English only. The site's front page: served at `/` (built into `dist/landing`, whose `index.html` the root build copies to `dist/index.html`; hence `base: '/landing/'`). Links to the product are root-relative (`/app#/…`, `LINKS` in `src/content.ts`). `index.html` forwards the app's old addresses (`/#/…`, sign-in returns `?code=…`) to `/app`.
 
 - **Run:** `npm run dev:landing` at the root, or `npm run dev` here.
-- **Nothing is shared.** Own `package.json`, lockfile and `node_modules`; no imports from `apps/saas` or `apps/content`. Links to the product are absolute (`LINKS` in `src/content.ts`).
+- **Nothing is shared.** Own `package.json`, lockfile and `node_modules`; no imports from `apps/saas` or `apps/content`.
 
 ## The story, top to bottom
 

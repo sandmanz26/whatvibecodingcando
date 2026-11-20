@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, MousePointer2, ArrowLeft, Mail, TriangleAlert, CheckCircle2 } from 'lucide-react'
-import { BRAND, parseProducts } from '../../saas/products'
+import { BRAND, parseProducts, WEBSITE } from '../../saas/products'
 import {
   LOCK_AFTER, RESET_MINUTES, canHash, checkPassword, hashPassword, isOnboarded, isSignedIn, lockAfterFail, newResetToken,
   passwordProblem, passwordScore, resetValid, sameEmail, useSaas, validEmail,
@@ -22,8 +22,8 @@ export function Shell({ title, sub, children, foot }: { title: string; sub?: Rea
   return (
     <div className="lp lp-signup lp-auth">
       <header className="lp-wrap lp-signup-head">
-        <Link to="/landingpage" className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</Link>
-        <Link to="/landingpage" className="lp-btn ghost sm"><ArrowLeft size={14} /> Website</Link>
+        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</a>
+        <a href={WEBSITE} className="lp-btn ghost sm"><ArrowLeft size={14} /> Website</a>
       </header>
       <main className="lp-wrap lp-signup-main">
         <div className="lp-auth-col">

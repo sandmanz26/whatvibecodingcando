@@ -41,6 +41,8 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
   const { data: rows, error } = await supabase.from('projects')
     .select('id, public_id, name, site_url, products, draft, created_at, releases(version, config, created_at, created_by)')
     .eq('workspace_id', workspaceId).is('deleted_at', null).order('created_at')
+    // Only the newest 50 releases of each project (what History shows), not every one ever published.
+    .order('version', { referencedTable: 'releases', ascending: false }).limit(50, { referencedTable: 'releases' })
   if (error) throw error
   dbIds.clear()
   const projects: Project[] = (rows ?? []).map((r) => {
@@ -177,7 +179,38 @@ const rowToThread = (r: ThreadRow): Thread => ({
   ...(r.kind && r.kind !== 'comment' ? { kind: r.kind } : {}), ...(r.version ? { version: r.version } : {}), ...(r.audio ? { audio: r.audio } : {}),
 })
 
+/**
+ * Supabase answers at most 1,000 rows per request (PostgREST's max rows), whatever .limit() asks.
+ * Lists that can be longer are read page by page, up to `max` rows. The query must have a stable
+ * order (a unique column last), or pages can overlap.
+ */
+const PAGE = 1000
+async function paged<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>, max: number): Promise<T[]> {
+  const out: T[] = []
+  for (let from = 0; from < max; from += PAGE) {
+    const { data, error } = await page(from, Math.min(from + PAGE, max) - 1)
+    if (error) throw error
+    const rows = (data ?? []) as T[]
+    out.push(...rows)
+    if (rows.length < Math.min(PAGE, max - from)) break
+  }
+  return out
+}
+
+/** The events of these runs, oldest first, at most `max` (20,000 by default). */
+async function eventsOf(ids: string[], max = 20000): Promise<EventRow[]> {
+  const events: EventRow[] = []
+  for (let i = 0; i < ids.length && events.length < max; i += 100) {
+    const chunk = ids.slice(i, i + 100)
+    events.push(...await paged<EventRow>((from, to) => supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit')
+      .in('run_id', chunk).order('run_id').order('t').order('id').range(from, to), max - events.length))
+  }
+  return events
+}
+
 /** A project's comments for the panel's inbox: read and changed under the members' row level security. */
+/** The most comments the panel lists; past it, the newest are shown and the list says so. */
+export const MAX_LIST = 5000
 export class PanelBackend implements Backend {
   readonly where = 'Saved on the server'
   private last = new Map<string, Thread>()
@@ -185,12 +218,16 @@ export class PanelBackend implements Backend {
   private get id() { const id = dbIds.get(this.publicId); if (!id) throw new Error('This project isn’t on the server.'); return id }
   async list() {
     const cols = 'id, page, anchor, author_name, text, created_at, edited_at, resolved_at, resolved_by, replies(id, author_name, text, created_at)'
-    const first = await supabase!.from('threads').select(`${cols}, kind, version, audio`).eq('project_id', this.id).order('created_at')
-    // A server without the review kinds yet (migration not run): the comments without them.
-    const res = first.error?.code === '42703' ? await supabase!.from('threads').select(cols).eq('project_id', this.id).order('created_at') : first
-    const { data, error } = res as unknown as { data: ThreadRow[] | null; error: typeof first.error }
-    if (error) throw error
-    const list = (data as ThreadRow[]).map(rowToThread)
+    // The newest MAX_LIST comments, read in pages (Supabase gives 1,000 rows a request), shown oldest first.
+    const read = (select: string) => paged<ThreadRow>((from, to) => supabase!.from('threads').select(select).eq('project_id', this.id)
+      .order('created_at', { ascending: false }).order('id').range(from, to), MAX_LIST)
+    let rows: ThreadRow[]
+    try { rows = await read(`${cols}, kind, version, audio`) } catch (e) {
+      // A server without the review kinds yet (migration not run): the comments without them.
+      if ((e as { code?: string }).code !== '42703') throw e
+      rows = await read(cols)
+    }
+    const list = rows.reverse().map(rowToThread)
     this.last = new Map(list.map((t) => [t.id, t]))
     return list
   }
@@ -218,7 +255,7 @@ export class PanelBackend implements Backend {
     this.last.delete(id)
   }
   subscribe(cb: () => void) {
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') cb() }, 10_000)
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') cb() }, 20_000)
     return () => window.clearInterval(t)
   }
 }
@@ -355,15 +392,9 @@ export async function studyLink(id: string, days = 30): Promise<string> {
 export async function revokeStudyLink(id: string) { const { error } = await supabase!.rpc('revoke_study_link', { p_study: id }); if (error) throw error }
 /** A study's runs, and their events (the latest 20,000). */
 export async function studyResults(id: string): Promise<{ runs: RunRow[]; events: EventRow[] }> {
-  const { data: runs, error } = await supabase!.from('runs').select('id, started_at, finished_at, device, vw, gaze_accuracy, result, events').eq('study_id', id).order('started_at', { ascending: false }).limit(1000)
+  const { data: runs, error } = await supabase!.from('runs').select('id, started_at, finished_at, device, vw, gaze_accuracy, result, events').eq('study_id', id).order('started_at', { ascending: false }).limit(1000) // Supabase's per-request maximum
   if (error) throw error
-  const ids = (runs ?? []).map((r) => r.id as string)
-  const events: EventRow[] = []
-  for (let i = 0; i < ids.length && events.length < 20000; i += 100) {
-    const { data, error: e } = await supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit').in('run_id', ids.slice(i, i + 100)).order('t').limit(20000 - events.length)
-    if (e) throw e
-    events.push(...(data as EventRow[]))
-  }
+  const events = await eventsOf((runs ?? []).map((r) => r.id as string))
   return { runs: runs as RunRow[], events }
 }
 export async function deleteRun(id: string) { const { error } = await supabase!.from('runs').delete().eq('id', id); if (error) throw error }
@@ -376,13 +407,7 @@ export async function projectSessions(publicId: string): Promise<{ runs: (RunRow
   if (!pid) return { runs: [], events: [] }
   const { data: runs, error } = await supabase!.from('runs').select('id, study_id, started_at, finished_at, device, vw, gaze_accuracy, result, events').eq('project_id', pid).order('started_at', { ascending: false }).limit(300)
   if (error) throw error
-  const ids = (runs ?? []).map((r) => r.id as string)
-  const events: EventRow[] = []
-  for (let i = 0; i < ids.length && events.length < 20000; i += 100) {
-    const { data, error: e } = await supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit').in('run_id', ids.slice(i, i + 100)).order('t').limit(20000 - events.length)
-    if (e) throw e
-    events.push(...(data as EventRow[]))
-  }
+  const events = await eventsOf((runs ?? []).map((r) => r.id as string))
   return { runs: runs as (RunRow & { study_id: string })[], events }
 }
 

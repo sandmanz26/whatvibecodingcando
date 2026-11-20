@@ -3,13 +3,13 @@ import { Link, Navigate, Outlet, useLocation, useNavigate, useOutletContext, use
 import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown, Sparkles } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
-import { BRAND, CATEGORIES, CAT_HELP, PRODUCTS, productOf, statusLabel } from '../../saas/products'
+import { BRAND, CATEGORIES, CAT_HELP, PRODUCTS, productOf, statusLabel, WEBSITE } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
-import { PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
+import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
 import { PanelNav } from './Nav'
@@ -102,12 +102,12 @@ export function PanelLayout() {
   return (
     <div className="up">
       <aside className="up-side">
-        <Link to="/landingpage" className="lp-logo sm"><span className="lp-mark" aria-hidden><MousePointer2 size={13} /></span>{BRAND}</Link>
+        <a href={WEBSITE} className="lp-logo sm"><span className="lp-mark" aria-hidden><MousePointer2 size={13} /></span>{BRAND}</a>
         <ProjectSwitcher projects={s.projects} current={project} onPick={(id) => update((x) => ({ ...x, current: id }))} onNew={() => setCreating(true)} />
         <PanelNav project={project} />
         <span className="lp-grow" />
         <div className="up-me"><b>{s.account.name}</b><span>{s.account.email}</span><button className="up-logout" onClick={logOut}><LogOut size={13} /> Log out</button></div>
-        <Link to="/landingpage" className="up-back"><ArrowLeft size={14} /> Website</Link>
+        <a href={WEBSITE} className="up-back"><ArrowLeft size={14} /> Website</a>
       </aside>
       <main className="up-main">
         <div className="up-beta"><TriangleAlert size={14} /> {cloud
@@ -364,9 +364,10 @@ export function Comments() {
           <button className="lp-btn primary" onClick={() => setSharing(true)}><Share2 size={14} /> Share list</button>
         </span></div>
       {cloud
-        ? <p className="up-note">Comments from every site with your snippet arrive here (checked every 10 seconds). Invite reviewers in <Link to="/app/reviewers">Reviewers</Link>.</p>
+        ? <p className="up-note">Comments from every site with your snippet arrive here (checked every 20 seconds while this page is open). Invite reviewers in <Link to="/app/reviewers">Reviewers</Link>.</p>
         : <p className="up-note">Demo mode: this inbox shows the comments saved in this browser on this domain, for example from the <button className="up-linkbtn" onClick={() => openDemo(project.id, toast)}>demo site</button> opened with this project.</p>}
       {sharing && <ShareList project={project} threads={threads} onClose={() => setSharing(false)} />}
+      {cloud && threads.length >= MAX_LIST && <p className="up-warn">This project has more than {MAX_LIST.toLocaleString('en')} comments: the newest {MAX_LIST.toLocaleString('en')} are listed. Complete or delete old ones to see the rest.</p>}
       <div className="up-row wrap">
         <div className="up-tabs" role="group" aria-label="Status">
           {(['all', 'open', 'ongoing', 'completed'] as const).map((v) => <button key={v} aria-pressed={status === v} onClick={() => setStatus(v)}>{v === 'all' ? 'All' : STATUS_LABEL[v]} <span>{count(v)}</span></button>)}

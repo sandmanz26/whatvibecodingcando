@@ -1,6 +1,6 @@
 # Vibe Collab (SaaS app)
 
-The hosted product: website (`#/landingpage`, the default page), register, login, forgot/reset password, onboarding, user panel (`#/app`), install page and the installable script, plus every research tool built for the content site (dock, research console, heatmaps and eye tracking, sessions, compare reviews, design tokens, inspect, versions). It starts as a copy of `apps/content`; from here it grows on its own (backend, accounts and a database come later).
+The hosted product, at `/app` (`app.html`; the website is `apps/landing`, at `/`): register, login, forgot/reset password, onboarding, user panel (`#/app`), install page and the installable script, plus every research tool built for the content site (dock, research console, heatmaps and eye tracking, sessions, compare reviews, design tokens, inspect, versions). It starts as a copy of `apps/content`; from here it grows on its own (backend, accounts and a database come later).
 
 This is a separate system from the content site. It has its own code (including `src/core`: the script's widget and storage interface, the heatmap renderer and the eye-movement analysis), its own dependencies and its own browser data (`saas:` storage prefix, `saas:vibe:` for the script, its own voice database). Changes made here stay here.
 
@@ -428,11 +428,9 @@ Everything else is the project's **published configuration**, built in the panel
 
 ## Website and user panel for the hosted product
 
-- **`#/landingpage`** is the product's website (working name in `src/saas/products.ts` → `BRAND`).
-  - Visitors pick the tools they want from a catalogue of 15 products, filtered by category, with a running "Your stack" summary.
-  - Each product says honestly where it works today: **On your site today** (in the script: `status: 'script'` in `src/saas/products.ts`) or **Early access** (built and usable in the demo console). Copy that lists what runs on a site is generated from that list (`inScript()`).
-  - It also has how it works, a live demo of the script in an iframe, beta pricing and FAQ.
-  - The picks carry into registering, then into onboarding.
+- **The website is `apps/landing`**, at the site's root. Its sign-up links carry the picked tools as `?products=` into registering, then onboarding. The old in-app website (`#/landingpage`) is gone: that address sends people to `/` (`WEBSITE` in `src/saas/products.ts`; every "Website" link and the logo use it).
+- **Two download areas.** `src/App.tsx` loads `HostedApp.tsx` (website pages, sign-in, panel, share links, guide, legal) or `DemoApp.tsx` (demo shop, research console and its tools, with their CSS) by address, each as its own chunk: opening the panel doesn't download the demo, its research tools or the eye-tracking model.
+- **Large projects.** Supabase returns at most 1,000 rows a request, so long lists are read in pages (`paged()` in `src/saas/cloud.ts`): the comment inbox shows the newest 5,000 (`MAX_LIST`, with a note past it), study results and participant paths up to 20,000 events, oldest first. The panel polls every 20 seconds and only while the tab is visible; the widget gets the newest 1,000 comments (`list_threads`). Projects load only their newest 50 releases.
 - **Two modes.** The build picks one (`src/saas/supabase.ts`).
   - **With a Supabase project** (`VITE_SUPABASE_URL` and the anon key, or Vercel's Supabase integration; see `supabase/README.md`), the panel uses it:
     - real accounts: register with email confirmation, login, forgot and reset password by email (`src/pages/saas/AuthCloud.tsx`);

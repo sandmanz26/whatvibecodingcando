@@ -3,10 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/landing/favicon.svg" />
     <meta name="description" content="Vibe Collab is the review layer for products built with AI. One script tag puts comments, user tests and design checks on top of your live site." />
     <meta name="theme-color" content="#1535e6" />
     <title>Vibe Collab — the review layer for AI-built products</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Vibe Collab — the review layer for AI-built products" />
+    <meta property="og:description" content="One script tag puts comments, user tests and design checks on top of your live site." />
+    <script>
+      // The site's root used to be the app: its links (#/app/…, #/share/…, #/guide) and sign-in
+      // returns from emails (?code=…, ?token_hash=…) carry on to the app at /app.
+      (function () {
+        function go() {
+          var h = location.hash, s = location.search
+          if (/^#\//.test(h) || /[?&](auth|code|token_hash|error|error_description)=/.test(s)) location.replace('/app' + s + h)
+        }
+        go()
+        addEventListener('hashchange', go)
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -52,6 +52,14 @@ select pg_temp.check(json_array_length(public.versions_of((select id from projec
 reset role;
 select pg_temp.check((select count(*) from threads t join projects p on p.id = t.project_id where p.public_id = 'teh-shop-v001') = 4, 'four threads stored');
 delete from storage.objects where bucket_id = 'narrations';
+-- a big project: the widget gets the newest 1,000 comments, not all of them
+reset role;
+insert into threads (project_id, page, anchor, author_name, reviewer, text)
+  select p.id, '/bulk', '{"sel":"h1"}', 'Bulk', 'x', 'Note ' || g from projects p, generate_series(1, 1100) g where p.public_id = 'teh-shop-v001';
+set role authenticated;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000d0b1', true);
+select pg_temp.check(json_array_length(public.list_threads('teh-shop-v001')) = 1000, 'a big project: the widget gets the 1,000 newest comments');
+reset role;
 delete from workspaces where name = 'Teh';
 delete from auth.users where id in ('00000000-0000-0000-0000-00000000d0a1', '00000000-0000-0000-0000-00000000d0b1', '00000000-0000-0000-0000-00000000d0c1');
 \o

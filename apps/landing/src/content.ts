@@ -5,17 +5,20 @@
  * Every fact below is true of the product as it is built today.
  */
 
-/** The live product. The landing page is standalone, so these are absolute. */
-const LIVE = 'https://whatvibecodingcando.vercel.app/'
+/**
+ * The product, on the same site: the landing page is served at the root (/) and the panel at /app.
+ * Root-relative, so the page works on any domain the site moves to.
+ */
+const APP = '/app#'
 export const LINKS = {
-  demo: `${LIVE}embed-demo.html`,
-  start: `${LIVE}#/app/register`,
+  demo: '/embed-demo.html',
+  start: `${APP}/app/register`,
   /** Sign-up with these products picked (the live site reads `?products=`). */
-  startWith: (ids: string[]) => `${LIVE}#/app/register${ids.length ? `?products=${ids.join(',')}` : ''}`,
-  login: `${LIVE}#/app/login`,
-  guide: `${LIVE}#/guide`,
-  privacy: `${LIVE}#/privacy`,
-  terms: `${LIVE}#/terms`,
+  startWith: (ids: string[]) => `${APP}/app/register${ids.length ? `?products=${ids.join(',')}` : ''}`,
+  login: `${APP}/app/login`,
+  guide: `${APP}/guide`,
+  privacy: `${APP}/privacy`,
+  terms: `${APP}/terms`,
 }
 
 export const BRAND = 'Vibe Collab'

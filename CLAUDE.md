@@ -2,8 +2,11 @@
 
 - **Role (the owner asked for this, always):** work as head of design, head of product, head of engineering and head of marketing at once. Judge every change for UX, product value, engineering quality and how it sells; say so when a request has a better alternative, and give a recommendation, not only options.
 
-- **Layout:** two separate systems. `apps/content` (the content site, served at `/content/`) and `apps/saas` (Vibe Collab, the SaaS, the main site at `/` on https://whatvibecodingcando.vercel.app/, opening on its website). One Vercel deployment builds the SaaS into the root of `dist` and the content site into `dist/content` (root `vercel.json`; old `/saas/…` addresses redirect to the root, so installed snippets keep working). Paths below are relative to an app (`src/...` means `apps/<app>/src/...`).
-- **Third system: `apps/landing`**, the standalone landing page for the proposal (served at `/landing/`, built into `dist/landing`). React + Vite, front end only, English only. Its own look (blueprint cobalt, marker yellow; `src/styles.css`) and its own copy (`src/content.ts`): no invented customers, numbers or testimonials, and every product claim must match `apps/saas/src/saas/products.ts`. It shares nothing with the other two; its links to the product are absolute (`LINKS` in `content.ts`). It draws the product's widget itself (`src/Widget.tsx`, a copy of the look, no import) and plays a scroll film from `public/frames` (README "The scroll film"); its demos store nothing and must say they are demos.
+- **Layout:** three separate systems, one Vercel deployment (root `vercel.json`, README "Vercel").
+  - `apps/landing`: the website, the site's front page at `/` (built into `dist/landing`; the root build copies its `index.html` to `dist/index.html`, so its base is `/landing/`). Its page forwards old app addresses (`/#/…`, `/?code=…`) to `/app`. Every claim on it must match `apps/saas/src/saas/products.ts`.
+  - `apps/saas`: Vibe Collab, the product. Its page is `app.html`, served at `/app` (panel at `/app#/app`); its public files stay at the root: `/embed/vibe.js` (customers' snippets: never move it), `/embed-demo.html`. Old `/saas/…` addresses redirect to the root.
+  - `apps/content`: the content site at `/content/`.
+  - Paths below are relative to an app (`src/...` means `apps/<app>/src/...`).
 - **Nothing is shared.**
   - Code: each app has its own copy of everything, including `src/core` (the embed widget and its `Backend` interface, the heatmap renderer, the eye-movement analysis).
   - Dependencies: each app has its own `package.json`, lockfile and `node_modules`; there are no workspaces.
@@ -12,12 +15,14 @@
 - When the owner asks for a change, make it in the system they mean; if unclear, ask. Bringing a feature to the other system is a separate, deliberate copy.
 - Everything built before the split (embed, landing, panel, research tools) is part of the SaaS too; the owner wants it there.
 - Before pushing: `npm run typecheck && npm run build` at the root must pass (after `npm run install:all`).
+- **Scale rules (SaaS):** Supabase returns at most 1,000 rows per request: any list that can be longer is read with `paged()` in `src/saas/cloud.ts`, with a stable order. Lists sent to the widget are bounded in SQL (`list_threads`: the 1,000 newest). Polling only while the tab is visible. New tables get an index for every query that filters them by project.
+- **Two download areas (SaaS):** `src/App.tsx` loads `HostedApp.tsx` (website pages, sign-in, panel) or `DemoApp.tsx` (demo shop, research console, its tools) by address; never import demo or console code into hosted pages.
 
 ## Each app
 
 - Two parts, kept apart: the product (lo-fi grey-wireframe AI marketplace, buyer side only, `src/pages/shop`, `src/components/Layout.tsx`) and the UX research tools (`src/tools`, research console pages in `src/pages`, the dock). Never link research tools from the product's navigation.
 - Third part: the installable collaboration script (`src/core/embed/`; install page `src/pages/Install.tsx`; demo `public/embed-demo.html`). In the SaaS it is two files: the small loader `dist/embed/vibe.js` (`main.ts`, `vite.embed.config.ts`, no React) and the widget `dist/embed/vibe-app.js` (`app.tsx`, `vite.embed-app.config.ts`), which the loader adds only for browsers that need it (README "Build"). Keep the loader small: no React and no UI in it. The content site keeps its single `vibe.js`. It runs on other people's sites: keep it in its shadow root, never read the host's field values, and store data only through the `Backend` interface in `src/core/embed/store.ts`.
-- Fourth part: the hosted product's website (`#/landingpage`, `src/pages/saas/Landing.tsx`) and user panel (`#/app/*`, `src/pages/saas/`, data in `src/saas/`). Its own look (`src/saas/saas.css`, scoped under `.lp`/`.up`); research tools are not mounted there. No server yet: say so wherever it matters (account, invites, domains, inbox), and never claim a product runs in the script unless its status is 'script'.
+- Fourth part (SaaS): the hosted product's pages (`/app`: sign-in, the user panel `#/app/*`, share links, guide and legal; `src/pages/saas/`, data in `src/saas/`; the website itself is `apps/landing`). Its own look (`src/saas/saas.css`, scoped under `.lp`/`.up`); research tools are not mounted there. No server yet: say so wherever it matters (account, invites, domains, inbox), and never claim a product runs in the script unless its status is 'script'.
   - Signing in, SaaS only (`src/pages/saas/Auth.tsx`, `Onboarding.tsx`): register → onboarding → panel, plus login, forgot and reset password.
   - It is local to the browser: passwords only as a PBKDF2 hash, no email sent (forgot password shows a labelled demo inbox).
   - The panel's guards: no account → register, signed out → login, not onboarded → onboarding.

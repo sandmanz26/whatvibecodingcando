@@ -15,7 +15,7 @@ const PER = 30 // frames from one key to the next
 const HOLD = [0, 1, 2, 3, 4, 5].map((i) => i * PER)
 const FRAMES = HOLD[HOLD.length - 1] + 1
 const STEPS = HOLD.length
-const src = (i: number) => `./frames/f-${String(i).padStart(3, '0')}.webp`
+const src = (i: number) => `${import.meta.env.BASE_URL}frames/f-${String(i).padStart(3, '0')}.webp`
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v))
 const ease = (t: number) => t * t * (3 - 2 * t)
 
@@ -39,7 +39,7 @@ export default function Showcase() {
     if (!ctx) return
     const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
     const imgs: (HTMLImageElement | undefined)[] = new Array(FRAMES)
-    let target = 0, shown = -1, pos = 0, raf = 0, alive = true, started = false
+    let target = 0, shown = -1, pos = 0, raf = 0, alive = true, started = false, near = true
 
     const ready = (i: number) => i >= 0 && i < FRAMES && !!imgs[i]?.complete && imgs[i]!.naturalWidth > 0
     const draw = (n: number) => {
@@ -72,6 +72,9 @@ export default function Showcase() {
     const onScroll = () => {
       const r = el.getBoundingClientRect()
       if (r.top < window.innerHeight * 2.5 && r.bottom > -window.innerHeight) start()
+      // The loop only runs while the film is on or near the screen (it stops once it has settled elsewhere).
+      near = r.top < window.innerHeight * 1.5 && r.bottom > -window.innerHeight * 0.5
+      if (near && !raf && alive) raf = requestAnimationFrame(tick)
       const p = clamp(-r.top / Math.max(1, r.height - window.innerHeight))
       target = frameAt(p)
       setStep(Math.min(STEPS - 1, Math.floor(p * STEPS)))
@@ -81,10 +84,11 @@ export default function Showcase() {
       pos = calm ? target : pos + (target - pos) * 0.16
       const n = Math.round(pos)
       if (n !== shown) draw(n)
-      raf = requestAnimationFrame(tick)
+      raf = near || Math.abs(target - pos) > 0.5 ? requestAnimationFrame(tick) : 0
     }
 
-    load(0); size(); onScroll(); tick()
+    load(0); size(); onScroll()
+    if (!raf) raf = requestAnimationFrame(tick)
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', size)
     return () => { alive = false; cancelAnimationFrame(raf); window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', size) }
