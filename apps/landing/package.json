@@ -6,7 +6,7 @@
   "description": "The standalone landing page for Vibe Collab (proposal). Front end only; shares nothing with apps/saas or apps/content.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --ssr src/entry-server.tsx --outDir .ssr && node prerender.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b"
   },

@@ -5,6 +5,14 @@ The standalone landing page for Vibe Collab, made for the proposal. React + Vite
 - **Run:** `npm run dev:landing` at the root, or `npm run dev` here.
 - **Nothing is shared.** Own `package.json`, lockfile and `node_modules`; no imports from `apps/saas` or `apps/content`.
 
+## SEO
+
+- **Prerendered.** `npm run build` also renders the page to HTML (`src/entry-server.tsx`, `prerender.mjs`) and puts it in `index.html`, so crawlers and link previews (WhatsApp, LinkedIn, X) see the whole page without JavaScript; `src/main.tsx` hydrates it. Code that needs the browser must stay in effects or event handlers.
+- **Head:** title, description, canonical, Open Graph and Twitter cards with `public/og.png` (1200×630, a capture of the hero), `apple-touch-icon.png`, and JSON-LD (`SoftwareApplication` with the Free and Pro offers; no ratings or reviews until real ones exist).
+- **robots.txt and sitemap.xml** are written by `prerender.mjs` and copied to the site's root by the root build; `/app` and `/embed/` are disallowed, and the app and the demo page carry `noindex`.
+- **The domain** comes from `VITE_SITE_URL` at build time (default `https://whatvibecodingcando.vercel.app`): set it in Vercel when the site moves to its own domain.
+- One `h1`. Decorations inside headings draw their text with CSS (`.deco-text`), so the heading reads as words alone.
+
 ## Analytics
 
 `src/analytics.ts`: PostHog, off unless the build has `VITE_POSTHOG_KEY` (`phc_…`, host `VITE_POSTHOG_HOST`). Loads after the page; one page view and the funnel's first clicks (`get_started_clicked` with the tools picked, `login_clicked`, `demo_opened`, each with the section). No autocapture or recording; a first-party cookie carries the anonymous id into the app at `/app`.

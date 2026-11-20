@@ -90,10 +90,11 @@ function Hero() {
         <p className="eyebrow on-blue">The review layer for AI-built products</p>
         <h1>
           <span className="h1-a">It looks <span className="pinned">finished.
-            <WPin n={1} className="hero-pin" />
+            {/* Decoration only: its number and name are drawn by CSS, so the heading reads as words alone. */}
+            <WPin n={<i className="deco-text" data-text="1" />} className="hero-pin" />
             <span className="cursor" aria-hidden>
               <svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 2l15 7.5-6.5 2L9 18z" fill="#e4ff54" stroke="#070d3a" strokeWidth="1.4" strokeLinejoin="round" /></svg>
-              <i>Rani</i>
+              <i className="deco-text" data-text="Rani" />
             </span>
           </span></span>{' '}
           <span className="h1-b">Find out if it’s <span className="hl">right.</span></span>

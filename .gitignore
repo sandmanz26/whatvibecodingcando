@@ -5,3 +5,4 @@ dist
 *.tsbuildinfo
 .taste-skill/inspect*
 pitch/*.mp4
+.ssr
