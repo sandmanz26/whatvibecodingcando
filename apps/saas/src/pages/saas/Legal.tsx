@@ -33,7 +33,7 @@ export function Privacy() {
     <Page title="Privacy policy">
       <h2>What we keep</h2>
       <ul>
-        <li><b>Your account:</b> name, email address and a password (stored by our authentication provider as a hash; we never see it).</li>
+        <li><b>Your account:</b> name, email address and a password (stored by our authentication provider as a hash; we never see it). If you continue with Google, we get your name and email address from Google, never your Google password.</li>
         <li><b>Your workspace:</b> projects, their site addresses, widget settings and their published versions, and invites you create.</li>
         <li><b>Comments on your sites:</b> the comment and reply text, the page path it was made on, where on the page (the element and position), the time, and the name the reviewer gave.</li>
         <li><b>Reviewers:</b> a reviewer who opens a review link gets an anonymous session for that browser. We keep the name they give and when they were last active; no email or password.</li>
@@ -60,6 +60,7 @@ export function Privacy() {
         <li><b>Vercel</b>: hosting of this website and the script.</li>
         {analyticsOn && <li><b>PostHog</b>: product analytics for this website and the app: which pages are opened and which steps are completed (sign-up, onboarding, installing, the first comment), with your account’s id when you’re signed in. No session recordings, no comment text, field values, emails or names; addresses are cleaned of private links before they are sent.</li>}
         <li><b>Our email provider</b>: sends account emails (confirmation, password reset).</li>
+        <li><b>Google</b>: only if you choose “Continue with Google”, to sign you in.</li>
       </ul>
       <h2>How long, and your choices</h2>
       <ul>

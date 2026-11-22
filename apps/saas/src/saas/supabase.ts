@@ -7,6 +7,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { TURNSTILE_KEY, turnstileToken } from '../core/embed/turnstile'
+import { track } from '../lib/analytics'
 
 const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -44,22 +45,35 @@ export async function captcha(): Promise<string | undefined> {
   finally { wrap.remove() }
 }
 
+/** The project's public Auth settings (which sign-in methods are on); null when unknown. */
+let settings: Promise<{ external?: Record<string, boolean> } | null> | null = null
+function authSettings() {
+  if (!URL_ || !KEY) return Promise.resolve(null)
+  settings ??= fetch(`${URL_}/auth/v1/settings`, { headers: { apikey: KEY } })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null)
+  return settings
+}
+
 /**
  * Whether the Supabase project lets reviewers get a session (Auth → anonymous sign-ins). Reviewers on
  * customers' sites need it; null when unknown (demo mode, or the check failed).
  */
-let anonCheck: Promise<boolean | null> | null = null
-export function anonymousSignInsOn(): Promise<boolean | null> {
-  if (!URL_ || !KEY) return Promise.resolve(null)
-  anonCheck ??= fetch(`${URL_}/auth/v1/settings`, { headers: { apikey: KEY } })
-    .then((r) => (r.ok ? r.json() : null))
-    .then((j) => (j && typeof j.external?.anonymous_users === 'boolean' ? j.external.anonymous_users as boolean : null))
-    .catch(() => null)
-  return anonCheck
+export const anonymousSignInsOn = (): Promise<boolean | null> =>
+  authSettings().then((j) => (typeof j?.external?.anonymous_users === 'boolean' ? j.external.anonymous_users : null))
+
+/** Whether "Continue with Google" is switched on in the Supabase project (Auth → Providers → Google). */
+export const googleOn = (): Promise<boolean> => authSettings().then((j) => j?.external?.google === true)
+
+/** Sends the browser to Google; it comes back to this page with ?auth=oauth&code=…, finished by finishAuthReturn. */
+export async function signInWithGoogle(): Promise<string> {
+  if (!supabase) return 'Google sign-in needs the server.'
+  const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: authReturnUrl('oauth'), queryParams: { prompt: 'select_account' } } })
+  return error ? authMessage(error) : ''
 }
 
 /** Where links in emails come back to: this site's root, with what the link was for. */
-export const authReturnUrl = (what: 'signup' | 'recovery' | 'email_change') =>
+export const authReturnUrl = (what: 'signup' | 'recovery' | 'email_change' | 'oauth') =>
   `${window.location.origin}${window.location.pathname}?auth=${what}`
 
 /**
@@ -76,10 +90,18 @@ export async function finishAuthReturn() {
   const { data } = await supabase.auth.getSession()
   const clean = `${window.location.origin}${window.location.pathname}`
   let route = '#/app'
-  if (err || !data.session) route = `#/app/login?link=${encodeURIComponent(err ? 'expired' : 'other-browser')}`
+  if (err || !data.session) route = `#/app/login?link=${what === 'oauth' ? 'google' : err ? 'expired' : 'other-browser'}`
   else if (what === 'recovery') route = '#/app/reset'
+  else if (what === 'oauth') {
+    track('login_completed', { method: 'google' })
+    // Where the login page was asked to go next (an invite, a deep link); only an in-app path.
+    let next = ''
+    try { next = sessionStorage.getItem('vibe.auth.next') ?? ''; sessionStorage.removeItem('vibe.auth.next') } catch { /* ignore */ }
+    if (/^\/app(\/[\w/-]*)?(\?[\w=&%-]*)?$/.test(next)) route = `#${next}`
+  }
   history.replaceState(null, '', `${clean}${route}`)
-  window.dispatchEvent(new HashChangeEvent('hashchange'))
+  // The hash router listens for popstate (replaceState fires none), so tell it the route changed.
+  window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
 }
 
 /** A Supabase auth error as a sentence for people. */

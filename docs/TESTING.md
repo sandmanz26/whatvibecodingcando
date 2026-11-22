@@ -49,6 +49,10 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 | 2.5 ⚡ | Log in dengan password benar | Masuk ke Overview | [ ] |
 | 2.6 | **Forgot password** → email → link reset → password baru | Bisa login dengan password baru | [ ] |
 | 2.7 | Buka `/app#/app` saat log out | Diarahkan ke login | [ ] |
+| 2.8 | (Setelah Google diaktifkan di Supabase) **Continue with Google** di halaman Register | Pilih akun Google → kembali ke app → onboarding (akun baru) atau Overview (akun lama) | [ ] |
+| 2.9 | Klik **Continue with Google**, lalu batalkan di layar Google | Kembali ke Log in dengan pesan "Google sign-in didn’t finish" | [ ] |
+| 2.10 | Akun Google → **Settings → Password** | Tertulis "You log in with Google"; bisa **Set password** tanpa password lama, lalu login dengan email + password | [ ] |
+| 2.11 | Google dimatikan di Supabase → buka Log in | Tombol Google tidak tampil | [ ] |
 
 ---
 

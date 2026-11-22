@@ -332,6 +332,9 @@
 .lp-auth-foot { text-align: center; font-size: 14px; color: var(--lp-ink-2); }
 .lp-auth-foot a, .lp-auth-link, .lp-auth-card p a { color: var(--lp-ink); font-weight: 650; }
 .lp-auth-link { font-size: 13px; align-self: flex-end; }
+.lp-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; }
+.lp-or { display: flex; align-items: center; gap: 12px; margin: 2px 0 6px; color: var(--lp-ink-2); font-size: 13px; }
+.lp-or::before, .lp-or::after { content: ''; flex: 1; height: 1px; background: var(--lp-line-2); }
 .lp-pass { position: relative; display: flex; }
 .lp-pass input { flex: 1; padding-right: 44px; min-width: 0; }
 .lp-pass button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 34px; border: 0; background: transparent; color: var(--lp-ink-2); border-radius: 8px; cursor: pointer; display: grid; place-items: center; }

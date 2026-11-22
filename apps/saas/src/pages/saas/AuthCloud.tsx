@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, CheckCircle2 } from 'lucide-react'
 import { parseProducts } from '../../saas/products'
 import { isOnboarded, isSignedIn, passwordProblem, refreshCloud, useSaas, useSaasReady, validEmail } from '../../saas/account'
-import { authMessage, authReturnUrl, captcha, supabase } from '../../saas/supabase'
+import { authMessage, authReturnUrl, captcha, googleOn, signInWithGoogle, supabase } from '../../saas/supabase'
 import { PasswordField, Shell, Strength, safeNext } from './Auth'
 import '../../saas/saas.css'
 import { track } from '../../lib/analytics'
@@ -28,6 +28,40 @@ function CheckEmail({ email, what, onResend }: { email: string; what: string; on
       <p className="lp-muted">Open it on any device. Nothing there after a few minutes? Check spam, or send it again.</p>
       <button className="lp-btn full" disabled={wait > 0} onClick={async () => { setNote(await onResend()); setWait(60) }}>{wait > 0 ? `Send again in ${wait} s` : 'Send again'}</button>
       {note && <p className="lp-hint">{note}</p>}
+    </>
+  )
+}
+
+/** Google's "G" mark, in its brand colours (Google's sign-in button guidelines). */
+const GoogleG = () => (
+  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+  </svg>
+)
+
+/**
+ * "Continue with Google", shown only when Google is switched on in the Supabase project, so turning
+ * it on there needs no new build. One button for both pages: Google creates the account on first use.
+ */
+function GoogleButton({ before }: { before?: () => void }) {
+  const [on, setOn] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => { let live = true; void googleOn().then((v) => { if (live) setOn(v) }); return () => { live = false } }, [])
+  if (!on) return null
+  return (
+    <>
+      <button type="button" className="lp-btn full lp-google" disabled={busy} onClick={async () => {
+        before?.()
+        setBusy(true); setError('')
+        const e = await signInWithGoogle()
+        if (e) { setBusy(false); setError(e) }
+      }}><GoogleG /> {busy ? 'Opening Google…' : 'Continue with Google'}</button>
+      {error && <p className="lp-error" role="alert">{error}</p>}
+      <div className="lp-or" role="separator"><span>or with email</span></div>
     </>
   )
 }
@@ -75,6 +109,7 @@ export function CloudRegister() {
   )
   return (
     <Shell title="Create your account" sub="Free during the beta. Next, you’ll set up your first project." foot={<>Already have an account? <Link to="/app/login">Log in</Link></>}>
+      <GoogleButton before={() => { try { sessionStorage.setItem('vibe.onboarding.products', products.join(',')) } catch { /* ignore */ } }} />
       <form className="lp-auth-fields" onSubmit={(e) => { e.preventDefault(); void submit() }} noValidate>
         <label className="lp-field">Your name
           <input autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoComplete="name" aria-invalid={tried && !name.trim()} />
@@ -121,9 +156,11 @@ export function CloudLogin() {
   }
   return (
     <Shell title="Log in" sub="Welcome back. Log in to your workspace." foot={<>New here? <Link to="/app/register">Create an account</Link></>}>
+      <GoogleButton before={() => { try { sessionStorage.setItem('vibe.auth.next', next) } catch { /* ignore */ } }} />
       <form className="lp-auth-fields" onSubmit={(e) => { e.preventDefault(); void submit() }} noValidate>
         {params.get('confirmed') && <p className="lp-ok"><CheckCircle2 size={16} /> Email confirmed. Log in to continue.</p>}
         {link === 'expired' && <p className="lp-error" role="alert">That link has expired or was already used. Log in, or ask for a new one.</p>}
+        {link === 'google' && <p className="lp-error" role="alert">Google sign-in didn’t finish. Try again, or log in with your email.</p>}
         {link === 'other-browser' && <p className="lp-error" role="alert">That link was opened in a different browser from the one it was asked in. Log in here, or open the link in the first browser.</p>}
         <label className="lp-field">Email
           <input type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} autoComplete="username" />

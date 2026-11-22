@@ -550,7 +550,18 @@ function PasswordCard() {
   const [pw2, setPw2] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const has = cloud || !!s.account?.password
+  // On the server: an email sign-up has a password; a Google one doesn't until it sets one (marked in its metadata).
+  const [cloudHas, setCloudHas] = useState(true)
+  useEffect(() => {
+    if (!supabase) return
+    let live = true
+    void supabase.auth.getUser().then(({ data }) => {
+      const u = data.user
+      if (live && u) setCloudHas((u.app_metadata?.providers as string[] | undefined ?? [u.app_metadata?.provider]).includes('email') || u.user_metadata?.has_password === true)
+    })
+    return () => { live = false }
+  }, [])
+  const has = cloud ? cloudHas : !!s.account?.password
   const problem = passwordProblem(pw, s.account?.email)
   const save = async () => {
     setError('')
@@ -560,11 +571,13 @@ function PasswordCard() {
       setBusy(true)
       try {
         // The current password is checked by logging in with it again.
-        const check = await supabase.auth.signInWithPassword({ email: s.account!.email, password: cur, options: { captchaToken: await captcha() } })
-        if (check.error) { setError(check.error.code === 'invalid_credentials' ? 'The current password is incorrect.' : authMessage(check.error)); return }
-        const { error: e } = await supabase.auth.updateUser({ password: pw })
+        if (has) {
+          const check = await supabase.auth.signInWithPassword({ email: s.account!.email, password: cur, options: { captchaToken: await captcha() } })
+          if (check.error) { setError(check.error.code === 'invalid_credentials' ? 'The current password is incorrect.' : authMessage(check.error)); return }
+        }
+        const { error: e } = await supabase.auth.updateUser({ password: pw, data: { has_password: true } })
         if (e) { setError(authMessage(e)); return }
-        toast('Password changed'); setCur(''); setPw(''); setPw2('')
+        toast(has ? 'Password changed' : 'Password set'); setCloudHas(true); setCur(''); setPw(''); setPw2('')
       } finally { setBusy(false) }
       return
     }
@@ -580,7 +593,7 @@ function PasswordCard() {
   return (
     <section className="up-card">
       <h2>Password</h2>
-      {!has && <p className="up-muted">This workspace was made before passwords. Set one so you can log in after logging out.</p>}
+      {!has && <p className="up-muted">{cloud ? 'You log in with Google. Optional: set a password to also log in with your email.' : 'This workspace was made before passwords. Set one so you can log in after logging out.'}</p>}
       <form className="up-grid2" onSubmit={(e) => { e.preventDefault(); void save() }}>
         {has && <label className="lp-field">Current password<input type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" maxLength={200} /></label>}
         <label className="lp-field">New password<input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" maxLength={200} /></label>
