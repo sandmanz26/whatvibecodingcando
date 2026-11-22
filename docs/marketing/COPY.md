@@ -70,7 +70,7 @@ Aturan untuk semua teks:
 
 ## 3. Show HN (minggu 5–6, setelah produk stabil & daftar < 1 menit)
 
-**Judul (tanpa hype):** `Show HN: Vibe Collab – comments and user tests on any live site from one script tag`
+**Judul (tanpa hype):** `Show HN: ourhunch – comments and user tests on any live site from one script tag`
 
 **Teks:**
 > Hi HN. This is a script tag that adds pinned comments, voice notes and simple user tests (tasks, 5-second tests, click heatmaps, and webcam eye tracking marked as experimental) to any website.
@@ -93,7 +93,7 @@ Aturan untuk semua teks:
 
 > 1/ Building websites with AI got 10× faster. Getting feedback on them didn't.
 > Clients still send WhatsApp screenshots: "the button on page 2 looks weird on my phone."
-> So I built Vibe Collab. 🧵
+> So I built ourhunch. 🧵
 >
 > 2/ One script tag. Send your client a link — no account.
 > They click the thing and type or say what's wrong.
@@ -120,7 +120,7 @@ Aturan untuk semua teks:
 >
 > In my client work, feedback arrives as screenshots and voice notes on WhatsApp, and finding *which* button on *which* phone takes longer than the fix.
 >
-> I built Vibe Collab to put the review on the product itself: one script tag, clients review from a link (no account), and every note carries the page, element and device. You can turn open notes into a prompt for your AI coding tool, and run simple user tests and heatmaps from the same script.
+> I built ourhunch to put the review on the product itself: one script tag, clients review from a link (no account), and every note carries the page, element and device. You can turn open notes into a prompt for your AI coding tool, and run simple user tests and heatmaps from the same script.
 >
 > It's free during the beta. If you run an agency or freelance, I'd love 15 minutes of your honest feedback — comment or DM me.
 >
@@ -132,7 +132,7 @@ Aturan untuk semua teks:
 >
 > Feedback datang lewat screenshot dan voice note di WhatsApp: "tombol di halaman kedua aneh di HP saya". Mencari tombol yang mana sering lebih lama daripada memperbaikinya.
 >
-> Karena itu saya membuat Vibe Collab: cukup satu baris script. Klien menerima satu link (tanpa perlu akun), klik bagian yang salah, lalu tulis atau rekam suara. Setiap catatan otomatis menyimpan halaman, elemennya, dan perangkat yang dipakai. Semua catatan bisa disalin jadi prompt untuk AI coder Anda. Script yang sama juga bisa dipakai untuk usability test dan heatmap.
+> Karena itu saya membuat ourhunch: cukup satu baris script. Klien menerima satu link (tanpa perlu akun), klik bagian yang salah, lalu tulis atau rekam suara. Setiap catatan otomatis menyimpan halaman, elemennya, dan perangkat yang dipakai. Semua catatan bisa disalin jadi prompt untuk AI coder Anda. Script yang sama juga bisa dipakai untuk usability test dan heatmap.
 >
 > Gratis selama beta. Untuk teman-teman freelancer dan agensi: saya ingin 15 menit masukan jujur dari Anda — komentar atau DM ya.
 >
@@ -168,10 +168,10 @@ Aturan untuk semua teks:
 ## 9. Pesan ke daftar pendukung saat Product Hunt (hari H)
 
 **WA/Email (ID):**
-> Hai [nama]! Hari ini Vibe Collab meluncur di Product Hunt 🚀 Kalau sempat, coba lihat dan tinggalkan komentar jujur di sana — masukan apa pun (termasuk kritik) sangat membantu. Link: [link PH]. Terima kasih banyak!
+> Hai [nama]! Hari ini ourhunch meluncur di Product Hunt 🚀 Kalau sempat, coba lihat dan tinggalkan komentar jujur di sana — masukan apa pun (termasuk kritik) sangat membantu. Link: [link PH]. Terima kasih banyak!
 
 **EN:**
-> Hi [name]! Vibe Collab is live on Product Hunt today. If you have a minute, I'd love your honest comment there — critique included: [PH link]. Thank you!
+> Hi [name]! ourhunch is live on Product Hunt today. If you have a minute, I'd love your honest comment there — critique included: [PH link]. Thank you!
 
 *(Jangan menulis "tolong upvote" — minta komentar/masukan.)*
 
@@ -197,10 +197,10 @@ Aturan untuk semua teks:
 
 ## 11. Direktori & launch boards — teks pendek
 
-- **Nama:** Vibe Collab
+- **Nama:** ourhunch
 - **Tagline (60):** Client feedback and user tests on any live site
 - **Deskripsi pendek (160):** One script tag adds pinned comments, voice notes and user tests to any website. Clients review via link, no account. $2 per site, free in beta.
-- **Deskripsi panjang (≈500):** Vibe Collab puts feedback on the product itself. Add one script tag, send a client or teammate a link, and they click any element on your live site to type or record what's wrong — no account needed. Every note carries the page, the element and the device. Copy open notes as a prompt for your AI coding tool, share a read-only list, or export CSV. The same script runs usability tasks, 5-second tests and click heatmaps with people who agree to take part. Normal visitors load ~5 KB and see nothing. Free during the beta, then $2 per site per month.
+- **Deskripsi panjang (≈500):** ourhunch puts feedback on the product itself. Add one script tag, send a client or teammate a link, and they click any element on your live site to type or record what's wrong — no account needed. Every note carries the page, the element and the device. Copy open notes as a prompt for your AI coding tool, share a read-only list, or export CSV. The same script runs usability tasks, 5-second tests and click heatmaps with people who agree to take part. Normal visitors load ~5 KB and see nothing. Free during the beta, then $2 per site per month.
 - **Kategori:** Developer Tools, Design Tools, User Research, Website Feedback, No-code
 - **Alternatif dari (untuk SaaSHub/AlternativeTo):** Marker.io, BugHerd, Userback, Ruttl, Pastel, Hotjar (feedback), Maze (usability tests)
 
@@ -213,7 +213,7 @@ Aturan untuk semua teks:
 **Subjek:** `Did your client leave the first comment yet?`
 
 > Hi [name],
-> Thanks for trying Vibe Collab. The moment it clicks is the first comment from a client, so here's the 2-minute path:
+> Thanks for trying ourhunch. The moment it clicks is the first comment from a client, so here's the 2-minute path:
 > 1. Open **Reviewers** → type their name → **Make link**.
 > 2. Send it on WhatsApp/email. They click anything on your site and type or record.
 > 3. You'll see it under **Results → Comments** with the page, element and device.

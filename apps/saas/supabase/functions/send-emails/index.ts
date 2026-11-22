@@ -8,7 +8,7 @@
  *
  * Secrets (Supabase → Edge Functions → Secrets; never in the repository or the app):
  *   RESEND_API_KEY      the Resend API key
- *   EMAIL_FROM          e.g. "Vibe Collab <notify@yourdomain.com>" (a domain verified in Resend)
+ *   EMAIL_FROM          e.g. "ourhunch <notify@yourdomain.com>" (a domain verified in Resend)
  *   EMAIL_CRON_SECRET   a long random string; pg_cron sends it as "Authorization: Bearer …"
  *   APP_URL             e.g. https://whatvibecodingcando.vercel.app
  * SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.

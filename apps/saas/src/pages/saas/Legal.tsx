@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, MousePointer2, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, TriangleAlert } from 'lucide-react'
 import { BRAND, inScript, WEBSITE } from '../../saas/products'
 import { analyticsOn } from '../../lib/analytics'
 import '../../saas/saas.css'
+import { BrandMark } from '../../components/BrandMark'
 
 /**
  * Privacy policy and terms, written from what the product actually does. They are drafts: before
@@ -15,7 +16,7 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
   return (
     <div className="lp lp-legal">
       <header className="lp-wrap lp-signup-head">
-        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</a>
+        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><BrandMark size={17} /></span>{BRAND}</a>
         <a href={WEBSITE} className="lp-btn ghost sm"><ArrowLeft size={14} /> Website</a>
       </header>
       <main className="lp-wrap lp-legal-main">

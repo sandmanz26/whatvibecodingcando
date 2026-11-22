@@ -4,9 +4,9 @@
 
 ---
 
-### 1. "Vibe Collab" itu nama kerja, dan menempel ke tren. ⚠️
-Nama ini masih ditulis "a working name" di produk. "Vibe" terikat tren *vibe coding* yang bisa memudar, dan ICP #1 kita (agensi dengan klien awam) tidak peduli soal vibe coding. Product Hunt, backlink direktori dan SEO menempel ke nama + domain **selamanya**.
-**Aksi:** putuskan nama & beli domain **sebelum** minggu 3 (launch boards). Kalau tetap "Vibe Collab", hapus label "working name".
+### 1. Nama kerja yang menempel ke tren. ✅
+Dulu "Vibe Collab", ditandai "a working name". **Diputuskan: ourhunch** (22 Nov 2026) — tidak terikat tren *vibe coding*, cocok untuk agensi maupun pembuat produk ("buktikan firasat Anda dengan feedback nyata"). Logo baru: pin yang berisi kilau. Label "working name" sudah dihapus.
+**Sisa aksi:** beli domain ourhunch (lihat #2).
 
 ### 2. Domain `*.vercel.app` terlihat seperti proyek hobi. ⚠️
 Di Product Hunt dan HN, domain gratisan langsung menurunkan kepercayaan, apalagi untuk script yang dipasang di situs produksi orang.
@@ -34,7 +34,7 @@ Landing page dan Product Hunt tidak punya satu pun testimoni, logo, atau angka. 
 
 ### 8. "Pasang satu baris script" — tapi vibe coder tidak tahu di mana `</body>`. ✅/⚠️
 Pengguna Lovable/Bolt jarang membuka `index.html`. Aktivasi (script terdeteksi) akan jadi titik bocor terbesar.
-**Perbaikan:** halaman Install sudah punya prompt "Ask an AI assistant". **Aksi tambahan disarankan:** halaman panduan khusus "Add Vibe Collab to a Lovable / Bolt / v0 app" (juga bagus untuk SEO) — masukkan ke minggu 0–1.
+**Perbaikan:** halaman Install sudah punya prompt "Ask an AI assistant". **Aksi tambahan disarankan:** halaman panduan khusus "Add ourhunch to a Lovable / Bolt / v0 app" (juga bagus untuk SEO) — masukkan ke minggu 0–1.
 
 ### 9. Bahasa: menjual ke klien Indonesia dengan widget berbahasa Inggris. ⚠️
 Klien agensi lokal (pemilik toko, UMKM) akan bingung dengan "Comment", "Reply", "Set as completed".

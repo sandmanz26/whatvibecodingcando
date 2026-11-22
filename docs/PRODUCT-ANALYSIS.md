@@ -1,4 +1,4 @@
-# Analisis produk & market fit — Vibe Collab
+# Analisis produk & market fit — ourhunch
 
 *Ditulis 20 November 2026. Sudut pandang: head of product, design, engineering dan marketing. Angka pasar dan harga pesaing dari riset web (daftar sumber di bawah); cek ulang sebelum dipakai di materi publik.*
 
@@ -6,7 +6,7 @@
 
 ## 1. Ringkasan satu paragraf
 
-Vibe Collab memecahkan masalah yang nyata: produk yang dibuat cepat (dengan AI atau tidak) tetap butuh **feedback dari klien, tim dan pengguna, langsung di halaman yang hidup**. Pasarnya besar dan tumbuh (platform vibe coding seperti Lovable dilaporkan ±$400 juta ARR awal 2026 dan ±8 juta pengguna terdaftar), tapi **kategori "website feedback" sudah ramai** (Marker.io, BugHerd, Userback, Ruttl, Feedbucket, Faster Fixes, Feedboon; plus komentar gratis bawaan Vercel). Fitur "kirim feedback ke AI coder" yang kita kira unik **sudah dimiliki beberapa pesaing lewat MCP**. Pembeda kita yang sebenarnya: **(1) harga $2/situs vs $18–59/bulan pesaing, (2) feedback + riset pengguna (usability test, heatmap, 5-second test) dalam satu script, (3) fokus pasar Indonesia/Asia Tenggara (Rupiah, QRIS, Bahasa Indonesia).** Untuk MVP yang layak ditagih, empat hal wajib: **screenshot di komentar, notifikasi email, MCP/API untuk AI coder, dan billing.**
+ourhunch memecahkan masalah yang nyata: produk yang dibuat cepat (dengan AI atau tidak) tetap butuh **feedback dari klien, tim dan pengguna, langsung di halaman yang hidup**. Pasarnya besar dan tumbuh (platform vibe coding seperti Lovable dilaporkan ±$400 juta ARR awal 2026 dan ±8 juta pengguna terdaftar), tapi **kategori "website feedback" sudah ramai** (Marker.io, BugHerd, Userback, Ruttl, Feedbucket, Faster Fixes, Feedboon; plus komentar gratis bawaan Vercel). Fitur "kirim feedback ke AI coder" yang kita kira unik **sudah dimiliki beberapa pesaing lewat MCP**. Pembeda kita yang sebenarnya: **(1) harga $2/situs vs $18–59/bulan pesaing, (2) feedback + riset pengguna (usability test, heatmap, 5-second test) dalam satu script, (3) fokus pasar Indonesia/Asia Tenggara (Rupiah, QRIS, Bahasa Indonesia).** Untuk MVP yang layak ditagih, empat hal wajib: **screenshot di komentar, notifikasi email, MCP/API untuk AI coder, dan billing.**
 
 ---
 
@@ -125,7 +125,7 @@ Kalau aktivasi rendah → masalah di instalasi (perbaiki onboarding). Kalau akti
 
 1. **Pesaing gratis/murah dengan MCP** (Faster Fixes open source, Userback free). → Jawaban: kita bukan hanya feedback; riset + harga + lokal.
 2. **Vercel Comments gratis** untuk developer di Vercel. → Jawaban: reviewer kita tidak butuh akun, bekerja di produksi & semua hosting, ada riset.
-3. **Nama "Vibe Collab" masih nama kerja** dan terdengar umum/terikat tren "vibe". → Putuskan nama & domain sebelum Product Hunt.
+3. **Nama "ourhunch" masih nama kerja** dan terdengar umum/terikat tren "vibe". → Putuskan nama & domain sebelum Product Hunt.
 4. **Satu orang founder, token terbatas.** → Fokus: MVP 4 fitur, satu ICP, satu kanal utama per minggu.
 5. **Kepatuhan privasi (UU PDP)** untuk riset dengan peserta. → Sudah ada consent & redaksi; perlu review hukum sebelum skala.
 

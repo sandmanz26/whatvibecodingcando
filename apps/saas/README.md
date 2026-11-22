@@ -1,4 +1,4 @@
-# Vibe Collab (SaaS app)
+# ourhunch (SaaS app)
 
 The hosted product, at `/app` (`app.html`; the website is `apps/landing`, at `/`): register, login, forgot/reset password, onboarding, user panel (`#/app`), install page and the installable script, plus every research tool built for the content site (dock, research console, heatmaps and eye tracking, sessions, compare reviews, design tokens, inspect, versions). It starts as a copy of `apps/content`; from here it grows on its own (backend, accounts and a database come later).
 

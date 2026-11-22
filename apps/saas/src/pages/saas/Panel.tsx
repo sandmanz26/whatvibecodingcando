@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, MousePointer2, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown, Sparkles } from 'lucide-react'
+import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown, Sparkles } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, CATEGORIES, CAT_HELP, PRODUCTS, productOf, statusLabel, WEBSITE } from '../../saas/products'
@@ -17,6 +17,7 @@ import { download, fixPrompt, threadsCsv, toShared } from '../../saas/stats'
 import { LocalBackend, NS, STATUS_LABEL, deviceLine, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
 import { resetAnalytics, track, trackOnce } from '../../lib/analytics'
+import { BrandMark } from '../../components/BrandMark'
 
 export interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
 export const usePanel = () => useOutletContext<Ctx>()
@@ -104,7 +105,7 @@ export function PanelLayout() {
   return (
     <div className="up">
       <aside className="up-side">
-        <a href={WEBSITE} className="lp-logo sm"><span className="lp-mark" aria-hidden><MousePointer2 size={13} /></span>{BRAND}</a>
+        <a href={WEBSITE} className="lp-logo sm"><span className="lp-mark" aria-hidden><BrandMark size={15} /></span>{BRAND}</a>
         <ProjectSwitcher projects={s.projects} current={project} onPick={(id) => update((x) => ({ ...x, current: id }))} onNew={() => setCreating(true)} />
         <PanelNav project={project} />
         <span className="lp-grow" />
@@ -317,7 +318,7 @@ export function Install() {
           <dt>Content-Security-Policy</dt>
           <dd>If your site sends one, allow the script: <code>script-src {scriptHost}</code>. When the server is live, also <code>connect-src</code> for its API.</dd>
           <dt>Your own button</dt>
-          <dd><code>{'<button data-vibe="comment">Give feedback</button>'}</code> starts a comment; <code>data-vibe="comments"</code> opens the list. From code: <code>window.VibeCollab.open('comment')</code>.</dd>
+          <dd><code>{'<button data-vibe="comment">Give feedback</button>'}</code> starts a comment; <code>data-vibe="comments"</code> opens the list. From code: <code>window.OurHunch.open('comment')</code>.</dd>
           <dt>Private parts of a page</dt>
           <dd>Add <code>data-private</code> to anything that shows personal data (an account menu, an order number): study recordings keep it as “private”, never its text.</dd>
           <dt>Tests and local builds</dt>

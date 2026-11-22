@@ -6,7 +6,7 @@
 
 - **Layout:** three separate systems, one Vercel deployment (root `vercel.json`, README "Vercel").
   - `apps/landing`: the website, the site's front page at `/` (built into `dist/landing`; the root build copies its `index.html` to `dist/index.html`, so its base is `/landing/`). Its page forwards old app addresses (`/#/…`, `/?code=…`) to `/app`. Every claim on it must match `apps/saas/src/saas/products.ts`.
-  - `apps/saas`: Vibe Collab, the product. Its page is `app.html`, served at `/app` (panel at `/app#/app`); its public files stay at the root: `/embed/vibe.js` (customers' snippets: never move it), `/embed-demo.html`. Old `/saas/…` addresses redirect to the root.
+  - `apps/saas`: ourhunch, the product. Its page is `app.html`, served at `/app` (panel at `/app#/app`); its public files stay at the root: `/embed/vibe.js` (customers' snippets: never move it), `/embed-demo.html`. Old `/saas/…` addresses redirect to the root.
   - `apps/content`: the content site at `/content/`.
   - Paths below are relative to an app (`src/...` means `apps/<app>/src/...`).
 - **Nothing is shared.**

@@ -18,7 +18,7 @@ const Tick = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden><path d="m3 8.5 3.2 3L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 )
 const Mark = () => (
-  <svg className="logo-mark" width="22" height="22" viewBox="0 0 32 32" aria-hidden><path d="M16 3a11 11 0 0 1 11 11c0 8-11 15-11 15S5 22 5 14A11 11 0 0 1 16 3z" fill="currentColor" /><circle cx="16" cy="14" r="4" className="logo-eye" /></svg>
+  <svg className="logo-mark" width="22" height="22" viewBox="0 0 32 32" aria-hidden><path d="M16 3a11 11 0 0 1 11 11c0 8-11 15-11 15S5 22 5 14A11 11 0 0 1 16 3z" fill="currentColor" /><path d="M16 8.2l1.75 4.05 4.05 1.75-4.05 1.75L16 19.8l-1.75-4.05L10.2 14l4.05-1.75z" className="logo-eye" /></svg>
 )
 
 /** Fades a block in the first time it is scrolled to. */
@@ -326,7 +326,7 @@ function End() {
         </div>
         <footer className="foot">
           <span className="logo"><Mark />{BRAND}</span>
-          <span className="fine on-blue">Beta · a working name</span>
+          <span className="fine on-blue">Beta</span>
           <span className="grow" />
           <a href={LINKS.guide}>User guide</a>
           <a href={LINKS.login}>Log in</a>

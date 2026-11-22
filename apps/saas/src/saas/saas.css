@@ -37,7 +37,7 @@
 /* logo */
 .lp-logo { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; text-decoration: none; color: var(--lp-ink); }
 .lp-logo.sm { font-size: 15.5px; }
-.lp-mark { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--lp-accent); color: #fff; border: 1.5px solid var(--lp-ink); }
+.lp-mark { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: #1535e6; color: #fff; border: 1.5px solid var(--lp-ink); }
 .lp-logo.sm .lp-mark { width: 24px; height: 24px; }
 
 /* nav */

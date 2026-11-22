@@ -17,7 +17,7 @@
 
 ## 2. Isi formulir
 
-**Name:** Vibe Collab *(atau nama final — lihat ROAST #1)*
+**Name:** ourhunch *(atau nama final — lihat ROAST #1)*
 
 **Tagline (maks 60 karakter) — pilihan, urutan rekomendasi:**
 1. `Client feedback and user tests on any live site` *(47)*
@@ -45,7 +45,7 @@
 >
 > I build websites for clients, more and more with AI. Building got 10× faster; feedback didn't. Clients still send screenshots and voice notes on WhatsApp — "the button on the second page, on my phone, looks weird" — and I spend more time figuring out *which* button than fixing it.
 >
-> **Vibe Collab** is one script tag that puts the review on the product itself:
+> **ourhunch** is one script tag that puts the review on the product itself:
 > - **Clients review with one link, no account.** They click the thing, type or record their voice.
 > - **Every note knows where it is:** the page, the exact element and the device (browser, system, screen size).
 > - **Copy fix prompt:** turn one comment, or all open ones, into a prompt for Cursor, Lovable or Claude Code.

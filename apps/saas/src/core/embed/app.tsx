@@ -31,9 +31,9 @@ import { frameMain } from './frame'
 import { Participant } from './Research'
 import { loadRun, saveRun, studyInfo, takeStudyToken, type RunState } from './research'
 
-/** The public API: window.VibeCollab.open('comment' | 'list'). Calls made before the script loaded are queued in q. */
+/** The public API: window.OurHunch.open('comment' | 'list') (also window.VibeCollab, the original name). Calls made before the script loaded are queued in q. */
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
-declare global { interface Window { __vibeCollab?: { version: string; project: string; server?: boolean }; VibeCollab?: Api | { q?: unknown[][] } } }
+declare global { interface Window { __vibeCollab?: { version: string; project: string; server?: boolean }; VibeCollab?: Api | { q?: unknown[][] }; OurHunch?: Api } }
 
 import { VERSION } from './version'
 import { takeHint } from './hints'
@@ -55,7 +55,7 @@ function pinHostStyle(host: HTMLElement) {
 class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() { return { failed: true } }
-  componentDidCatch(e: unknown) { console.warn('[Vibe Collab] the widget stopped after an error; the page is unaffected.', e) }
+  componentDidCatch(e: unknown) { console.warn('[ourhunch] the widget stopped after an error; the page is unaffected.', e) }
   render() { return this.state.failed ? null : this.props.children }
 }
 
@@ -155,7 +155,7 @@ function localMode(project: string, legacy: WidgetConfig | null): Mode {
     subscribe(cb) { subs.add(cb); const off = source.subscribe(project, cb); return () => { subs.delete(cb); off() } },
     async useToken(t) {
       const s = source.redeem(project, t)
-      if (!s) { console.warn('[Vibe Collab] that review link has expired or was already used. Ask for a new one.'); return }
+      if (!s) { console.warn('[ourhunch] that review link has expired or was already used. Ask for a new one.'); return }
       try { localStorage.setItem(sessionKey(project), JSON.stringify({ ...s, preview: false })) } catch { /* ignore */ }
       // A fresh link decides: a tab opened from the panel can inherit an old preview flag.
       if (s.preview) ss.set(previewKey(project), '1')
@@ -260,7 +260,7 @@ export async function boot(given?: HTMLScriptElement | null) {
   const me = given ?? (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
   // Loaded by our own session.html: this is the session frame, not a widget.
   if (me?.dataset.frame !== undefined) { if (server.hasServer) frameMain(server.serverUrl, server.serverKey); return }
-  if (window.__vibeCollab) { console.warn('[Vibe Collab] the script is on this page twice; the second copy does nothing.'); return }
+  if (window.__vibeCollab) { console.warn('[ourhunch] the script is on this page twice; the second copy does nothing.'); return }
   const script = me
   const d = script?.dataset ?? {}
   if (script?.src) server.useFrame(script.src)
@@ -300,12 +300,12 @@ export async function boot(given?: HTMLScriptElement | null) {
   let mode: Mode | null = null
   if (server.hasServer) {
     const file = await server.fetchSettings(project, !!token)
-    if (file.gone) { console.info('[Vibe Collab] this project was deleted; nothing to show.'); return }
+    if (file.gone) { console.info('[ourhunch] this project was deleted; nothing to show.'); return }
     if (file.live) mode = serverMode(project, file)
   }
   if (!mode) {
     const first = new LocalConfigSource().get(project)
-    if (first.gone) { console.info('[Vibe Collab] this project was deleted; nothing to show.'); reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown: false, why: 'The project was deleted.' }); return }
+    if (first.gone) { console.info('[ourhunch] this project was deleted; nothing to show.'); reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown: false, why: 'The project was deleted.' }); return }
     // Before the project has published settings, the snippet's own data- attributes apply, as in 0.1.
     const legacy: WidgetConfig | null = first.live ? null : {
       v: 1, on: d.products === undefined || d.products.split(',').map((x) => x.trim()).includes('comments'),
@@ -354,7 +354,7 @@ export async function boot(given?: HTMLScriptElement | null) {
     }, [needsJoin]) // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
       m.reportSeen(decision.show, decision.show ? '' : decision.why)
-      if (!decision.show) console.info(`[Vibe Collab] not shown: ${decision.why}`)
+      if (!decision.show) console.info(`[ourhunch] not shown: ${decision.why}`)
     }, [decision])
     const [problem, setProblem] = useState<string | null>(() => (m.sessions ? server.reviewLinkError() : null))
     useEffect(() => {
@@ -378,6 +378,8 @@ export async function boot(given?: HTMLScriptElement | null) {
   const open = (what: OpenWhat = 'comment') => host.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: what === 'list' ? 'list' : 'comment' }))
   const queued = (window.VibeCollab as { q?: unknown[][] } | undefined)?.q ?? []
   window.VibeCollab = { version: VERSION, project, open }
+  // The brand's name for the same API (window.VibeCollab stays: sites already call it).
+  window.OurHunch = window.VibeCollab
   // The site's own buttons: <button data-vibe="comment"> starts a comment, data-vibe="comments" opens the list.
   document.addEventListener('click', (e) => {
     const el = (e.target as Element | null)?.closest?.('[data-vibe]')
@@ -408,7 +410,7 @@ export async function boot(given?: HTMLScriptElement | null) {
       createRoot(mount).render(<Boundary><Root /></Boundary>)
       for (const call of queued) if (call[0] === 'open') open(call[1] as OpenWhat)
     } catch (e) {
-      console.warn('[Vibe Collab] could not start; the page is unaffected.', e)
+      console.warn('[ourhunch] could not start; the page is unaffected.', e)
     }
   }
   if (document.body) start()
@@ -429,7 +431,7 @@ function mountAlone(node: ReactNode) {
       const el = document.createElement('div')
       root.appendChild(el)
       createRoot(el).render(<Boundary>{node}</Boundary>)
-    } catch (e) { console.warn('[Vibe Collab] could not start; the page is unaffected.', e) }
+    } catch (e) { console.warn('[ourhunch] could not start; the page is unaffected.', e) }
   }
   if (document.body) go()
   else document.addEventListener('DOMContentLoaded', go, { once: true })

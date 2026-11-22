@@ -51,7 +51,7 @@ function app(): Promise<void> {
 async function main() {
   if (!script?.src) return
   if (script.dataset.frame !== undefined) return app()
-  if (window.__vibeCollabLoader) { console.warn('[Vibe Collab] the script is on this page twice; the second copy does nothing.'); return }
+  if (window.__vibeCollabLoader) { console.warn('[ourhunch] the script is on this page twice; the second copy does nothing.'); return }
   window.__vibeCollabLoader = true
   const d = script.dataset
   if (d.disabled !== undefined && d.disabled !== 'false') return
@@ -62,7 +62,7 @@ async function main() {
   const has = (store: () => Storage, k: string) => { try { return store().getItem(k) !== null } catch { return false } }
   if (has(() => localStorage, `${NS}reviewer:${project}`) || has(() => localStorage, `${NS}session:${project}`) || has(() => sessionStorage, `${NS}run:${project}`)) return app()
   const file = await server.fetchSettings(project)
-  if (file.gone) { console.info('[Vibe Collab] this project was deleted; nothing to show.'); return }
+  if (file.gone) { console.info('[ourhunch] this project was deleted; nothing to show.'); return }
   if (!file.live) return app()
   const c = file.live.config
   if (c.on && c.audience === 'everyone' && c.modules.comments) return app()
@@ -72,8 +72,8 @@ async function main() {
     : !env ? `${window.location.hostname} isn’t one of this project’s environments (Widget → Website).`
       : !env.on ? `The widget is off for ${window.location.hostname} (Widget → Website).`
         : 'Only reviewers see it; open the site through a review link.'
-  console.info(`[Vibe Collab] not shown: ${why}`)
+  console.info(`[ourhunch] not shown: ${why}`)
   server.reportSeen(project, VERSION, false, why)
 }
 
-main().catch((e) => console.warn('[Vibe Collab] could not start; the page is unaffected.', e))
+main().catch((e) => console.warn('[ourhunch] could not start; the page is unaffected.', e))

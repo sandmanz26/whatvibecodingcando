@@ -3,8 +3,8 @@
 | Path | System | Run / build |
 |---|---|---|
 | `apps/content` | **The content site.** The AI marketplace prototype, with the research dock and console used to show what vibe coding can do. It also has a copy of the SaaS website, panel and script. | `npm run dev` · `npm run build:content` → `dist/content` (served at `/content/`) |
-| `apps/saas` | **Vibe Collab, the SaaS.** Its page is `app.html`, served at `/app`: with sign-up, the user panel, the install page, the script and every research tool built so far. React + Vite for now; backend later. | `npm run dev:saas` · `npm run build:saas` → the root of `dist` (served at `/`) |
-| `apps/landing` | **The website**, the site's front page at `/`. Standalone, front end only, English. It explains the problem Vibe Collab solves and links to the product at `/app`. | `npm run dev:landing` · `npm run build:landing` → `dist/landing` (served at `/landing/`) |
+| `apps/saas` | **ourhunch, the SaaS.** Its page is `app.html`, served at `/app`: with sign-up, the user panel, the install page, the script and every research tool built so far. React + Vite for now; backend later. | `npm run dev:saas` · `npm run build:saas` → the root of `dist` (served at `/`) |
+| `apps/landing` | **The website**, the site's front page at `/`. Standalone, front end only, English. It explains the problem ourhunch solves and links to the product at `/app`. | `npm run dev:landing` · `npm run build:landing` → `dist/landing` (served at `/landing/`) |
 
 **The three are separate systems.**
 - **Code.** Each has its own code (including its own copy of the script, the heatmap renderer and the eye-movement analysis, in `src/core`).

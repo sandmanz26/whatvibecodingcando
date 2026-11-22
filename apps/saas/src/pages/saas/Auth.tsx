@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Eye, EyeOff, MousePointer2, ArrowLeft, Mail, TriangleAlert, CheckCircle2 } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, Mail, TriangleAlert, CheckCircle2 } from 'lucide-react'
 import { BRAND, parseProducts, WEBSITE } from '../../saas/products'
 import {
   LOCK_AFTER, RESET_MINUTES, canHash, checkPassword, hashPassword, isOnboarded, isSignedIn, lockAfterFail, newResetToken,
@@ -8,6 +8,7 @@ import {
 } from '../../saas/account'
 import '../../saas/saas.css'
 import { track } from '../../lib/analytics'
+import { BrandMark } from '../../components/BrandMark'
 
 /**
  * Register, log in, forgot password and reset password. There is no server yet: the account lives
@@ -23,7 +24,7 @@ export function Shell({ title, sub, children, foot }: { title: string; sub?: Rea
   return (
     <div className="lp lp-signup lp-auth">
       <header className="lp-wrap lp-signup-head">
-        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</a>
+        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><BrandMark size={17} /></span>{BRAND}</a>
         <a href={WEBSITE} className="lp-btn ghost sm"><ArrowLeft size={14} /> Website</a>
       </header>
       <main className="lp-wrap lp-signup-main">

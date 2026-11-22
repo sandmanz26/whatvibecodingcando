@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Check, ArrowLeft, ArrowRight, MousePointer2, Copy, ExternalLink, LogOut } from 'lucide-react'
+import { Check, ArrowLeft, ArrowRight, Copy, ExternalLink, LogOut } from 'lucide-react'
 import { BRAND, PRODUCTS, inScript, parseProducts, productOf, statusLabel, CATEGORIES, CAT_HELP, WEBSITE } from '../../saas/products'
 import { SAAS_ERROR, settled, freeId, isOnboarded, isSignedIn, newProject, originOf, slug, useSaas, useSaasReady } from '../../saas/account'
 import { copyText, demoUrl, installSnippet } from '../../saas/snippet'
@@ -8,6 +8,7 @@ import { publish } from '../../saas/widget'
 import { cloud } from '../../saas/supabase'
 import '../../saas/saas.css'
 import { resetAnalytics, track } from '../../lib/analytics'
+import { BrandMark } from '../../components/BrandMark'
 
 const STEPS = ['Tools', 'Project', 'Install']
 
@@ -88,7 +89,7 @@ export default function Onboarding() {
   return (
     <div className="lp lp-signup">
       <header className="lp-wrap lp-signup-head">
-        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</a>
+        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><BrandMark size={17} /></span>{BRAND}</a>
         <ol className="lp-progress" aria-label="Steps">
           {STEPS.map((s, i) => <li key={s} className={i === step ? 'on' : i < step ? 'done' : ''} aria-current={i === step ? 'step' : undefined}>{i < step ? <Check size={12} /> : i + 1} {s}</li>)}
         </ol>

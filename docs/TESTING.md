@@ -1,4 +1,4 @@
-# Panduan testing manual — Vibe Collab
+# Panduan testing manual — ourhunch
 
 Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **hasil yang diharapkan**. Centang `[x]` kalau lulus; kalau gagal, isi template laporan bug di bagian akhir.
 
@@ -26,7 +26,7 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
 |---|---|---|---|
-| 1.1 ⚡ | Buka `/` | Landing page tampil (judul "Vibe Collab — the review layer for AI-built products"), tanpa error | [ ] |
+| 1.1 ⚡ | Buka `/` | Landing page tampil (judul "ourhunch — the review layer for AI-built products"), tanpa error | [ ] |
 | 1.2 | Scroll sampai bawah, pelan | Film scroll berjalan mulus; semua gambar/video muncul; tidak ada kotak kosong | [ ] |
 | 1.3 | Klik **Get started** (tombol utama) | Pindah ke `/app#/app/register` (halaman "Create your account") | [ ] |
 | 1.4 | Di bagian toolbox/harga, pilih beberapa tool lalu klik tombol mulai | Alamat berisi `?products=...`; saat onboarding, tool tersebut sudah tercentang | [ ] |

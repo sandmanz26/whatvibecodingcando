@@ -4,7 +4,7 @@ Read this first, then `CLAUDE.md` (the full list of house rules — it applies t
 
 ## What this is
 
-**Vibe Collab**: one script tag puts pinned comments, voice notes and user tests (usability tasks, 5-second tests, click heatmaps, webcam eye tracking marked Labs) on any website. Clients review from a one-time link without an account. Pricing: Free (1 site) and Pro at $2 per site per month (free during the beta). Owner: a solo founder in Indonesia; talk to them in **Bahasa Indonesia**, keep all product UI and code in **English**.
+**ourhunch**: one script tag puts pinned comments, voice notes and user tests (usability tasks, 5-second tests, click heatmaps, webcam eye tracking marked Labs) on any website. Clients review from a one-time link without an account. Pricing: Free (1 site) and Pro at $2 per site per month (free during the beta). Owner: a solo founder in Indonesia; talk to them in **Bahasa Indonesia**, keep all product UI and code in **English**.
 
 Live: `https://whatvibecodingcando.vercel.app/` (website) · `/app` (sign-in and panel) · `/embed/vibe.js` (customers' snippet — never move it).
 

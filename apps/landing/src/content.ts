@@ -21,7 +21,7 @@ export const LINKS = {
   terms: `${APP}/terms`,
 }
 
-export const BRAND = 'Vibe Collab'
+export const BRAND = 'ourhunch'
 
 /** The six problems, each named by the sentence people actually say when it happens. */
 export const PROBLEMS = [

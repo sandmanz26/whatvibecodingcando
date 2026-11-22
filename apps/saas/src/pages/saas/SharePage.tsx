@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { MousePointer2, Download, CornerDownRight, Printer } from 'lucide-react'
+import { Download, CornerDownRight, Printer } from 'lucide-react'
 import { BRAND, WEBSITE } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
 import { getShareCloud } from '../../saas/cloud'
 import { LOCAL_SHARE_PREFIX, decodeLocalShare, download, threadsCsv, type SharedList, type SharedThread } from '../../saas/stats'
 import '../../saas/saas.css'
+import { BrandMark } from '../../components/BrandMark'
 
 const STATUS = (t: SharedThread) => (t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open')
 const LABEL = { open: 'Open', ongoing: 'Ongoing', completed: 'Completed' } as const
@@ -69,7 +70,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   return (
     <div className="lp sp">
       <header className="lp-wrap lp-signup-head">
-        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><MousePointer2 size={15} /></span>{BRAND}</a>
+        <a href={WEBSITE} className="lp-logo"><span className="lp-mark" aria-hidden><BrandMark size={17} /></span>{BRAND}</a>
       </header>
       <main className="lp-wrap sp-main">{children}</main>
     </div>

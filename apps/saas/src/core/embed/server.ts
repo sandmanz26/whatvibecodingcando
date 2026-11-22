@@ -95,7 +95,7 @@ function openFrame() {
       iframe.show{opacity:1;pointer-events:auto;width:340px;height:150px;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483647;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);background:#fff}`
     const f = document.createElement('iframe')
     f.src = frameUrl
-    f.title = 'Vibe Collab sign-in'
+    f.title = 'ourhunch sign-in'
     f.setAttribute('aria-hidden', 'true')
     f.setAttribute('tabindex', '-1')
     const fail = window.setTimeout(() => resolve(null), 6000)
@@ -214,8 +214,8 @@ export async function startReview(project: string, token: string | null, name?: 
     const m = (e as Error).message
     if (token) linkError = m
     if (m === 'not_invited' || m === 'link_expired' || m === 'no_project') ls.del(rvKey(project))
-    if (m === 'anonymous_disabled') console.warn('[Vibe Collab] the project’s server doesn’t allow reviewer sessions yet (Supabase → Authentication → Sign In / Providers → allow anonymous sign-ins).')
-    else if (token) console.warn(`[Vibe Collab] the review link didn’t work: ${m}.`)
+    if (m === 'anonymous_disabled') console.warn('[ourhunch] the project’s server doesn’t allow reviewer sessions yet (Supabase → Authentication → Sign In / Providers → allow anonymous sign-ins).')
+    else if (token) console.warn(`[ourhunch] the review link didn’t work: ${m}.`)
     return null
   }
 }
@@ -278,7 +278,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Comments on the server, behind the same Backend interface the widget always used. */
 export class ServerBackend implements Backend {
-  readonly where = 'Saved on Vibe Collab'
+  readonly where = 'Saved on ourhunch'
   private last = new Map<string, Thread>()
   constructor(private project: string) {}
   async list() {

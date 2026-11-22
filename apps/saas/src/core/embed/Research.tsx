@@ -127,7 +127,7 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
             <button className="vc-btn" onClick={() => update({ ...st, phase: 'declined' })}>No thanks</button>
             <button className="vc-btn primary" disabled={busy || !!error} onClick={() => void agree()}>{busy ? 'Starting…' : 'I agree, start'}</button>
           </div>
-          <p className="vc-where">Run with Vibe Collab for the site’s owner.</p>
+          <p className="vc-where">Run with ourhunch for the site’s owner.</p>
         </div>
       </div>
     )

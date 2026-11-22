@@ -128,7 +128,7 @@ export function WidgetBuilder() {
               </>}
               <label>C key starts a comment <Switch checked={draft.launcher.shortcut} onChange={() => edit((c) => ({ ...c, launcher: { ...c.launcher, shortcut: !c.launcher.shortcut } }))} label="C key starts a comment" /></label>
             </div>
-            {draft.launcher.kind === 'hidden' && <pre className="up-code">{`<button data-vibe="comment">Give feedback</button>\n<button data-vibe="comments">All comments</button>\n\n// or from code\nwindow.VibeCollab.open('comment')`}</pre>}
+            {draft.launcher.kind === 'hidden' && <pre className="up-code">{`<button data-vibe="comment">Give feedback</button>\n<button data-vibe="comments">All comments</button>\n\n// or from code\nwindow.OurHunch.open('comment')`}</pre>}
           </section>
 
           <section className="up-card">

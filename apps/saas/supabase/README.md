@@ -1,4 +1,4 @@
-# Vibe Collab backend (Supabase)
+# ourhunch backend (Supabase)
 
 The SaaS's backend, in this app only (`apps/saas/supabase`).
 
@@ -123,7 +123,7 @@ Who gets what: everyone on a project's team (their sign-in email) hears about ne
    - Dashboard: **Edge Functions → Deploy a new function → Via editor**, name `send-emails`, add the files `index.ts` and `render.ts` from `functions/send-emails/`, deploy, then in its settings turn **Enforce JWT verification off** (the function checks its own secret).
 5. **Edge Functions → Secrets** (never in the repository, the app or a chat):
    - `RESEND_API_KEY` = the key from step 2
-   - `EMAIL_FROM` = `Vibe Collab <notify@yourdomain.com>`
+   - `EMAIL_FROM` = `ourhunch <notify@yourdomain.com>`
    - `EMAIL_CRON_SECRET` = a long random string (e.g. from a password manager)
    - `APP_URL` = `https://whatvibecodingcando.vercel.app` (your domain later)
 6. **Database → Extensions:** enable `pg_cron` and `pg_net`.

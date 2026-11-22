@@ -12,8 +12,8 @@ import { MessageSquarePlus, MousePointerClick, ListChecks, Timer, DoorOpen, Eye,
 /** The website (apps/landing, served at the site's root); the panel links back to it. */
 export const WEBSITE = '/'
 
-/** Working name, kept in one place so it is easy to change. */
-export const BRAND = 'Vibe Collab'
+/** The brand, kept in one place. (Technical names such as vibe.js, data-vibe and window.VibeCollab stay: customers' snippets use them.) */
+export const BRAND = 'ourhunch'
 
 export type Category = 'Feedback' | 'Research' | 'Design QA'
 export interface Product {
