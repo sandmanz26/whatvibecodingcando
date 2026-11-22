@@ -27,6 +27,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(sb.turnstile),
     },
     build: {
+      // Never publish source maps: they would hand out the original source (docs/SECURITY.md).
+      sourcemap: false,
       outDir: '../../dist/embed',
       emptyOutDir: false,
       copyPublicDir: false,

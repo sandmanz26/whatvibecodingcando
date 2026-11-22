@@ -1,5 +1,7 @@
 # Vibe coding monorepo — notes for Claude
 
+`AGENTS.md` is the short version of these rules for any AI agent (Cursor, Codex, Copilot, Gemini…). Keep both in step when a rule changes.
+
 - **Role (the owner asked for this, always):** work as head of design, head of product, head of engineering and head of marketing at once. Judge every change for UX, product value, engineering quality and how it sells; say so when a request has a better alternative, and give a recommendation, not only options.
 
 - **Layout:** three separate systems, one Vercel deployment (root `vercel.json`, README "Vercel").
@@ -17,6 +19,8 @@
 - Before pushing: `npm run typecheck && npm run build` at the root must pass (after `npm run install:all`).
 - **Scale rules (SaaS):** Supabase returns at most 1,000 rows per request: any list that can be longer is read with `paged()` in `src/saas/cloud.ts`, with a stable order. Lists sent to the widget are bounded in SQL (`list_threads`: the 1,000 newest). Polling only while the tab is visible. New tables get an index for every query that filters them by project.
 - **Analytics:** PostHog on the website (`apps/landing/src/analytics.ts`) and the app at `/app` (`apps/saas/src/lib/analytics.ts`), only when `VITE_POSTHOG_KEY` is set. Never in the script on customers' sites, never autocapture or session recording, never comment text, field values, emails or names; named funnel events only.
+- **Email (SaaS):** feedback notifications go triggers → `email_outbox` → pg_cron → Edge Function `supabase/functions/send-emails` (Resend). The outbox and `email_due`/`email_done` are service-role only; secrets live in Supabase only. Setup in `apps/saas/supabase/README.md`.
+- **Security:** `docs/SECURITY.md`. Every Vite config keeps `sourcemap: false`; never commit or paste secrets; the repository should be private (owner action).
 - **Two download areas (SaaS):** `src/App.tsx` loads `HostedApp.tsx` (website pages, sign-in, panel) or `DemoApp.tsx` (demo shop, research console, its tools) by address; never import demo or console code into hosted pages.
 
 ## Each app

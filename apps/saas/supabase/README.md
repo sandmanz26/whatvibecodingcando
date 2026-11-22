@@ -67,6 +67,8 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 - **`migrations/20261115000000_heatmap_quality.sql`**: `heatmap_points` also returns, per point, a participant number (within the answer, no ids), the time in their run, their device and eye-tracking accuracy, for a better heatmap.
 - **`migrations/20261116000000_comment_context.sql`**: `post_thread` records the site version whenever the published settings have one (no Versions module needed), and refuses an anchor that isn't a JSON object or is over 4,000 characters (it now carries the reviewer's browser and window size).
 - **`migrations/20261120000000_scale.sql`**: indexes for large projects (participant paths, heatmaps, rate-limit cleanup), housekeeping without pg_cron (`take_rate` now and then clears old rate-limit rows and expired one-time links, in bounded batches), and `list_threads` returns the newest 1,000 comments.
+- **`migrations/20261122000000_email.sql`**: email notifications. `projects.notify` ('instant' | 'daily' | 'off'), the `email_outbox` (filled by triggers on new comments and reviewers' replies; no access for anon or members), `email_due()` and `email_done()` for the service role only. Tested in `tests/email_test.sql`.
+- **`functions/send-emails/`**: the Edge Function that sends them with Resend (`index.ts`; templates in `render.ts`; mocked tests in `test.ts`).
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
   - `supabase_stub.sql` stands in for Supabase's `auth` schema and roles.
@@ -85,7 +87,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
      3. Only then: Supabase → Authentication → Attack Protection → CAPTCHA protection → Turnstile, and paste the **secret key** there (only there: never in Vercel, the repository or a chat).
      - The other way round (CAPTCHA on in Supabase before the deployment sends tokens) locks out every sign-up, login and reviewer.
 5. **Database → Extensions → pg_cron** (optional, before running the third migration): enables the hourly cleanup.
-6. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
+6. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). With Resend: host `smtp.resend.com`, port `465`, username `resend`, password = a Resend API key, sender = an address on a domain verified in Resend. Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
 7. **Auth → Email Templates.** So links work on any device (the default links only work in the browser that asked), set the link in two templates. Keep the rest of the text as you like.
    - **Confirm signup:** `<a href="https://whatvibecodingcando.vercel.app/app#/app/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>`
    - **Reset Password:** `<a href="https://whatvibecodingcando.vercel.app/app#/app/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>`
@@ -97,14 +99,56 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
      - The build refuses to run if the browser key is a service role or secret key.
    - The service role key and the database password never go into the app, the repository or a chat. Only the Edge Functions use the service role.
 
+## Email notifications (owner, once)
+
+Who gets what: everyone on a project's team (their sign-in email) hears about new comments and reviewers' replies, grouped (at most one email per project every 5 minutes), as a daily summary at 08:00 WIB, or not at all (Settings → Project → *Email me about new feedback*). Reviewers and participants never get these emails. Sign-up and password emails are separate: they go through Auth → SMTP (step 6).
+
+1. **Resend:** create an account at resend.com → **Domains → Add domain** → add the DNS records it shows at your domain registrar → wait for *Verified*. Without your own domain Resend only sends to your own address (fine for a first test, not for customers).
+2. **Resend → API Keys → Create** (permission: Sending access). Keep it in Resend and Supabase only.
+3. **Run the migration** `migrations/20261122000000_email.sql` in the SQL Editor.
+4. **Deploy the function** — either:
+   - CLI, from `apps/saas`: `npx supabase login`, `npx supabase link --project-ref <ref>`, `npx supabase functions deploy send-emails --no-verify-jwt`; or
+   - Dashboard: **Edge Functions → Deploy a new function → Via editor**, name `send-emails`, add the files `index.ts` and `render.ts` from `functions/send-emails/`, deploy, then in its settings turn **Enforce JWT verification off** (the function checks its own secret).
+5. **Edge Functions → Secrets** (never in the repository, the app or a chat):
+   - `RESEND_API_KEY` = the key from step 2
+   - `EMAIL_FROM` = `Vibe Collab <notify@yourdomain.com>`
+   - `EMAIL_CRON_SECRET` = a long random string (e.g. from a password manager)
+   - `APP_URL` = `https://whatvibecodingcando.vercel.app` (your domain later)
+6. **Database → Extensions:** enable `pg_cron` and `pg_net`.
+7. **Schedule it** (SQL Editor; replace the two values in angle brackets — the secret is the same as `EMAIL_CRON_SECRET`, not a Supabase key):
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/send-emails', 'email_function_url');
+   select vault.create_secret('<EMAIL_CRON_SECRET>', 'email_cron_secret');
+   select cron.schedule('vibe-collab-email-instant', '*/5 * * * *', $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'email_function_url'),
+       headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'email_cron_secret')),
+       body := '{"mode":"instant"}'::jsonb)
+   $$);
+   select cron.schedule('vibe-collab-email-daily', '0 1 * * *', $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'email_function_url'),
+       headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'email_cron_secret')),
+       body := '{"mode":"daily"}'::jsonb)
+   $$);
+   ```
+   `0 1 * * *` is 01:00 UTC = 08:00 WIB.
+8. **Check it:** leave a comment as a reviewer; within 5 minutes the team gets an email. If not:
+   - `select * from cron.job_run_details order by start_time desc limit 5;` (did the job run?)
+   - `select status_code, content from net._http_response order by created desc limit 5;` (401 = the two secrets differ; 500 "missing secret" = step 5)
+   - `select count(*) from email_outbox where sent_at is null;` (waiting emails)
+   - Edge Functions → send-emails → **Logs** (Resend errors, e.g. an unverified domain).
+
+To stop all notification emails at once: `select cron.unschedule('vibe-collab-email-instant'); select cron.unschedule('vibe-collab-email-daily');`
+
 ## Tests
 
-- `tests/run.sh` runs every `*_test.sql` on a fresh database: `rls_test.sql` (row level security), `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account), `share_test.sql` (dashboard, clearing data, share links), `install_test.sql` (installation reports), `research_test.sql` (studies, participants, events, heatmap) and `review_kinds_test.sql` (versions, A vs B, voice notes and their bucket).
+- `tests/run.sh` runs every `*_test.sql` on a fresh database: `rls_test.sql` (row level security), `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account), `share_test.sql` (dashboard, clearing data, share links), `install_test.sql` (installation reports), `research_test.sql` (studies, participants, events, heatmap) and `review_kinds_test.sql` (versions, A vs B, voice notes and their bucket), `email_test.sql` (outbox, who may read it, instant/daily/off).
 - The full path (panel → invite link → reviewer on another domain → comment in the database → panel inbox, plus kill switch, preview and delete account) was checked in a browser against these migrations on Postgres 16. It is not in CI yet.
 
 ## Not done yet (before a public launch)
 
-- **Emails:** invite emails to reviewers and notifications of new comments. Today the owner copies the link and sends it.
+- **Emails:** invite emails to reviewers (today the owner copies the review link and sends it). Notifications of new feedback are built ("Email notifications" above) and need the owner's setup.
 - **CAPTCHA:** ready in the code, off until the Turnstile keys are set (step 4 above).
 - **CI** running these tests on every push.
 

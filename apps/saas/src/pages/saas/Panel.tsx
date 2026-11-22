@@ -7,7 +7,7 @@ import { BRAND, CATEGORIES, CAT_HELP, PRODUCTS, productOf, statusLabel, WEBSITE 
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
 import { draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
-import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState } from '../../saas/account'
+import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState, type Notify } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
 import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
@@ -485,6 +485,17 @@ export function SettingsPage() {
             <div className="lp-field">Website<span className="up-static">{project.siteUrl ? project.siteUrl.replace(/^https?:\/\//, '') : 'Not set'} · <Link to="/app/widget">change in Widget → Website</Link></span></div>
           </div>
           <p className="up-muted">Project id <code>{project.id}</code> can’t change: your snippet and the comments already made are tied to it.</p>
+          <label className="lp-field">Email me about new feedback
+            <select className="up-select" value={project.notify ?? 'instant'} disabled={!cloud} onChange={(e) => {
+              const v = e.target.value as Notify
+              if (setProject((p) => ({ ...p, notify: v }))) toast(v === 'off' ? 'Feedback emails off' : v === 'daily' ? 'You’ll get one summary a day' : 'You’ll get an email when feedback arrives')
+            }}>
+              <option value="instant">When feedback arrives (grouped every few minutes)</option>
+              <option value="daily">One summary a day</option>
+              <option value="off">Off</option>
+            </select>
+            <span className="lp-hint">{cloud ? 'Sent to everyone on this project’s team, for new comments and reviewers’ replies. Your own replies don’t send emails.' : 'Emails need the server: this browser-only beta doesn’t send any.'}</span>
+          </label>
           <div className="up-row"><button className="lp-btn primary sm" disabled={!projectDirty || !pname.trim()} onClick={() => { if (setProject((p) => ({ ...p, name: pname.trim() }))) toast('Saved') }}>Save</button>
             {projectDirty && <button className="lp-btn sm ghost" onClick={() => setPname(project.name)}>Cancel</button>}</div>
         </section>

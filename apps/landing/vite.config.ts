@@ -9,5 +9,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/landing/',
-  build: { outDir: '../../dist/landing', emptyOutDir: true },
+  build: {
+      // Never publish source maps: they would hand out the original source (docs/SECURITY.md).
+      sourcemap: false, outDir: '../../dist/landing', emptyOutDir: true },
 })

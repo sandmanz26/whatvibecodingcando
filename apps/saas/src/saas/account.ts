@@ -29,8 +29,11 @@ export interface Project {
   config?: WidgetConfig
   /** published widget settings, oldest first; the last one is what sites get */
   releases?: Release[]
+  /** how the team hears about new feedback by email (server only; absent = 'instant') */
+  notify?: Notify
   createdAt: string
 }
+export type Notify = 'instant' | 'daily' | 'off'
 export interface Invite { email: string; role: 'admin' | 'member'; projectId: string; at: string }
 /** A password as stored: PBKDF2-SHA-256 of the password with a random salt; never the password itself. */
 export interface PasswordHash { salt: string; hash: string; iter: number }

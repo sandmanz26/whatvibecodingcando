@@ -17,6 +17,8 @@ A change in one never reaches the other. To bring something across, copy it on p
 - **Checks:** `npm run typecheck` and `npm run build` (all three apps).
 - **Claude Code plugin:** the `ux-research-kit` plugin stays at the root (`.claude-plugin/`, `plugins/`).
 
+AI agents: start with `AGENTS.md`. Product, testing, security and marketing documents: `docs/`.
+
 Each app's documentation is in its own README (`apps/content/README.md`, `apps/saas/README.md`, `apps/landing/README.md`).
 
 ## Vercel: one deployment, three apps

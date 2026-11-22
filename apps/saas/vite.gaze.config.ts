@@ -21,6 +21,8 @@ export default defineConfig({
   plugins: [copyMediapipe()],
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
+      // Never publish source maps: they would hand out the original source (docs/SECURITY.md).
+      sourcemap: false,
     outDir: '../../dist/embed',
     emptyOutDir: false,
     copyPublicDir: false,

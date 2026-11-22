@@ -15,7 +15,7 @@ import { supabase } from './supabase'
 import { parseConfig, publicConfig, type Release, type Seen } from '../core/embed/config'
 import type { Backend, Thread } from '../core/embed/store'
 import type { Stats, SharedList, ShareRow } from './stats'
-import type { Invite, Project, SaasState } from './account'
+import type { Invite, Notify, Project, SaasState } from './account'
 import { identify } from '../lib/analytics'
 
 const BUCKET = 'widget-config'
@@ -40,11 +40,14 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
   workspaceId = ws?.[0]?.id ?? null
   if (!workspaceId) return { ...EMPTY, account, signedIn: true, onboarded: false }
 
-  const { data: rows, error } = await supabase.from('projects')
-    .select('id, public_id, name, site_url, products, draft, created_at, releases(version, config, created_at, created_by)')
+  // `notify` comes with the email migration; a server without it yet still loads its projects.
+  const load = (cols: string) => supabase!.from('projects')
+    .select(cols)
     .eq('workspace_id', workspaceId).is('deleted_at', null).order('created_at')
     // Only the newest 50 releases of each project (what History shows), not every one ever published.
     .order('version', { referencedTable: 'releases', ascending: false }).limit(50, { referencedTable: 'releases' })
+  const first = await load('id, public_id, name, site_url, products, draft, notify, created_at, releases(version, config, created_at, created_by)')
+  const { data: rows, error } = (first.error?.code === '42703' ? await load('id, public_id, name, site_url, products, draft, created_at, releases(version, config, created_at, created_by)') : first) as unknown as { data: { id: string; public_id: string; name: string; site_url: string; products: string[] | null; draft: unknown; notify?: Notify; created_at: string; releases: unknown }[] | null; error: typeof first.error }
   if (error) throw error
   dbIds.clear()
   const projects: Project[] = (rows ?? []).map((r) => {
@@ -58,7 +61,7 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
     return {
       id: r.public_id, name: r.name, siteUrl: r.site_url, products: r.products ?? [],
       widget: { position: 'right', shortcut: true, color: '#e8590c' }, domains: host ? [host] : [],
-      createdAt: r.created_at, ...(draft ? { config: draft } : {}), ...(releases.length ? { releases } : {}),
+      createdAt: r.created_at, ...(r.notify ? { notify: r.notify } : {}), ...(draft ? { config: draft } : {}), ...(releases.length ? { releases } : {}),
       copiedSnippet: readCopied(r.public_id),
     }
   })
@@ -113,6 +116,10 @@ export async function pushCloud(prev: SaasState, next: SaasState): Promise<void>
       dbIds.set(p.id, data.id)
     } else if (old.name !== p.name || old.siteUrl !== p.siteUrl || old.products.join() !== p.products.join() || JSON.stringify(old.config) !== JSON.stringify(p.config)) {
       const { error } = await supabase.from('projects').update({ name: p.name, site_url: p.siteUrl, products: p.products, draft: p.config ?? null }).eq('id', dbIds.get(p.id)!)
+      if (error) throw error
+    }
+    if (old && p.notify && old.notify !== p.notify) {
+      const { error } = await supabase.from('projects').update({ notify: p.notify }).eq('id', dbIds.get(p.id)!)
       if (error) throw error
     }
     // releases: only ever appended

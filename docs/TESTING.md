@@ -176,6 +176,21 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 
 ---
 
+## 10b. Email notifikasi (setelah setup email di `apps/saas/supabase/README.md`)
+
+| # | Langkah | Hasil yang diharapkan | ✔ |
+|---|---|---|---|
+| 10b.1 | Settings → Project → **Email me about new feedback** = *When feedback arrives* | Toast "You’ll get an email when feedback arrives" | [ ] |
+| 10b.2 | Browser B (reviewer): buat 2 komentar | Dalam ≤ 5 menit, **satu** email "…: 2 new comments and replies" ke email tim | [ ] |
+| 10b.3 | Klik **Open your comments** di email | Panel → Comments terbuka | [ ] |
+| 10b.4 | Balas komentar dari panel (sebagai pemilik) | **Tidak** ada email untuk balasan Anda sendiri | [ ] |
+| 10b.5 | Reviewer membalas | Email "a new reply" | [ ] |
+| 10b.6 | Ubah ke *One summary a day*, reviewer berkomentar | Tidak ada email sekarang; ringkasan datang besok 08:00 WIB | [ ] |
+| 10b.7 | Ubah ke *Off*, reviewer berkomentar | Tidak ada email | [ ] |
+| 10b.8 | Daftar akun baru / Forgot password | Email konfirmasi & reset datang dari alamat domain Anda (bukan Supabase) | [ ] |
+
+Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.md` (query `cron.job_run_details`, `net._http_response`, log Edge Function).
+
 ## 11. Keamanan & privasi (cek cepat)
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
@@ -185,6 +200,8 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 11.3 | Elemen dengan `data-private` di situs uji, peserta mengklik | Di hasil studi tercatat "(private)", bukan teksnya | [ ] |
 | 11.4 | Coba buka panel proyek orang lain (ganti id di alamat) | Tidak bisa melihat data | [ ] |
 | 11.5 | Snippet di domain yang **tidak** terdaftar | Widget tidak muncul | [ ] |
+| 11.6 | Buka `https://whatvibecodingcando.vercel.app/landing/assets/` lalu cari file `.map` (DevTools → Sources) | Tidak ada source map; kode termampatkan | [ ] |
+| 11.7 | GitHub → repo → Settings | Repo **Private** (lihat `docs/SECURITY.md`) | [ ] |
 
 ---
 
