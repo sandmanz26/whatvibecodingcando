@@ -99,6 +99,18 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
      - The build refuses to run if the browser key is a service role or secret key.
    - The service role key and the database password never go into the app, the repository or a chat. Only the Edge Functions use the service role.
 
+## Catching up a database that missed a migration
+
+If the SQL Editor says `relation "public.runs" does not exist` (or `studies`, `run_events`), the research migration never ran there. Run **`catch-up/2026-11-22-research-scale-email.sql`** once (all of it, one Run): it applies, in order, research → heatmap_quality (restores the newer `heatmap_points`) → scale → email. It was tested on a copy of a database in exactly that state, and the result is identical to running every migration in order. Check afterwards:
+
+```sql
+select to_regclass('public.studies') is not null as studies, to_regclass('public.runs') is not null as runs,
+       to_regclass('public.email_outbox') is not null as email_outbox,
+       exists (select 1 from pg_indexes where indexname = 'runs_project_started_idx') as scale_index;
+```
+
+All four must be `true`. To see which migrations a database has, compare its tables and functions with `migrations/` (the newest file names the newest objects).
+
 ## Email notifications (owner, once)
 
 Who gets what: everyone on a project's team (their sign-in email) hears about new comments and reviewers' replies, grouped (at most one email per project every 5 minutes), as a daily summary at 08:00 WIB, or not at all (Settings → Project → *Email me about new feedback*). Reviewers and participants never get these emails. Sign-up and password emails are separate: they go through Auth → SMTP (step 6).
