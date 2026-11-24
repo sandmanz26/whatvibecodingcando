@@ -12,7 +12,7 @@ const HostedApp = lazy(() => import('./HostedApp'))
 const DemoApp = lazy(() => import('./DemoApp'))
 
 /** Addresses of the hosted product; everything else is the demo. */
-export const isHosted = (path: string) => path === '/landingpage' || path === '/privacy' || path === '/terms' || path === '/guide' || path.startsWith('/share/') || path === '/app' || path.startsWith('/app/')
+export const isHosted = (path: string) => path === '/landingpage' || path === '/privacy' || path === '/terms' || path === '/guide' || path === '/admin' || path.startsWith('/share/') || path === '/app' || path.startsWith('/app/')
 
 export default function App() {
   return (

@@ -1,7 +1,22 @@
 // Internal ops panel (founder only): every read and write goes through admin-only database
 // functions (supabase/migrations/…_ops.sql). Nothing here is shown to normal users.
-import { useEffect, useState } from 'react'
-import { supabase } from './supabase'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { authMessage, captcha } from './supabase'
+
+/**
+ * The ops panel signs in on its own, apart from the customer panel: its own Supabase client and
+ * session, kept in sessionStorage (gone when the tab closes), email and password only.
+ */
+const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+let client: SupabaseClient | null = null
+function admin(): SupabaseClient | null {
+  if (!URL_ || !KEY) return null
+  client ??= createClient(URL_, KEY, {
+    auth: { storageKey: 'oh-ops-auth', storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' },
+  })
+  return client
+}
 
 export const PLANS = ['free', 'pro_beta', 'founding', 'pro'] as const
 export type Plan = (typeof PLANS)[number]
@@ -24,31 +39,47 @@ export interface UserDetail {
 export interface AuditRow { id: number; admin: string | null; action: string; target: string | null; detail: Record<string, unknown>; at: string }
 
 async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
-  if (!supabase) throw new Error('Ops needs the server')
-  const { data, error } = await supabase.rpc(fn, args)
+  const sb = admin()
+  if (!sb) throw new Error('Ops needs the server')
+  const { data, error } = await sb.rpc(fn, args)
   if (error) throw new Error(error.message)
   return data as T
 }
 
-/** Is the signed-in user a platform admin? Reads only their own row (row level security). */
+/** Is the ops session's user a platform admin? Reads only their own row (row level security). */
 export async function amAdmin(): Promise<boolean> {
-  if (!supabase) return false
-  const { data: { session } } = await supabase.auth.getSession()
+  const sb = admin()
+  if (!sb) return false
+  const { data: { session } } = await sb.auth.getSession()
   if (!session) return false
-  const { data, error } = await supabase.from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
+  const { data, error } = await sb.from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
   return !error && !!data
 }
 
-/** For the panel's nav: shows the Ops link only when the server says so. */
-export function useIsAdmin(): boolean {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    let live = true
-    void amAdmin().then((x) => { if (live) setOn(x) }).catch(() => {})
-    return () => { live = false }
-  }, [])
-  return on
+/** The ops session's email, or null when signed out. */
+export async function opsEmail(): Promise<string | null> {
+  const sb = admin()
+  if (!sb) return null
+  const { data: { session } } = await sb.auth.getSession()
+  return session?.user.email ?? null
 }
+
+/**
+ * Signs in to ops. A wrong password and an account without admin access get the same answer, and a
+ * non-admin's session is dropped at once.
+ */
+export async function opsSignIn(email: string, password: string): Promise<string> {
+  const sb = admin()
+  if (!sb) return 'Ops needs the server.'
+  const { error } = await sb.auth.signInWithPassword({ email, password, options: { captchaToken: await captcha() } })
+  const refused = 'Email or password is incorrect, or this account has no ops access.'
+  if (error) { const m = authMessage(error); return m === 'Email or password is incorrect.' || m === 'confirm-first' ? refused : m }
+  if (await amAdmin()) return ''
+  await sb.auth.signOut({ scope: 'local' })
+  return refused
+}
+
+export async function opsSignOut() { await admin()?.auth.signOut({ scope: 'local' }) }
 
 export const opsOverview = () => rpc<Overview>('ops_overview')
 export const opsDaily = (days: number) => rpc<Day[]>('ops_signups_daily', { p_days: days })

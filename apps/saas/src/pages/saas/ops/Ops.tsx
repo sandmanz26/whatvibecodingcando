@@ -1,13 +1,12 @@
-// Internal ops panel at /app#/app/ops: founder only. Not linked for normal users; non-admins see "Not found".
+// Internal ops panel at /app#/admin: founder only, with its own sign-in (saas/ops.ts), apart from the customer panel.
 // All data comes from admin-only database functions (saas/ops.ts); no comment text, no PostHog events.
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { RefreshCw, X } from 'lucide-react'
+import { LogOut, RefreshCw, X } from 'lucide-react'
 import { cloud } from '../../../saas/supabase'
 import { Modal, Toasts } from '../../../components/ui'
 import { useStore } from '../../../store/store'
 import {
-  PLANS, PLAN_LABEL, amAdmin, opsAudit, opsDaily, opsFunnel, opsOverview, opsSetPlan, opsUserDetail, opsUsers,
+  PLANS, PLAN_LABEL, amAdmin, opsEmail, opsSignIn, opsSignOut, opsAudit, opsDaily, opsFunnel, opsOverview, opsSetPlan, opsUserDetail, opsUsers,
   type AuditRow, type Day, type Funnel, type OpsUser, type Overview, type Plan, type UserDetail,
 } from '../../../saas/ops'
 
@@ -17,24 +16,56 @@ const date = (s: string | null) => (s ? new Date(s).toLocaleDateString('en', { y
 const when = (s: string) => new Date(s).toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 export default function Ops() {
-  const [state, setState] = useState<'checking' | 'no' | 'yes'>(cloud ? 'checking' : 'no')
+  const [state, setState] = useState<'checking' | 'out' | 'in'>(cloud ? 'checking' : 'out')
   useEffect(() => {
+    document.title = 'Ops · ourhunch'
     if (!cloud) return
     let live = true
-    void amAdmin().then((x) => { if (live) setState(x ? 'yes' : 'no') }).catch(() => { if (live) setState('no') })
+    void amAdmin().then((x) => { if (live) setState(x ? 'in' : 'out') }).catch(() => { if (live) setState('out') })
     return () => { live = false }
   }, [])
   if (!cloud) return <Plain title="Ops needs the server" text="This build runs the browser demo, which has no accounts to look at." />
   if (state === 'checking') return <Plain title="" text="Loading…" />
-  if (state === 'no') return <Plain title="Not found" text="There is nothing at this address." />
-  return <OpsPanel />
+  if (state === 'out') return <OpsLogin onIn={() => setState('in')} />
+  return <OpsPanel onOut={() => setState('out')} />
 }
 
 function Plain({ title, text }: { title: string; text: string }) {
-  return <div className="up ops-plain"><main className="up-main"><div className="up-page">{title && <h1>{title}</h1>}<p className="up-muted">{text}</p><Link to="/app">Back to the panel</Link></div></main></div>
+  return <div className="up ops-plain"><main className="up-main"><div className="up-page">{title && <h1>{title}</h1>}<p className="up-muted">{text}</p></div></main></div>
 }
 
-function OpsPanel() {
+/** Its own sign-in: email and password, a session only for this tab. */
+function OpsLogin({ onIn }: { onIn: () => void }) {
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async () => {
+    if (busy) return
+    if (!email.trim() || !pw) { setError('Enter your email and password.'); return }
+    setBusy(true); setError('')
+    const e = await opsSignIn(email.trim(), pw)
+    setBusy(false); setPw('')
+    if (e) setError(e); else onIn()
+  }
+  return (
+    <div className="lp ops-login">
+      <form className="lp-auth-card ops-login-card" onSubmit={(e) => { e.preventDefault(); void submit() }} noValidate>
+        <p className="ops-login-tag">ourhunch · internal</p>
+        <h1>Ops sign-in</h1>
+        <p className="lp-muted">For the ourhunch team only. This session ends when you close the tab.</p>
+        <label className="lp-field">Email<input id="ops-email" type="email" autoFocus autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} /></label>
+        <label className="lp-field">Password<input id="ops-password" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} maxLength={200} /></label>
+        {error && <p className="lp-error" role="alert">{error}</p>}
+        <button type="submit" className="lp-btn primary full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      </form>
+    </div>
+  )
+}
+
+function OpsPanel({ onOut }: { onOut: () => void }) {
+  const [me, setMe] = useState<string | null>(null)
+  useEffect(() => { void opsEmail().then(setMe) }, [])
   const { toast } = useStore()
   const [days, setDays] = useState(30)
   const [ov, setOv] = useState<Overview | null>(null)
@@ -67,7 +98,8 @@ function OpsPanel() {
             <div className="ops-actions">
               <label className="up-muted">Window <select className="up-select" value={days} onChange={(e) => setDays(+e.target.value)}>{[7, 30, 90, 180].map((d) => <option key={d} value={d}>{d} days</option>)}</select></label>
               <button className="lp-btn sm" onClick={refresh} disabled={loading}><RefreshCw size={14} /> {loading ? 'Loading…' : 'Refresh'}</button>
-              <Link className="lp-btn sm ghost" to="/app">Panel</Link>
+              {me && <span className="up-muted ops-me">{me}</span>}
+              <button className="lp-btn sm ghost" onClick={async () => { await opsSignOut(); onOut() }}><LogOut size={14} /> Sign out</button>
             </div>
           </div>
           {err && <div className="up-warn">Couldn’t load: {err}</div>}
