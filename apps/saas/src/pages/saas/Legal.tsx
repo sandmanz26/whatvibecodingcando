@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, TriangleAlert } from 'lucide-react'
-import { BRAND, inScript, WEBSITE } from '../../saas/products'
+import { BRAND, inScript, PRICING, WEBSITE } from '../../saas/products'
 import { analyticsOn } from '../../lib/analytics'
 import '../../saas/saas.css'
 import { BrandMark } from '../../components/BrandMark'
@@ -21,7 +21,7 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
       </header>
       <main className="lp-wrap lp-legal-main">
         <h1>{title}</h1>
-        <p className="lp-note"><TriangleAlert size={13} /> Draft for the beta, last updated 13 November 2026. It describes what the product does today; it will be reviewed before sign-up opens to everyone.</p>
+        <p className="lp-note"><TriangleAlert size={13} /> Draft for the beta, last updated 24 November 2026. It describes what the product does today; it will be reviewed before sign-up opens to everyone.</p>
         {children}
       </main>
     </div>
@@ -79,6 +79,7 @@ export function Terms() {
       <h2>The beta</h2>
       <ul>
         <li>{BRAND} is in beta and free. Features can change; we’ll say so in the panel before something you use goes away.</li>
+        <li>After the beta, Pro is planned at {PRICING.proPerSite} per site per month ({PRICING.foundingPerSite} per site, locked, for the first {PRICING.foundingCustomers} customers). Nothing is billed today, and nothing will be charged without you choosing it.</li>
         <li>{inScript()} run on your own site today; Reports and Prompts are in your panel.</li>
       </ul>
       <h2>Your part</h2>

@@ -204,10 +204,10 @@ export const PRICES = [
   },
   {
     name: 'Pro',
-    price: '$2',
+    price: '$4.80',
     unit: 'per site, per month',
-    note: 'Every tool, for every site you add. Rp 29.000 in Indonesia.',
-    items: ['Usability tests, 5-second tests, heatmaps', 'Participant paths and eye tracking (Labs)', 'Reports, CSV downloads, share links', 'No price per seat'],
+    note: 'Founding price: $2 per site (Rp 29.000 in Indonesia), locked for the first 200 customers. Free during the beta.',
+    items: ['Usability tests, 5-second tests, heatmaps', 'Participant paths and eye tracking (Labs)', 'Reports, CSV downloads, share links', 'Unlimited reviewers, no price per seat'],
     cta: 'Get Pro free during the beta',
   },
 ]

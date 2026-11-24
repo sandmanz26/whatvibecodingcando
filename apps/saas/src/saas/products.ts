@@ -9,6 +9,18 @@
 import type { LucideIcon } from 'lucide-react'
 import { MessageSquarePlus, MousePointerClick, ListChecks, Timer, DoorOpen, Eye, Columns2, Palette, ScanSearch, Mic, FileText, Flame, SquareDashedMousePointer } from 'lucide-react'
 
+/**
+ * Pricing, per site, no seats. The website (apps/landing/src/content.ts) must say the same.
+ * Announced only: no billing exists yet, and Pro is free for everyone during the beta.
+ */
+export const PRICING = {
+  freeSites: 1,
+  freeReviewers: 3,
+  proPerSite: '$4.80',
+  foundingPerSite: '$2',
+  foundingCustomers: 200,
+} as const
+
 /** The website (apps/landing, served at the site's root); the panel links back to it. */
 export const WEBSITE = '/'
 

@@ -28,7 +28,7 @@ The standalone landing page for ourhunch, made for the proposal. React + Vite, f
 | The loop | Paste, send a link, review, copy the fix as a prompt, ship again. |
 | Try it | The page itself can be commented on (press C). Notes stay in memory; nothing is stored or sent. |
 | The spec | Why it is safe on a real site, as facts. |
-| Pricing | Free, and Pro at $2 a site; free during the beta. |
+| Pricing | Free (1 site), and Pro at $4.80 a site a month (founding price $2 a site, locked for the first 200 customers); free during the beta. Billing isn’t built yet. |
 
 ## Rules
 

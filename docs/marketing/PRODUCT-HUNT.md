@@ -25,15 +25,15 @@
 3. `One script: comments, user tests and heatmaps` *(45)*
 
 **Description (yang tampil di pratinjau: ±260 karakter):**
-> One script tag adds pinned comments, voice notes and user tests to any website. Clients review with a link, no account. Every note carries the page, element and device, and copies as a prompt for your AI coder. Free in beta, then $2 a site.
+> One script tag adds pinned comments, voice notes and user tests to any website. Clients review with a link, no account. Every note carries the page, element and device, and copies as a prompt for your AI coder. Free in beta, then $4.80/site ($2 founding).
 
-*(240 karakter)*
+*(255 karakter)*
 
 **Links:** `https://<domain>/?utm_source=producthunt&utm_campaign=launch`
 
 **Topics (pilih 3):** Developer Tools · Design Tools · User Experience *(alternatif: Productivity, SaaS)*
 
-**Pricing:** Free (with paid plan) — "Free during beta; $2 per site per month after."
+**Pricing:** Free (with paid plan) — "Free during beta; then $4.80 per site per month ($2 founding price, locked for the first 200 customers)."
 
 **Makers:** akun Anda. **Hunter:** tidak wajib — meluncur sendiri sudah biasa.
 
@@ -52,7 +52,7 @@
 > - **User tests from the same script:** usability tasks, 5-second tests and click heatmaps with people who agree to take part (webcam eye tracking too, labelled Labs — it's a webcam, not a lab).
 > - Your normal visitors see nothing and load ~5 KB. The script never reads what people type into your forms.
 >
-> It's **free during the beta**, then **$2 per site per month** — we priced it for freelancers and small agencies with many client sites.
+> It's **free during the beta**, then **$4.80 per site per month**, and the first 200 customers lock a **$2 founding price** — we priced it for freelancers and small agencies with many client sites.
 >
 > What I'd love your honest take on:
 > 1. What's missing before you'd use this with a real client?
@@ -75,7 +75,7 @@ Gunakan **screenshot produk asli**, bukan ilustrasi AI. Latar putih/abu terang, 
 | 3 | **Every note knows the page, element and device** | Panel Comments: satu komentar dengan baris "Chrome 131 · macOS · 1280×800", badge status |
 | 4 | **Turn feedback into a prompt for your AI coder** | Teks prompt hasil *Copy open as AI prompt* di sebelah editor (Cursor/Lovable) |
 | 5 | **User tests and heatmaps from the same script** | Hasil studi: tabel tugas (success %, waktu) + heatmap klik di atas halaman |
-| 6 | **$2 a site. Free during the beta.** | Kartu harga Free / Pro dari landing page + "1 script tag" snippet |
+| 6 | **$4.80 a site ($2 founding). Free during the beta.** | Kartu harga Free / Pro dari landing page + "1 script tag" snippet |
 
 **Thumbnail (240 × 240, boleh GIF < 3 MB):** logo panah oranye; animasi: pin jatuh ke tombol, muncul angka "1". Latar polos.
 
@@ -93,7 +93,7 @@ Rekam layar asli (OBS/QuickTime), resolusi 1920×1080, tanpa musik keras; teks b
 | 18–28 | Klien klik tombol, ketik komentar, rekam suara | "They click the thing and say what's wrong." |
 | 28–34 | Panel Comments: komentar + baris perangkat | "You see the page, element and device." |
 | 34–40 | *Copy open as AI prompt* → tempel ke editor AI | "Hand it to your AI coder." |
-| 40–45 | Kartu harga + logo | "User tests too. $2 a site. Free in beta." |
+| 40–45 | Kartu harga + logo | "User tests too. $4.80 a site, $2 founding. Free in beta." |
 
 ---
 
@@ -133,7 +133,7 @@ Rekam layar asli (OBS/QuickTime), resolusi 1920×1080, tanpa musik keras; teks b
 ## 8. Jawaban siap pakai untuk komentar
 
 **"How is this different from Marker.io / BugHerd?"**
-> They're great for bigger teams (and priced per seat, $39–59+/month). We're built for freelancers and small agencies juggling many client sites: $2 per site, clients need no account, and usability tests and heatmaps come in the same script. If you need deep Jira workflows today, Marker.io is the safer pick — that's on our roadmap.
+> They're great for bigger teams (and priced per seat, $39–59+/month). We're built for freelancers and small agencies juggling many client sites: $4.80 per site ($2 founding), no seats, clients need no account, and usability tests and heatmaps come in the same script. If you need deep Jira workflows today, Marker.io is the safer pick — that's on our roadmap.
 
 **"Vercel already has comments."**
 > True, and if your whole team is on Vercel previews it's a good choice. On free plans every reviewer needs a Vercel account, and it's for preview deployments. Ours works on any host, on production, with a link and no account — and adds user tests and heatmaps.
@@ -142,7 +142,7 @@ Rekam layar asli (OBS/QuickTime), resolusi 1920×1080, tanpa musik keras; teks b
 > Normal visitors load a ~5 KB check and see nothing; the widget only loads for reviewers you invite or study participants who agree. It lives in a shadow root (your CSS can't break it and vice versa), never reads form values, and you can switch it off from the panel without touching code.
 
 **"$2 sounds unsustainable."**
-> It's our founding price, locked for the first 200 customers. The normal price will be announced well ahead (planned $5 a site) — still a fraction of the alternatives. And your data is always exportable as CSV.
+> It's our founding price, locked for the first 200 customers. The normal price is $4.80 a site, about 40% below typical feedback tools and with no per-seat fees. And your data is always exportable as CSV.
 
 **"Does it have an MCP server / Jira integration?"**
 > Not yet — today you copy feedback as a prompt or CSV. Which one would you use first: MCP into your editor, or Jira/Linear/GitHub issues? We're deciding the order from answers like yours.

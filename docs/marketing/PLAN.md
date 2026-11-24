@@ -25,14 +25,14 @@
 
 **Kategori:** website feedback + user testing dalam satu script.
 
-**Satu kalimat (EN):** *Client feedback and user tests on your live site — one script tag, $2 a site.*
+**Satu kalimat (EN):** *Client feedback and user tests on your live site — one script tag, $4.80 a site ($2 founding).*
 
 **Satu kalimat (ID):** *Feedback klien dan tes pengguna langsung di situs Anda — satu baris script, Rp 29 ribu per situs.*
 
 **Tiga alasan memilih kita (dalam urutan ini):**
 1. **Klien tidak perlu akun.** Kirim satu link; mereka klik elemen, ketik atau rekam suara. Browser, OS dan ukuran layar ikut tercatat.
 2. **Feedback + riset dalam satu tempat.** Usability test, 5-second test, heatmap (dan eye tracking, Labs) memakai script yang sama — tidak perlu langganan Maze terpisah.
-3. **$2 per situs.** Pesaing $18–59 per bulan, sering per orang.
+3. **$4,80 per situs (founding $2 untuk 200 pelanggan pertama).** ±40% di bawah pasar; pesaing $18–59 per bulan, sering per orang.
 
 **Bonus untuk vibe coder:** *Copy fix prompt* — feedback jadi prompt siap tempel ke Cursor/Lovable/Claude Code.
 
@@ -43,8 +43,8 @@
 | Keberatan | Jawaban |
 |---|---|
 | "Vercel sudah punya comments gratis" | Reviewer Vercel di paket gratis harus punya akun Vercel, dan hanya di preview. Kita: tanpa akun, di produksi, di hosting apa pun, plus usability test & heatmap. |
-| "Kenapa tidak Marker.io / BugHerd?" | Mereka bagus untuk tim besar ($39–59+/bulan, per kursi). Kita untuk freelancer/agensi kecil yang punya banyak situs: $2/situs. |
-| "$2? Pasti akan naik / tutup" | Harga founding $2 dikunci untuk 200 pelanggan pertama; harga normal nanti akan diumumkan ($5/situs rencana). Data bisa diekspor (CSV) kapan saja. |
+| "Kenapa tidak Marker.io / BugHerd?" | Mereka bagus untuk tim besar ($39–59+/bulan, per kursi). Kita untuk freelancer/agensi kecil yang punya banyak situs: $4,80/situs (founding $2), tanpa kursi. |
+| "$2? Pasti akan naik / tutup" | Harga founding $2 dikunci untuk 200 pelanggan pertama; harga normal $4,80/situs (±40% di bawah pasar). Data bisa diekspor (CSV) kapan saja. |
 | "Aman di situs saya?" | Pengunjung biasa hanya memuat ±5 KB dan tidak melihat apa pun. Script tidak pernah membaca isi kolom form, berjalan di shadow DOM, bisa dimatikan dari panel tanpa ubah kode. |
 | "Eye tracking pakai webcam akurat?" | Tidak seakurat alat lab — makanya label Labs. Cocok untuk melihat area yang dilihat, bukan kata per kata. |
 

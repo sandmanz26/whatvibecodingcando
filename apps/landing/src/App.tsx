@@ -204,7 +204,7 @@ function Toolbox() {
             <span className="stackbar-n">{picked.length}</span>
             <p><b>{picked.length === 1 ? 'tool' : 'tools'} in your script</b><span>{picked.length ? picked.map((t) => t.name).join(' · ') : 'Nothing on yet. Flip a switch.'}</span></p>
           </div>
-          <div className="stackbar-price"><span>Free in the beta, then</span><b>$2 a site</b></div>
+          <div className="stackbar-price"><span>Free in the beta, then</span><b>$4.80 a site</b></div>
           <a className="btn marker" href={LINKS.startWith(on)}>Start with {picked.length === 1 ? 'this one' : 'these'} <Arrow /></a>
         </div>
       </div>
@@ -296,8 +296,8 @@ function Pricing() {
       <div className="wrap">
         <div className="head">
           <p className="eyebrow">Pricing</p>
-          <h2>Every tool. <span className="hl ink">$2 a site.</span></h2>
-          <p className="sub">One price per website or app. No seats and no tiers to compare. During the beta every account gets Pro free, and nothing is charged without you choosing it.</p>
+          <h2>Every tool. <span className="hl ink">$4.80 a site.</span></h2>
+          <p className="sub">One price per website or app, about 40% less than typical feedback tools. No seats, no tiers to compare, and unlimited reviewers on Pro. During the beta every account gets Pro free, and nothing is charged without you choosing it.</p>
         </div>
         <div className="prices">
           {PRICES.map((p, n) => (

@@ -6,7 +6,7 @@
 
 ## 1. Ringkasan satu paragraf
 
-ourhunch memecahkan masalah yang nyata: produk yang dibuat cepat (dengan AI atau tidak) tetap butuh **feedback dari klien, tim dan pengguna, langsung di halaman yang hidup**. Pasarnya besar dan tumbuh (platform vibe coding seperti Lovable dilaporkan ±$400 juta ARR awal 2026 dan ±8 juta pengguna terdaftar), tapi **kategori "website feedback" sudah ramai** (Marker.io, BugHerd, Userback, Ruttl, Feedbucket, Faster Fixes, Feedboon; plus komentar gratis bawaan Vercel). Fitur "kirim feedback ke AI coder" yang kita kira unik **sudah dimiliki beberapa pesaing lewat MCP**. Pembeda kita yang sebenarnya: **(1) harga $2/situs vs $18–59/bulan pesaing, (2) feedback + riset pengguna (usability test, heatmap, 5-second test) dalam satu script, (3) fokus pasar Indonesia/Asia Tenggara (Rupiah, QRIS, Bahasa Indonesia).** Untuk MVP yang layak ditagih, empat hal wajib: **screenshot di komentar, notifikasi email, MCP/API untuk AI coder, dan billing.**
+ourhunch memecahkan masalah yang nyata: produk yang dibuat cepat (dengan AI atau tidak) tetap butuh **feedback dari klien, tim dan pengguna, langsung di halaman yang hidup**. Pasarnya besar dan tumbuh (platform vibe coding seperti Lovable dilaporkan ±$400 juta ARR awal 2026 dan ±8 juta pengguna terdaftar), tapi **kategori "website feedback" sudah ramai** (Marker.io, BugHerd, Userback, Ruttl, Feedbucket, Faster Fixes, Feedboon; plus komentar gratis bawaan Vercel). Fitur "kirim feedback ke AI coder" yang kita kira unik **sudah dimiliki beberapa pesaing lewat MCP**. Pembeda kita yang sebenarnya: **(1) harga $4,80/situs (founding $2 untuk 200 pelanggan pertama) vs $18–59/bulan pesaing, (2) feedback + riset pengguna (usability test, heatmap, 5-second test) dalam satu script, (3) fokus pasar Indonesia/Asia Tenggara (Rupiah, QRIS, Bahasa Indonesia).** Untuk MVP yang layak ditagih, empat hal wajib: **screenshot di komentar, notifikasi email, MCP/API untuk AI coder, dan billing.**
 
 ---
 
@@ -47,7 +47,7 @@ ourhunch memecahkan masalah yang nyata: produk yang dibuat cepat (dengan AI atau
 
 Urutan prioritas — fokus ke #1 dulu, karena paling cepat menghasilkan pengguna yang membayar:
 
-1. **Freelancer & agensi kecil web di Indonesia/SEA** (1–10 orang) yang membuat situs untuk klien, sering dengan AI. Rasa sakitnya: *feedback klien datang lewat WhatsApp berupa screenshot dan voice note yang campur aduk; revisi bolak-balik.* Mereka punya banyak situs (= banyak $2), dan klien mereka orang awam (butuh antarmuka sederhana, idealnya Bahasa Indonesia).
+1. **Freelancer & agensi kecil web di Indonesia/SEA** (1–10 orang) yang membuat situs untuk klien, sering dengan AI. Rasa sakitnya: *feedback klien datang lewat WhatsApp berupa screenshot dan voice note yang campur aduk; revisi bolak-balik.* Mereka punya banyak situs (= banyak situs berbayar), dan klien mereka orang awam (butuh antarmuka sederhana, idealnya Bahasa Indonesia).
 2. **Indie maker / vibe coder** yang meluncurkan aplikasi ke pengguna pertama dan butuh feedback + bukti apakah orang bisa memakai aplikasinya (usability test murah).
 3. **Tim produk kecil (startup tahap awal)** yang butuh usability test dan heatmap tanpa langganan Maze.
 
@@ -77,13 +77,13 @@ Urutan prioritas — fokus ke #1 dulu, karena paling cepat menghasilkan pengguna
 
 ## 6. Yang kurang untuk MVP (urut prioritas)
 
-**MVP = versi yang layak ditagih $2 dan tidak membuat pengguna pergi di minggu pertama.**
+**MVP = versi yang layak ditagih (founding $2, normal $4,80 per situs) dan tidak membuat pengguna pergi di minggu pertama.**
 
 | # | Fitur | Kenapa wajib | Perkiraan kerja |
 |---|---|---|---|
 | 1 | **Screenshot otomatis di setiap komentar** | Semua pesaing punya; developer butuh melihat apa yang dilihat reviewer. Tanpa ini kita terlihat "kurang". | Sedang (render bagian layar di browser reviewer, simpan di storage privat) |
 | 2 | **Notifikasi email** (komentar baru, ringkasan harian) | Tanpa ini pemilik lupa membuka panel → churn. | Sedang (perlu Resend/SMTP) |
-| 3 | **Billing + batas paket** (Free 1 situs / Pro $2) | Supaya bisa mulai menagih; batas dicek di server. | Sedang–besar (Xendit atau Lemon Squeezy + webhook) |
+| 3 | **Billing + batas paket** (Free 1 situs / Pro $4,80, founding $2) | Supaya bisa mulai menagih; batas dicek di server. | Sedang–besar (Xendit atau Lemon Squeezy + webhook) |
 | 4 | **MCP server / API "open comments"** | Pesaing sudah punya; vibe coder ingin AI coder membaca feedback langsung, menandai selesai. Kita sudah punya `fixPrompt`, tinggal dibuka lewat API. | Sedang |
 | 5 | **Widget dalam Bahasa Indonesia** (otomatis dari bahasa browser) | Klien agensi Indonesia orang awam; pesaing semua berbahasa Inggris. **Pembeda lokal termurah.** | Kecil–sedang |
 | 6 | **Error console terlampir** (opsional, data pribadi disamarkan) | Laporan bug lengkap tanpa reviewer paham teknis. | Kecil–sedang |
@@ -97,11 +97,12 @@ Urutan prioritas — fokus ke #1 dulu, karena paling cepat menghasilkan pengguna
 
 ## 7. Harga — pendapat jujur
 
-- **$2/situs/bulan sangat murah** dibanding pesaing ($18–59). Bagus untuk akuisisi dan pasar Indonesia, tapi ada dua risiko:
+- **Keputusan (disetujui pemilik):** harga normal Pro **$4,80/situs/bulan**, ±40% di bawah pasar (pesaing terdekat rata-rata ±$8 per situs, mis. Userback $39/bulan untuk 5 situs; paket awal Marker.io/BugHerd/Userback/Feedbucket ±$39–49/bulan). Tetap per situs, tanpa kursi, reviewer tak terbatas. **Harga founding $2/situs/bulan dikunci untuk 200 pelanggan pertama.** Pro gratis selama beta; billing belum dibangun.
+- **$2/situs/bulan (founding) sangat murah** dibanding pesaing ($18–59). Bagus untuk akuisisi dan pasar Indonesia, tapi ada dua risiko:
   1. **Sinyal kualitas:** sebagian pembeli B2B menganggap terlalu murah = tidak serius.
   2. **Margin tipis:** biaya tetap ±$45–65/bulan (Supabase Pro, Vercel Pro, email) → butuh ±30 situs berbayar untuk impas; storage screenshot & voice note menambah biaya per situs.
-- **Rekomendasi:** pertahankan **$2 sebagai harga "Founding member"** yang dikunci seumur hidup untuk 100–200 pelanggan pertama, dan umumkan sejak awal bahwa harga normal nanti **$5/situs** (masih jauh di bawah pesaing). Ini memberi alasan "beli sekarang" tanpa merusak ekonomi jangka panjang.
-- **Bayar tahunan** untuk internasional ($24/tahun) supaya potongan payment processor tidak memakan 18–30% tagihan.
+- **Diterapkan:** **$2 sebagai harga "Founding member"** yang dikunci untuk 200 pelanggan pertama, dan sejak awal diumumkan bahwa harga normal **$4,80/situs** (masih jauh di bawah pesaing). Ini memberi alasan "beli sekarang" tanpa merusak ekonomi jangka panjang.
+- **Bayar tahunan** untuk internasional ($24/tahun founding, $57,60/tahun normal) supaya potongan payment processor tidak memakan 18–30% tagihan.
 
 ---
 

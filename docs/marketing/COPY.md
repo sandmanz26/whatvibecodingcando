@@ -31,7 +31,7 @@ Aturan untuk semua teks:
 
 ### 1.2 r/SideProject
 
-**Judul:** `Side project: one script tag for client feedback + user tests, $2/site`
+**Judul:** `Side project: one script tag for client feedback + user tests, $4.80/site`
 
 > Built this because my client feedback lived in WhatsApp screenshots. One script tag; clients review from a link without an account; every note has the page, element and device; copy it all as a prompt for your AI coder. Same script runs usability tasks and click heatmaps. Free during beta — feedback very welcome: <link>
 
@@ -41,15 +41,15 @@ Aturan untuk semua teks:
 
 ### 1.4 r/SaaS (maks 1x per 60 hari — pakai setelah ada angka)
 
-**Judul:** `Pricing at $2/site when competitors charge $40+/month — sanity check?`
+**Judul:** `Pricing at $4.80/site ($2 founding) when competitors charge $40+/month — sanity check?`
 
-> Building a website-feedback + user-testing tool for freelancers/small agencies (often many client sites, little budget). Competitors charge per seat, $18–59/month. I'm testing a founding price of $2 per site, planned $5 later. Costs are mostly Supabase + storage for voice notes. What would you watch out for? Happy to share numbers so far: [angka nyata].
+> Building a website-feedback + user-testing tool for freelancers/small agencies (often many client sites, little budget). Competitors charge per seat, $18–59/month. I'm testing a founding price of $2 per site for the first 200 customers, $4.80 per site after that. Costs are mostly Supabase + storage for voice notes. What would you watch out for? Happy to share numbers so far: [angka nyata].
 
 ---
 
 ## 2. Indie Hackers (minggu 2; ulang setelah PH dengan hasilnya)
 
-**Judul:** `From WhatsApp screenshots to one script tag: building a $2 feedback tool from Indonesia`
+**Judul:** `From WhatsApp screenshots to one script tag: building a $4.80 feedback tool from Indonesia`
 
 > **The problem.** I build sites for clients, increasingly with AI. Feedback still arrived as screenshots and voice notes on WhatsApp. Finding *where* the problem was took longer than fixing it.
 >
@@ -57,7 +57,7 @@ Aturan untuk semua teks:
 >
 > **Decisions so far.**
 > - Normal visitors load ~5 KB and see nothing; the widget loads only for reviewers. (Customers' sites matter more than our features.)
-> - $2 per site instead of per seat, because agencies have many sites and few seats.
+> - $4.80 per site ($2 founding) instead of per seat, because agencies have many sites and few seats.
 > - No session recording of all visitors — Clarity does that for free; we focus on feedback you can act on.
 >
 > **Numbers (honest):** [pendaftar], [script terpasang], [komentar diterima], [pengguna berbayar].
@@ -106,7 +106,7 @@ Aturan untuk semua teks:
 >
 > 6/ Your normal visitors load ~5 KB and see nothing.
 >
-> 7/ Free during beta, then $2 per site. Built in Indonesia 🇮🇩
+> 7/ Free during beta, then $4.80 per site ($2 founding). Built in Indonesia 🇮🇩
 > Try it → <link>
 > What should it send feedback to next: Jira/Linear or your AI editor?
 
@@ -182,7 +182,7 @@ Aturan untuk semua teks:
 **Subjek:** `Client feedback without screenshots — 15 min?`
 
 > Hi [name], I saw [agency]'s work on [project] — [satu pujian spesifik].
-> Quick question: how do your clients send revision feedback today? I'm building a small tool where clients click directly on the live site (no account) and you get the page, element and device for each note. Free during beta, $2/site after.
+> Quick question: how do your clients send revision feedback today? I'm building a small tool where clients click directly on the live site (no account) and you get the page, element and device for each note. Free during beta, $4.80/site after ($2 founding).
 > Would you try it on one project? I'll set it up with you in 15 minutes.
 > — [Nama], [link]
 
@@ -199,8 +199,8 @@ Aturan untuk semua teks:
 
 - **Nama:** ourhunch
 - **Tagline (60):** Client feedback and user tests on any live site
-- **Deskripsi pendek (160):** One script tag adds pinned comments, voice notes and user tests to any website. Clients review via link, no account. $2 per site, free in beta.
-- **Deskripsi panjang (≈500):** ourhunch puts feedback on the product itself. Add one script tag, send a client or teammate a link, and they click any element on your live site to type or record what's wrong — no account needed. Every note carries the page, the element and the device. Copy open notes as a prompt for your AI coding tool, share a read-only list, or export CSV. The same script runs usability tasks, 5-second tests and click heatmaps with people who agree to take part. Normal visitors load ~5 KB and see nothing. Free during the beta, then $2 per site per month.
+- **Deskripsi pendek (160):** One script tag adds pinned comments, voice notes and user tests to any website. Clients review via link, no account. $4.80 per site, free in beta.
+- **Deskripsi panjang (≈500):** ourhunch puts feedback on the product itself. Add one script tag, send a client or teammate a link, and they click any element on your live site to type or record what's wrong — no account needed. Every note carries the page, the element and the device. Copy open notes as a prompt for your AI coding tool, share a read-only list, or export CSV. The same script runs usability tasks, 5-second tests and click heatmaps with people who agree to take part. Normal visitors load ~5 KB and see nothing. Free during the beta, then $4.80 per site per month ($2 founding price, locked for the first 200 customers).
 - **Kategori:** Developer Tools, Design Tools, User Research, Website Feedback, No-code
 - **Alternatif dari (untuk SaaSHub/AlternativeTo):** Marker.io, BugHerd, Userback, Ruttl, Pastel, Hotjar (feedback), Maze (usability tests)
 

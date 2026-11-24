@@ -18,7 +18,7 @@ Komentar pertama di Product Hunt hampir pasti: *"Marker.io/Userback punya screen
 
 ### 4. "Fix it with AI" bukan pembeda — pesaing sudah punya MCP. ✅
 Faster Fixes (open source), Feedboon, Userback dan Feedbucket sudah menyambungkan feedback ke Cursor/Claude Code.
-**Perbaikan:** pesan utama diubah urutannya: (1) klien tanpa akun, (2) feedback + riset satu script, (3) $2/situs. AI prompt jadi *bonus*, bukan headline. Pertanyaan "MCP vs Jira dulu?" dipakai di maker comment untuk riset sekaligus engagement.
+**Perbaikan:** pesan utama diubah urutannya: (1) klien tanpa akun, (2) feedback + riset satu script, (3) $4,80/situs (founding $2). AI prompt jadi *bonus*, bukan headline. Pertanyaan "MCP vs Jira dulu?" dipakai di maker comment untuk riset sekaligus engagement.
 
 ### 5. Product Hunt bukan tempat ICP #1 berkumpul. ✅
 Agensi kecil Indonesia tidak menunggu di Product Hunt pukul 15:01 WIB. Product Hunt = kredibilitas, backlink dan pengguna global awal, **bukan** mesin akuisisi utama.
@@ -26,7 +26,7 @@ Agensi kecil Indonesia tidak menunggu di Product Hunt pukul 15:01 WIB. Product H
 
 ### 6. $2 terdengar seperti "akan tutup bulan depan". ✅
 Pembeli B2B curiga harga terlalu murah; margin juga tipis (biaya tetap ±$45–65/bulan, storage voice note & screenshot per situs).
-**Perbaikan:** dibingkai sebagai **harga founding, dikunci untuk 200 pelanggan pertama**, harga normal direncanakan **$5/situs**; jawaban siap pakai ada di `PRODUCT-HUNT.md` §8. ⚠️ Anda perlu menyetujui angka $5 itu sebelum diumumkan.
+**Perbaikan:** dibingkai sebagai **harga founding, dikunci untuk 200 pelanggan pertama**, harga normal **$4,80/situs** (±40% di bawah pasar, tanpa biaya per kursi); jawaban siap pakai ada di `PRODUCT-HUNT.md` §8. ✅ **Diputuskan:** normal $4,80, founding $2 untuk 200 pelanggan pertama, Pro gratis selama beta.
 
 ### 7. Nol bukti sosial. ⚠️
 Landing page dan Product Hunt tidak punya satu pun testimoni, logo, atau angka. Pengunjung HN/PH yang skeptis akan pergi.
@@ -63,6 +63,6 @@ Dua pesan berbeda bisa membingungkan, tapi bisa juga saling melengkapi.
 ---
 
 ## Hasil akhir roast
-- Diperbaiki langsung di dokumen: #3, #4, #5, #6 (pembingkaian), #10, #11, #12, #13.
-- **Menunggu keputusan Anda:** nama & domain (#1–2), angka harga normal $5 (#6), testimoni (#7), panduan Lovable (#8), widget Bahasa Indonesia (#9), pilihan pesan (#14).
+- Diperbaiki langsung di dokumen: #3, #4, #5, #6 (harga diputuskan), #10, #11, #12, #13.
+- **Menunggu keputusan Anda:** nama & domain (#1–2), testimoni (#7), panduan Lovable (#8), widget Bahasa Indonesia (#9), pilihan pesan (#14).
 - Paket ini **siap dipakai** begitu minggu 0 di `PLAN.md` selesai.
