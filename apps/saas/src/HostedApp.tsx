@@ -1,5 +1,5 @@
 // The hosted product (website pages, sign-in and the user panel), loaded only on its own addresses.
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Onboarding from './pages/saas/Onboarding'
 import { Forgot as LocalForgot, Login as LocalLogin, Register as LocalRegister, Reset as LocalReset } from './pages/saas/Auth'
@@ -13,6 +13,9 @@ import SharePage from './pages/saas/SharePage'
 import { Privacy, Terms } from './pages/saas/Legal'
 import { Guide } from './pages/saas/Guide'
 import { PanelLayout, Products, Install as PanelInstall, Comments, ReviewersPage, SettingsPage } from './pages/saas/Panel'
+
+// Internal ops panel (founder only): its own download, never linked for normal users.
+const Ops = lazy(() => import('./pages/saas/ops/Ops'))
 
 /** The hosted product: website pages (guide, legal, share links), sign-in and the user panel. */
 export default function HostedApp() {
@@ -31,6 +34,7 @@ export default function HostedApp() {
       <Route path="app/confirm" element={cloud ? <Confirm /> : <Navigate to="/app/login" replace />} />
       <Route path="app/onboarding" element={<Onboarding />} />
       <Route path="app/signup" element={<SignupRedirect />} />
+      <Route path="ops" element={<Suspense fallback={null}><Ops /></Suspense>} />
       <Route path="app" element={<PanelLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="products" element={<Products />} />

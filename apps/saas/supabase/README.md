@@ -69,6 +69,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 - **`migrations/20261120000000_scale.sql`**: indexes for large projects (participant paths, heatmaps, rate-limit cleanup), housekeeping without pg_cron (`take_rate` now and then clears old rate-limit rows and expired one-time links, in bounded batches), and `list_threads` returns the newest 1,000 comments.
 - **`migrations/20261122000000_email.sql`**: email notifications. `projects.notify` ('instant' | 'daily' | 'off'), the `email_outbox` (filled by triggers on new comments and reviewers' replies; no access for anon or members), `email_due()` and `email_done()` for the service role only. Tested in `tests/email_test.sql`.
 - **`migrations/20261124000000_anchor_state.sql`**: pins that survive redeploys. `set_anchor(thread, anchor)` lets a reviewer of the project re-pin a comment or report its pin as moved/gone; the comparison's second element and the device stay, the version comes from the published settings. Tested in `tests/anchor_test.sql`.
+- **`migrations/20261124150000_ops.sql`**: the internal ops panel (`/app#/ops`, founder only). `platform_admins` (written by hand only), `is_platform_admin()`, `account_plans` (plan labels, no billing; a user reads only their own row), `ops_audit`, and the admin-only functions `ops_overview`, `ops_signups_daily`, `ops_funnel`, `ops_users`, `ops_user_detail`, `ops_audit_recent`, `ops_set_plan`. Tested in `tests/ops_test.sql`. See "Internal ops panel" below.
 - **`functions/send-emails/`**: the Edge Function that sends them with Resend (`index.ts`; templates in `render.ts`; mocked tests in `test.ts`).
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
@@ -160,9 +161,22 @@ Who gets what: everyone on a project's team (their sign-in email) hears about ne
 
 To stop all notification emails at once: `select cron.unschedule('vibe-collab-email-instant'); select cron.unschedule('vibe-collab-email-daily');`
 
+## Internal ops panel
+
+`/app#/ops` shows signups, sites, the funnel, users (with plan labels) and the admin action log. It is not linked for normal users; anyone who is not a platform admin sees "Not found". Every read and write goes through `security definer` functions that refuse non-admins; anon can't call them; plan changes are logged in `ops_audit`. No passwords, tokens or comment text are returned.
+
+1. Run `migrations/20261124150000_ops.sql` in the SQL Editor (once, after the earlier migrations).
+2. Make yourself admin (SQL Editor, with your own sign-in email):
+   ```sql
+   insert into public.platform_admins (user_id) select id from auth.users where email = '<your email>';
+   ```
+3. Reload the panel: an **Ops** link appears in the side menu (or open `/app#/ops`).
+
+Remove an admin: `delete from public.platform_admins where user_id = (select id from auth.users where email = '<their email>');`. List admins: `select a.user_id, u.email, a.added_at from public.platform_admins a join auth.users u on u.id = a.user_id;`. There is no way to add an admin from the app, on purpose.
+
 ## Tests
 
-- `tests/run.sh` runs every `*_test.sql` on a fresh database: `rls_test.sql` (row level security), `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account), `share_test.sql` (dashboard, clearing data, share links), `install_test.sql` (installation reports), `research_test.sql` (studies, participants, events, heatmap) and `review_kinds_test.sql` (versions, A vs B, voice notes and their bucket), `email_test.sql` (outbox, who may read it, instant/daily/off), `anchor_test.sql` (re-pinning and pin states).
+- `tests/run.sh` runs every `*_test.sql` on a fresh database: `rls_test.sql` (row level security), `rpc_test.sql` (review links, comments, origins, rate limits, deleting an account), `share_test.sql` (dashboard, clearing data, share links), `install_test.sql` (installation reports), `research_test.sql` (studies, participants, events, heatmap) and `review_kinds_test.sql` (versions, A vs B, voice notes and their bucket), `email_test.sql` (outbox, who may read it, instant/daily/off), `ops_test.sql` (ops functions refuse non-admins and anon, plan changes are audited, users can't write their plan), `anchor_test.sql` (re-pinning and pin states).
 - The full path (panel → invite link → reviewer on another domain → comment in the database → panel inbox, plus kill switch, preview and delete account) was checked in a browser against these migrations on Postgres 16. It is not in CI yet.
 
 ## Not done yet (before a public launch)

@@ -33,6 +33,7 @@ Code that runs in a browser can always be read: the browser has to receive it to
 - The widget lives in a shadow root, never reads form values, scrubs emails/phone numbers from labels, honours `data-private`.
 - Security headers (`vercel.json`): HSTS, `nosniff`, referrer policy, permissions policy, `frame-ancestors 'self'` / `X-Frame-Options: SAMEORIGIN` and `Cross-Origin-Opener-Policy` on our pages (not on `/embed/`, which customers load).
 - CSV exports keep cells that start with `= + - @` as text (no spreadsheet formula injection).
+- Internal ops panel: admins only in `platform_admins` (added by hand in the SQL Editor), every ops function is `security definer` with a pinned search path, refuses non-admins, is not callable by anon, and plan changes are logged in `ops_audit`.
 - Email notifications: the outbox and its functions are for the service role only; the Edge Function checks its own secret in constant time.
 - Dependency audit: `npm audit --omit=dev` in each app.
 

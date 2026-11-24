@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BarChart3, Boxes, ChevronRight, Code2, LayoutDashboard, LifeBuoy, Settings, SlidersHorizontal, Users, Wrench, type LucideIcon } from 'lucide-react'
+import { BarChart3, Boxes, ChevronRight, Code2, LayoutDashboard, LifeBuoy, Settings, Shield, SlidersHorizontal, Users, Wrench, type LucideIcon } from 'lucide-react'
 import type { Project } from '../../saas/account'
+import { useIsAdmin } from '../../saas/ops'
 
 /**
  * The panel's sidebar, two levels deep so it stays short however many tools a project turns on:
@@ -55,6 +56,7 @@ function readOpen(): Record<string, boolean> { try { return JSON.parse(localStor
 export function PanelNav({ project }: { project: Project | null }) {
   const { pathname, search } = useLocation()
   const groups = groupsFor(project)
+  const admin = useIsAdmin()
   const [open, setOpen] = useState<Record<string, boolean>>(() => ({ setup: true, results: true, ...readOpen() }))
   // The group holding the page being shown always opens.
   useEffect(() => {
@@ -89,6 +91,7 @@ export function PanelNav({ project }: { project: Project | null }) {
       {link({ to: '/app/reviewers', label: 'Reviewers', icon: Users })}
       {link({ to: '/app/settings', label: 'Settings', icon: Settings })}
       {link({ to: '/guide', label: 'User guide', icon: LifeBuoy })}
+      {admin && link({ to: '/ops', label: 'Ops', icon: Shield })}
     </nav>
   )
 }
