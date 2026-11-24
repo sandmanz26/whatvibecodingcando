@@ -6,3 +6,6 @@ dist
 .taste-skill/inspect*
 pitch/*.mp4
 .ssr
+
+# Local working copies made by coding agents
+.claude/worktrees/
