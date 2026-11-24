@@ -296,6 +296,9 @@ export class ServerBackend implements Backend {
       now = await rpc<ServerThread>('post_thread', { p_public_id: this.project, p_page: t.page, p_anchor: t.anchor, p_text: t.text, p_id: UUID.test(t.id) ? t.id : null, ...(t.kind && t.kind !== 'comment' ? { p_kind: t.kind } : {}), ...(t.audio ? { p_audio: t.audio } : {}) })
     } else {
       if (t.text !== before.text) now = await rpc('edit_thread', { p_thread: t.id, p_text: t.text })
+      // A re-pinned anchor, or the pin's state the widget saw (moved, gone, ok again): any reviewer may report it.
+      const pin = (a: Thread['anchor']) => `${a.sel}|${a.rx}|${a.ry}|${a.st?.s ?? ''}|${a.st?.at ?? ''}`
+      if (pin(t.anchor) !== pin(before.anchor)) now = await rpc('set_anchor', { p_thread: t.id, p_anchor: t.anchor })
       if (!!t.resolved !== !!before.resolved) now = await rpc('set_resolved', { p_thread: t.id, p_resolved: !!t.resolved })
       const had = new Set(before.replies.map((r) => r.id))
       for (const r of t.replies) if (!had.has(r.id)) now = await rpc('post_reply', { p_thread: t.id, p_text: r.text, p_id: UUID.test(r.id) ? r.id : null })

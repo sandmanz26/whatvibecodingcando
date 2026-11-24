@@ -39,6 +39,10 @@ export const CSS = `
 .vc-pin.st-completed { background: #2f9e44; }
 .vc-pin.sel { box-shadow: 0 0 0 3px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.3); }
 .vc-pin.lost { opacity: .65; border-style: dashed; }
+.vc-pin.moved { border-style: dashed; border-color: #f59f00; }
+.vc-pin.gone { background: #868e96; opacity: .8; border-style: dashed; }
+.vc-pin-tag { position: absolute; left: 22px; top: -6px; white-space: nowrap; background: #f59f00; color: #1c1c1c; font-size: 10.5px; font-weight: 700; padding: 1px 5px; border-radius: 6px; }
+.vc-repin { display: grid; gap: 6px; margin: 6px 0; padding: 8px; border-radius: 8px; background: rgba(245,159,0,.12); }
 .vc-pin.draft { background: #1c1c1c; pointer-events: none; }
 
 .vc-card { position: fixed; z-index: 2147483001; background: var(--vc-bg); border: 1px solid var(--vc-line); border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.22); padding: 12px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 16px); overflow-y: auto; }

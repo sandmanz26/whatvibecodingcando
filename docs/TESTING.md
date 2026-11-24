@@ -117,6 +117,10 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 6.11 | **Open on site** pada komentar | Halaman situs terbuka di elemen terkait, sebagai reviewer | [ ] |
 | 6.12 | Hapus satu komentar (ikon tempat sampah) | Hilang setelah konfirmasi | [ ] |
 | 6.13 | Filter lalu **Delete these (n)** | Hanya yang terfilter terhapus | [ ] |
+| 6.14 | Setelah 5.x: ubah situs (ganti class, pindahkan tombol, hapus satu elemen) lalu buka lagi sebagai reviewer | Pin yang elemennya hanya ganti class tetap normal; tombol yang pindah: pin putus-putus "Moved?"; elemen yang dihapus: pin abu-abu, kartu "Element changed or removed" + deskripsi (mis. button “Buy now”) | [ ] |
+| 6.15 | Pada pin "Moved?" tekan **Yes, this one**; pada pin abu-abu tekan **Pick element** lalu klik elemen yang benar | Pin jadi normal; setelah reload tetap di elemen itu (juga di browser lain) | [ ] |
+| 6.16 | Panel → Comments → filter **Needs re-pin** | Komentar dengan pin moved/gone tampil dengan "was on: … · not found since vX"; **Close** menyelesaikannya | [ ] |
+| 6.17 | Tambahkan `data-hunch="buy"` pada tombol, buat komentar, lalu ubah teks & posisinya | Pin tetap di tombol itu tanpa "Moved?" | [ ] |
 
 ---
 
@@ -258,6 +262,8 @@ npm run install:all
 npm run typecheck && npm run build     # wajib lulus sebelum push
 npm run preview                         # buka http://localhost:4173/ (website) dan /app.html (aplikasi)
 ```
+
+Tes pin (tanpa browser): `node apps/saas/tests/anchor.test.ts` → semua "ok".
 
 Tes database (butuh PostgreSQL 16 lokal): `cd apps/saas/supabase && bash tests/run.sh` → semua file harus "ALL PASS".
 

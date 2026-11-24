@@ -15,6 +15,10 @@ import { ShareList } from './ShareList'
 import { PanelNav } from './Nav'
 import { download, fixPrompt, threadsCsv, toShared } from '../../saas/stats'
 import { LocalBackend, NS, STATUS_LABEL, deviceLine, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
+import { describe as describeEl, stateOf } from '../../core/embed/anchor'
+
+/** Open comments whose pin the widget last saw as moved or gone: they need re-pinning on the site. */
+const needsRepin = (t: Thread) => !t.resolved && (stateOf(t.anchor.st)?.s === 'moved' || stateOf(t.anchor.st)?.s === 'gone')
 import '../../saas/saas.css'
 import { resetAnalytics, track, trackOnce } from '../../lib/analytics'
 import { BrandMark } from '../../components/BrandMark'
@@ -293,6 +297,7 @@ export function Install() {
           <h2>Your snippet</h2>
           <pre className="up-code">{code}</pre>
           <button className="lp-btn primary" onClick={() => void copy(code, 'Snippet', true)}><Copy size={14} /> Copy snippet</button>
+          <p className="up-muted">Tip (optional): add <code>data-hunch="name"</code> to important elements, for example <code>&lt;button data-hunch="buy"&gt;</code>, to keep pins 100% stable when your site changes. Without it, pins still find their element again in most redeploys, or ask “Moved?”.</p>
         </section>
         <section className="up-card">
           <h2><Radar size={16} /> Installation check</h2>
@@ -343,16 +348,19 @@ export function Comments() {
   const [deleting, setDeleting] = useState<Thread | null>(null)
   const [bulk, setBulk] = useState(false)
   const status = (params.get('status') ?? 'all') as Status | 'all'
+  const repin = params.get('repin') === '1'
   const sharing = params.get('share') === '1'
   // ?kind=compare or ?kind=voice: the sidebar's Component reviews and Voice notes (Results).
   const kind = (['compare', 'voice'] as const).find((k) => k === params.get('kind')) ?? null
   if (!project || !backend) return null
   const setStatus = (v: Status | 'all') => setParams(() => { const n = new URLSearchParams(params); if (v === 'all') n.delete('status'); else n.set('status', v); return n }, { replace: true })
+  const setRepin = (v: boolean) => setParams(() => { const n = new URLSearchParams(params); if (v) n.set('repin', '1'); else n.delete('repin'); return n }, { replace: true })
   const setSharing = (v: boolean) => setParams(() => { const n = new URLSearchParams(params); if (v) n.set('share', '1'); else n.delete('share'); return n }, { replace: true })
   const versions = [...new Set(threads.map((t) => t.version).filter((v): v is string => !!v))]
   const ofKind = threads.filter((t) => !kind || t.kind === kind)
   const shown = ofKind.filter((t) => !ver || t.version === ver)
     .filter((t) => status === 'all' || statusOf(t) === status)
+    .filter((t) => !repin || needsRepin(t))
     .filter((t) => !q.trim() || `${t.text} ${t.author} ${t.page} ${t.replies.map((r) => r.text).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const count = (v: Status | 'all') => ofKind.filter((t) => v === 'all' || statusOf(t) === v).length
@@ -377,11 +385,13 @@ export function Comments() {
         <div className="up-tabs" role="group" aria-label="Status">
           {(['all', 'open', 'ongoing', 'completed'] as const).map((v) => <button key={v} aria-pressed={status === v} onClick={() => setStatus(v)}>{v === 'all' ? 'All' : STATUS_LABEL[v]} <span>{count(v)}</span></button>)}
         </div>
+        {(repin || ofKind.some(needsRepin)) && <button className="lp-btn sm" aria-pressed={repin} onClick={() => setRepin(!repin)} title="Comments whose element changed or moved on the site">Needs re-pin <span>{ofKind.filter(needsRepin).length}</span></button>}
         {versions.length > 1 && <select className="up-select" value={ver} onChange={(e) => setVer(e.target.value)} aria-label="Version"><option value="">All versions</option>{versions.map((v) => <option key={v} value={v}>v{v}</option>)}</select>}
         <input className="up-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search comments" aria-label="Search comments" />
         {shown.some((t) => !t.resolved) && <button className="lp-btn sm" onClick={() => void copyPrompt(shown.filter((t) => !t.resolved))} title="The open comments shown, as one prompt for your AI coding tool"><Sparkles size={13} /> Copy open as AI prompt</button>}
         {shown.length > 0 && <button className="lp-btn sm ghost danger" onClick={() => setBulk(true)}><Trash2 size={13} /> Delete {shown.length === ofKind.length && !q.trim() && !ver && status === 'all' ? 'all' : 'these'} ({shown.length})</button>}
       </div>
+      {repin && <p className="up-note">These pins lost their element after the site changed. Re-pinning happens on the site: press <i>Open on site</i>, click the pin, then <i>Yes, this one</i> or <i>Pick element</i>. Or close the comment if it no longer applies. Tip: add <code>data-hunch="name"</code> to important elements to keep pins stable.</p>}
       {shown.length === 0 ? <div className="up-card up-muted">{ofKind.length === 0 ? (kind === 'compare' ? 'No component reviews yet. Reviewers start one with the A vs B button in the widget.' : kind === 'voice' ? 'No voice notes yet. Reviewers record one with the microphone button in the widget.' : 'No comments yet.') : 'Nothing matches.'}</div> : (
         <ul className="up-inbox">
           {shown.map((t) => {
@@ -391,13 +401,14 @@ export function Comments() {
                 <div className="up-row"><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span>{t.kind === 'compare' && <span className="up-badge">A vs B</span>}{t.kind === 'voice' && <span className="up-badge">Voice</span>}{t.version && <span className="up-badge">v{t.version}</span>}<b>{t.author}</b><span className="up-muted">· {ago(t.createdAt)} · <code>{t.page}</code></span></div>
                 <p className="up-text">{t.text}</p>
                 {deviceLine(t.anchor) && <p className="up-device">{deviceLine(t.anchor)}</p>}
+                {needsRepin(t) && (() => { const st = stateOf(t.anchor.st)!; return <p className="up-warn">Needs re-pin · was on: {describeEl(t.anchor.fp) || <code>{t.anchor.sel}</code>} · {st.s === 'gone' ? 'not found' : 'may have moved'} since {st.v ? `v${st.v}` : st.at ? ago(st.at) : 'recently'}</p> })()}
                 {t.kind === 'compare' && t.anchor.b && <p className="up-muted">A: <code>{t.anchor.sel}</code> · B: <code>{t.anchor.b.sel}</code></p>}
                 {t.kind === 'voice' && t.audio && cloud && <VoiceNote path={t.audio} />}
                 {t.replies.length > 0 && <ul className="up-replies">{t.replies.map((r) => <li key={r.id}><b>{r.author}</b> {r.text}</li>)}</ul>}
                 <div className="up-row">
                   {t.resolved
                     ? <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: undefined }, 'Reopened')}><RotateCcw size={13} /> Reopen</button>
-                    : <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: { by: 'panel', at: new Date().toISOString() } }, 'Set as completed')}><Check size={13} /> Set as completed</button>}
+                    : <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: { by: 'panel', at: new Date().toISOString() } }, needsRepin(t) ? 'Closed' : 'Set as completed')}><Check size={13} /> {needsRepin(t) ? 'Close' : 'Set as completed'}</button>}
                   {url ? (cloud || t.page.startsWith('/embed-demo.html')
                     ? <button className="lp-btn sm ghost" onClick={() => void openAsReviewer(project.id, url).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })} title="Opens the page as a reviewer">Open on site <ExternalLink size={12} /></button>
                     // In the browser-only demo, review links work on the demo site only: this opens the page as it is.

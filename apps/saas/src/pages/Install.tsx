@@ -55,6 +55,7 @@ export default function Install() {
               </div>
             </div>
             <pre className="code install-code">{snippet}</pre>
+            <p className="muted" style={{ fontSize: 12.5 }}>Tip (optional): add <span className="mono">data-hunch="name"</span> to important elements to keep pins 100% stable when the site changes.</p>
             <div className="row" style={{ gap: 8 }}>
               <button className="btn primary" disabled={!valid} onClick={() => void copy()}>{copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy snippet</>}</button>
             </div>

@@ -350,6 +350,21 @@ The first step towards a hosted product: one script tag adds comments to any sit
   - **Comment text** is rendered as text only (no `innerHTML`).
 - **Storage.** Code is in `src/embed/`. For now there is `LocalBackend` (localStorage per project), so teammates don't see each other's comments yet. The widget only talks to a `Backend` interface (`list`, `upsert` one thread, `remove` one, `subscribe` to changes elsewhere). A shared database needs only a new implementation of that interface, plus decisions on accounts, project keys and allowed domains.
 
+### Pins that survive redeploys
+
+The script's pins find their element again after the customer's site changes (`src/core/embed/anchor.ts`).
+
+- **Saved with every new comment** (inside the anchor JSON, as `anchor.fp`): tag, stable attributes (`data-hunch`, `data-testid`/`data-test`/`data-cy`, id unless it looks generated, `aria-label`, `name`, `role`, link path, `alt`, `title`, `type`), up to 80 characters of visible text (masked; never from form fields, editable areas or anything marked private), four ancestors (tag + stable id/role/test id + one stable class), the index among same-tag siblings, the nearest landmark or heading, and the position on the page. Generated ids and classes (React `:r1:`, hashes, CSS modules, styled-components/emotion `css-…`, Tailwind arbitrary values) are ignored. The old selector and click position stay as they were.
+- **On load, on route changes and after DOM changes** (debounced, when the browser is idle, at most 400 candidates per tag): same-tag elements are scored (`data-hunch` decides alone, then test ids, id, labels, text, ancestors, sibling index, position). Three outcomes:
+  - **confident** (score ≥ 0.72 and clearly ahead of the next): a normal pin;
+  - **uncertain** (≥ 0.42, or two candidates tie): a dashed pin labelled **Moved?**; its card offers **Yes, this one** and **Pick element**;
+  - **not found**: a grey pin at its last position, "Element changed or removed" and what it was on (button “Buy now”), with **Pick element**.
+  A pin never jumps silently to a doubtful element (two buttons with the same label are told apart by ancestors, index and position, and a tie is "Moved?").
+- **Saved state:** the widget reports moved/gone (and ok again) once per comment, and a confirmation or re-pick saves the new anchor, through the Backend: in the browser demo the stored thread, on the server `set_anchor` (migration `20261124000000_anchor_state.sql`; any reviewer of the project, own rate limit; the server sets the site version the state was first seen in, `anchor.st`). Comments made before this keep the old selector behaviour.
+- **Panel:** Comments → **Needs re-pin** lists open comments whose pin was last seen moved or gone ("was on: button “Buy now” · not found since v2.3"); close them, or re-pin on the site (Open on site).
+- **Tip for customers:** `data-hunch="name"` on important elements keeps pins 100% stable (Install page and Guide).
+- **Tests:** `node apps/saas/tests/anchor.test.ts` (Node 22.18+, no dependencies) checks the pure scoring and fingerprint helpers; the database side is `supabase/tests/anchor_test.sql`.
+
 ### Widget settings (0.2)
 
 The snippet carries only the project, so it never has to change:
