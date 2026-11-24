@@ -535,7 +535,7 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 .up-record-list { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .up-round-chip { background: #eee6fb; color: #4b2a9b; }
 @media print { .up-beta, .no-print, .toasts { display: none !important; } .up-main { padding: 0 !important; } .up-record { max-width: none; } .up-record a { color: inherit; text-decoration: none; } }
-/* ---------- internal ops panel (/app#/ops) ---------- */
+/* ---------- internal ops panel (/app#/app/ops) ---------- */
 .up.ops, .up.ops-plain { display: block; min-height: 100vh; background: var(--lp-bg); }
 .ops-page { max-width: 1240px; margin: 0 auto; }
 .ops-actions, .ops-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

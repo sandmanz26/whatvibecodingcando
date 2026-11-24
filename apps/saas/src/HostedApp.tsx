@@ -35,7 +35,7 @@ export default function HostedApp() {
       <Route path="app/confirm" element={cloud ? <Confirm /> : <Navigate to="/app/login" replace />} />
       <Route path="app/onboarding" element={<Onboarding />} />
       <Route path="app/signup" element={<SignupRedirect />} />
-      <Route path="ops" element={<Suspense fallback={null}><Ops /></Suspense>} />
+      <Route path="app/ops" element={<Suspense fallback={null}><Ops /></Suspense>} />
       <Route path="app" element={<PanelLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="products" element={<Products />} />

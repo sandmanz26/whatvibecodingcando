@@ -93,7 +93,7 @@ export function PanelNav({ project }: { project: Project | null }) {
       {link({ to: '/app/reviewers', label: 'Reviewers', icon: Users })}
       {link({ to: '/app/settings', label: 'Settings', icon: Settings })}
       {link({ to: '/guide', label: 'User guide', icon: LifeBuoy })}
-      {admin && link({ to: '/ops', label: 'Ops', icon: Shield })}
+      {admin && link({ to: '/app/ops', label: 'Ops', icon: Shield })}
     </nav>
   )
 }

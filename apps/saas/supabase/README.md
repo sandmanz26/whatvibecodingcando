@@ -70,7 +70,7 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
 - **`migrations/20261122000000_email.sql`**: email notifications. `projects.notify` ('instant' | 'daily' | 'off'), the `email_outbox` (filled by triggers on new comments and reviewers' replies; no access for anon or members), `email_due()` and `email_done()` for the service role only. Tested in `tests/email_test.sql`.
 - **`migrations/20261124000000_anchor_state.sql`**: pins that survive redeploys. `set_anchor(thread, anchor)` lets a reviewer of the project re-pin a comment or report its pin as moved/gone; the comparison's second element and the device stay, the version comes from the published settings. Tested in `tests/anchor_test.sql`.
 - **`migrations/20261124100000_review_rounds.sql`**: review rounds and approvals. `projects.rounds_on` / `rounds_included`, `review_rounds` (one open per project; members only), `round_approvals` (written only by `approve_round`, read by members), `threads.round_id` (set by a trigger; with rounds on and no round open, reviewers can't add comments, the team can: `reviewers.team`, set by `start_review` for one-time links), `current_round` / `approve_round` for the script, and approval emails (`email_outbox.approval_id`, `email_due` sends them with the next instant run unless notifications are off). Redeploy the Edge Function `send-emails` after it (new email). Tested in `tests/rounds_test.sql`.
-- **`migrations/20261124150000_ops.sql`**: the internal ops panel (`/app#/ops`, founder only). `platform_admins` (written by hand only), `is_platform_admin()`, `account_plans` (plan labels, no billing; a user reads only their own row), `ops_audit`, and the admin-only functions `ops_overview`, `ops_signups_daily`, `ops_funnel`, `ops_users`, `ops_user_detail`, `ops_audit_recent`, `ops_set_plan`. Tested in `tests/ops_test.sql`. See "Internal ops panel" below.
+- **`migrations/20261124150000_ops.sql`**: the internal ops panel (`/app#/app/ops`, founder only). `platform_admins` (written by hand only), `is_platform_admin()`, `account_plans` (plan labels, no billing; a user reads only their own row), `ops_audit`, and the admin-only functions `ops_overview`, `ops_signups_daily`, `ops_funnel`, `ops_users`, `ops_user_detail`, `ops_audit_recent`, `ops_set_plan`. Tested in `tests/ops_test.sql`. See "Internal ops panel" below.
 - **`functions/send-emails/`**: the Edge Function that sends them with Resend (`index.ts`; templates in `render.ts`; mocked tests in `test.ts`).
 - **`tests/`**: the row level security tests. Two customers and a stranger try to read, change, join or take over each other's data; anon tries to read; bad data is refused.
   - Run them on any local Postgres: `PGHOST=… PGPORT=… PGUSER=… tests/run.sh`.
@@ -164,14 +164,14 @@ To stop all notification emails at once: `select cron.unschedule('vibe-collab-em
 
 ## Internal ops panel
 
-`/app#/ops` shows signups, sites, the funnel, users (with plan labels) and the admin action log. It is not linked for normal users; anyone who is not a platform admin sees "Not found". Every read and write goes through `security definer` functions that refuse non-admins; anon can't call them; plan changes are logged in `ops_audit`. No passwords, tokens or comment text are returned.
+`/app#/app/ops` shows signups, sites, the funnel, users (with plan labels) and the admin action log. It is not linked for normal users; anyone who is not a platform admin sees "Not found". Every read and write goes through `security definer` functions that refuse non-admins; anon can't call them; plan changes are logged in `ops_audit`. No passwords, tokens or comment text are returned.
 
 1. Run `migrations/20261124150000_ops.sql` in the SQL Editor (once, after the earlier migrations).
 2. Make yourself admin (SQL Editor, with your own sign-in email):
    ```sql
    insert into public.platform_admins (user_id) select id from auth.users where email = '<your email>';
    ```
-3. Reload the panel: an **Ops** link appears in the side menu (or open `/app#/ops`).
+3. Reload the panel: an **Ops** link appears in the side menu (or open `/app#/app/ops`).
 
 Remove an admin: `delete from public.platform_admins where user_id = (select id from auth.users where email = '<their email>');`. List admins: `select a.user_id, u.email, a.added_at from public.platform_admins a join auth.users u on u.id = a.user_id;`. There is no way to add an admin from the app, on purpose.
 

@@ -1,4 +1,4 @@
-// Internal ops panel at /app#/ops: founder only. Not linked for normal users; non-admins see "Not found".
+// Internal ops panel at /app#/app/ops: founder only. Not linked for normal users; non-admins see "Not found".
 // All data comes from admin-only database functions (saas/ops.ts); no comment text, no PostHog events.
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
