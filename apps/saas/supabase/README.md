@@ -97,9 +97,10 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
    - A Google account with the same email as an existing email-and-password account is linked to it automatically (Google has verified the address). Someone who joined with Google can set a password later in Settings → Password.
 5. **Database → Extensions → pg_cron** (optional, before running the third migration): enables the hourly cleanup.
 6. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). With Resend: host `smtp.resend.com`, port `465`, username `resend`, password = a Resend API key, sender = an address on a domain verified in Resend. Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
-7. **Auth → Email Templates.** So links work on any device (the default links only work in the browser that asked), set the link in two templates. Keep the rest of the text as you like.
-   - **Confirm signup:** `<a href="https://whatvibecodingcando.vercel.app/app#/app/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>`
-   - **Reset Password:** `<a href="https://whatvibecodingcando.vercel.app/app#/app/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>`
+7. **Auth → Email Templates.** Use the branded files in `email-templates/` (subjects and steps: "Email notifications" step 8). Their links use the `token_hash` form, so they work on any device (the default links only work in the browser that asked):
+   - **Confirm signup:** `https://ourhunch.com/app#/app/confirm?token_hash={{ .TokenHash }}&type=email`
+   - **Reset Password:** `https://ourhunch.com/app#/app/confirm?token_hash={{ .TokenHash }}&type=recovery`
+   - Magic link, change email and invite use `type=magiclink`, `email_change` and `invite`.
    - The default `{{ .ConfirmationURL }}` links also work, but only when opened in the same browser (they come back as `/app?auth=…&code=…`; links already sent to `/` still work, the website forwards them).
 8. **Keys.**
    - The project URL and the anon (publishable) key are public by design and go into the app's build.
@@ -122,45 +123,96 @@ All four must be `true`. To see which migrations a database has, compare its tab
 
 ## Email notifications (owner, once)
 
-Who gets what: everyone on a project's team (their sign-in email) hears about new comments and reviewers' replies, grouped (at most one email per project every 5 minutes), as a daily summary at 08:00 WIB, or not at all (Settings → Project → *Email me about new feedback*). Reviewers and participants never get these emails. Sign-up and password emails are separate: they go through Auth → SMTP (step 6).
+Every email ourhunch sends itself goes through the Edge Function `send-emails` and Resend. Sign-up and password emails are separate: Supabase Auth sends them through SMTP (step 6 above), with the templates in `email-templates/`.
 
-1. **Resend:** create an account at resend.com → **Domains → Add domain** → add the DNS records it shows at your domain registrar → wait for *Verified*. Without your own domain Resend only sends to your own address (fine for a first test, not for customers).
+| Email | Sent when | To | How often |
+|---|---|---|---|
+| New comment / reply | a reviewer comments or replies (not the team's own replies) | the project's team | grouped per project: every 5 min (*instant*), in the daily summary (*daily*) or never (*off*) |
+| New research results | a participant finishes a study run; grouped per study, with the task success rate so far | team | as above |
+| Round approved | a reviewer approves a round | team | next 5-minute run, even for *daily* projects; never for *off* |
+| Your client started reviewing | the first time a (non-team) reviewer opens the current round | team | once per round, as above |
+| Round due tomorrow | an open round is due tomorrow (UTC) and has no approval | team | once per round, as above |
+| ourhunch is live on <site> | the script reports from one of the project's sites for the first time | team | once per project, as above |
+| Weekly summary | Mondays, for account owners with activity in the last 7 days | the account owner | once a week; projects set to *off* are left out |
+| Welcome | right after sign-up (confirmed email or first sign-in) | the person who signed up | once, within 5 minutes |
+| Day 1: Add ourhunch in 2 minutes | ≥ 24 h after sign-up, no install detected | the person who signed up | once, only while not installed |
+| Day 3: Invite your first client | ≥ 3 days, installed, no review link or reviewer yet | the person who signed up | once, only while not done |
+| Day 7: Test with real users | ≥ 7 days, has comments, no study yet | the person who signed up | once, only while not done |
+
+The last four are lifecycle emails ("Tips and product updates", Settings → Notifications): on by default for new accounts, off for accounts that existed before them (those get no onboarding series), at most one a day, each kind once, never to anonymous reviewers or participants. They carry a one-click unsubscribe (link to `/app#/unsubscribe?t=…` and `List-Unsubscribe` / `List-Unsubscribe-Post` headers pointing at the function); the token is random per user and only turns tips off. Activity emails link to the notification settings instead.
+
+Every email: 600px table layout with inline styles, preheader, one button, plain-text part, footer with why it was sent, the settings link and the postal address (when `EMAIL_POSTAL_ADDRESS` is set). Pictures of all of them: `docs/email-previews/`. Regenerate them (and the Auth templates) from `apps/saas`:
+`npx esbuild supabase/functions/send-emails/preview.ts --bundle --platform=node --format=esm --outfile=/tmp/se-preview.mjs && node /tmp/se-preview.mjs /tmp/email-previews`.
+
+1. **Resend:** create an account at resend.com → **Domains → Add domain** (`ourhunch.com`) → add the DNS records it shows (SPF, DKIM, and a DMARC record such as `v=DMARC1; p=none;`) at your domain registrar → wait for *Verified*. Without your own domain Resend only sends to your own address.
 2. **Resend → API Keys → Create** (permission: Sending access). Keep it in Resend and Supabase only.
-3. **Run the migration** `migrations/20261122000000_email.sql` in the SQL Editor.
+3. **Run the migrations** in the SQL Editor, in order: `migrations/20261122000000_email.sql`, then (after the others) `migrations/20261125000000_emails_complete.sql`. A database that already has everything up to `…_ops.sql` can run the one-paste file **`catch-up/2026-11-25-emails.sql`** instead.
 4. **Deploy the function** — either:
    - CLI, from `apps/saas`: `npx supabase login`, `npx supabase link --project-ref <ref>`, `npx supabase functions deploy send-emails --no-verify-jwt`; or
-   - Dashboard: **Edge Functions → Deploy a new function → Via editor**, name `send-emails`, add the files `index.ts` and `render.ts` from `functions/send-emails/`, deploy, then in its settings turn **Enforce JWT verification off** (the function checks its own secret).
+   - Dashboard: **Edge Functions → Deploy a new function → Via editor**, name `send-emails`, add the files `index.ts` and `render.ts` from `functions/send-emails/` (not `test.ts` or `preview.ts`), deploy, then in its settings turn **Enforce JWT verification off** (the function checks its own secret; the unsubscribe request is checked by its token).
 5. **Edge Functions → Secrets** (never in the repository, the app or a chat):
    - `RESEND_API_KEY` = the key from step 2
-   - `EMAIL_FROM` = `ourhunch <notify@yourdomain.com>`
+   - `EMAIL_FROM` = `ourhunch <hello@ourhunch.com>` (an address on the verified domain)
    - `EMAIL_CRON_SECRET` = a long random string (e.g. from a password manager)
-   - `APP_URL` = `https://whatvibecodingcando.vercel.app` (your domain later)
+   - `APP_URL` = `https://ourhunch.com` (every link in the emails starts here; the app also works on `https://whatvibecodingcando.vercel.app`)
+   - `EMAIL_REPLY_TO` (optional) = where replies to the welcome email go, e.g. your own inbox
+   - `EMAIL_FOUNDER_NAME` (optional) = signs the welcome email; otherwise "The ourhunch team"
+   - `EMAIL_POSTAL_ADDRESS` (optional, recommended before sending tips widely) = your business postal address, shown in every footer; leave it unset and the line is left out
 6. **Database → Extensions:** enable `pg_cron` and `pg_net`.
-7. **Schedule it** (SQL Editor; replace the two values in angle brackets — the secret is the same as `EMAIL_CRON_SECRET`, not a Supabase key):
+7. **Schedule it** (SQL Editor; replace the two values in angle brackets — the secret is the same as `EMAIL_CRON_SECRET`, not a Supabase key). If you already scheduled the first two, run only the vault lines you haven't and the two new jobs:
    ```sql
    select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/send-emails', 'email_function_url');
    select vault.create_secret('<EMAIL_CRON_SECRET>', 'email_cron_secret');
+   -- activity emails + welcome emails, every 5 minutes
    select cron.schedule('vibe-collab-email-instant', '*/5 * * * *', $$
      select net.http_post(
        url := (select decrypted_secret from vault.decrypted_secrets where name = 'email_function_url'),
        headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'email_cron_secret')),
        body := '{"mode":"instant"}'::jsonb)
    $$);
+   -- daily summary, 01:00 UTC = 08:00 WIB
    select cron.schedule('vibe-collab-email-daily', '0 1 * * *', $$
      select net.http_post(
        url := (select decrypted_secret from vault.decrypted_secrets where name = 'email_function_url'),
        headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'email_cron_secret')),
        body := '{"mode":"daily"}'::jsonb)
    $$);
+   -- lifecycle (day 1 / day 3 / day 7), 02:17 UTC = 09:17 WIB
+   select cron.schedule('ourhunch-email-lifecycle', '17 2 * * *', $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'email_function_url'),
+       headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'email_cron_secret')),
+       body := '{"mode":"lifecycle"}'::jsonb)
+   $$);
+   -- weekly summary, Mondays 01:43 UTC = 08:43 WIB
+   select cron.schedule('ourhunch-email-weekly', '43 1 * * 1', $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'email_function_url'),
+       headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'email_cron_secret')),
+       body := '{"mode":"weekly"}'::jsonb)
+   $$);
    ```
-   `0 1 * * *` is 01:00 UTC = 08:00 WIB.
-8. **Check it:** leave a comment as a reviewer; within 5 minutes the team gets an email. If not:
+8. **Auth emails (Supabase → Authentication):**
+   - **SMTP** (step 6 above): host `smtp.resend.com`, port `465`, username `resend`, password = a Resend API key, sender `ourhunch <hello@ourhunch.com>`.
+   - **Email Templates:** paste each file's HTML (everything after the first comment line) and set the subject:
+
+     | Template | File | Subject |
+     |---|---|---|
+     | Confirm signup | `email-templates/confirm-signup.html` | Confirm your email for ourhunch |
+     | Reset Password | `email-templates/reset-password.html` | Set a new password for ourhunch |
+     | Magic Link | `email-templates/magic-link.html` | Your ourhunch login link |
+     | Change Email Address | `email-templates/change-email.html` | Confirm your new email for ourhunch |
+     | Invite user | `email-templates/invite.html` | You’re invited to ourhunch |
+
+     Their links use the `token_hash` form (`https://ourhunch.com/app#/app/confirm?token_hash={{ .TokenHash }}&type=…`), so they work on any device. On another domain, replace `https://ourhunch.com` in the files. They have no postal-address line (Supabase can't read the function's secrets); add it by hand if you want it there too.
+9. **Check it:** leave a comment as a reviewer; within 5 minutes the team gets an email. Sign up a new account: the welcome email comes within 5 minutes. If not:
    - `select * from cron.job_run_details order by start_time desc limit 5;` (did the job run?)
    - `select status_code, content from net._http_response order by created desc limit 5;` (401 = the two secrets differ; 500 "missing secret" = step 5)
    - `select count(*) from email_outbox where sent_at is null;` (waiting emails)
+   - `select kind, count(*) from email_sent group by 1;` (lifecycle and weekly emails sent)
    - Edge Functions → send-emails → **Logs** (Resend errors, e.g. an unverified domain).
 
-To stop all notification emails at once: `select cron.unschedule('vibe-collab-email-instant'); select cron.unschedule('vibe-collab-email-daily');`
+To stop all emails at once: `select cron.unschedule('vibe-collab-email-instant'); select cron.unschedule('vibe-collab-email-daily'); select cron.unschedule('ourhunch-email-lifecycle'); select cron.unschedule('ourhunch-email-weekly');`
 
 ## Internal ops panel
 

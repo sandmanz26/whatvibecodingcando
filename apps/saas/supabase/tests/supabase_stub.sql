@@ -7,7 +7,8 @@ do $$ begin
 end $$;
 create schema auth;
 create table auth.users (id uuid primary key, email text, created_at timestamptz default now(), last_sign_in_at timestamptz,
-  raw_app_meta_data jsonb default '{}'::jsonb, is_anonymous boolean not null default false);
+  raw_app_meta_data jsonb default '{}'::jsonb, is_anonymous boolean not null default false,
+  email_confirmed_at timestamptz);
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claims', true)::json->>'sub', '')::uuid
 $$;

@@ -46,7 +46,7 @@ cd apps/saas && npx esbuild supabase/functions/send-emails/test.ts --bundle --pl
 
 - **Auth & data:** Supabase (Postgres + Auth + Storage). Sign-in: email + password, and Google when it is enabled in Supabase (the button appears by itself). Panel code in `apps/saas/src/saas/` (`cloud.ts`, `supabase.ts`), pages in `apps/saas/src/pages/saas/`.
 - **Widget settings:** a versioned, validated file on Supabase Storage (CDN), edited in the panel's *Widget* page ("Update site"), with history and restore.
-- **Email:** feedback notifications via triggers → `email_outbox` → pg_cron → Edge Function `send-emails` → Resend. Auth emails via Supabase SMTP (Resend). Setup: `apps/saas/supabase/README.md` → "Email notifications".
+- **Email:** activity notifications via triggers → `email_outbox` → pg_cron → Edge Function `send-emails` → Resend; lifecycle emails (welcome, day 1/3/7, opt-out "Tips and product updates" with one-click unsubscribe) and a Monday summary from the same function. Auth emails via Supabase SMTP (Resend) with the templates in `apps/saas/supabase/email-templates/`. Previews: `docs/email-previews/`. Setup: `apps/saas/supabase/README.md` → "Email notifications".
 - **Analytics:** PostHog, enabled by `VITE_POSTHOG_KEY` in Vercel.
 - **SEO:** the website is prerendered (`apps/landing/prerender.mjs`); `VITE_SITE_URL` sets the canonical domain.
 

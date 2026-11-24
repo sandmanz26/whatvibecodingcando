@@ -471,3 +471,22 @@ export async function updateRoundCloud(roundId: string, patch: { name?: string; 
   const { error } = await supabase!.from('review_rounds').update(row).eq('id', roundId)
   if (error) throw new Error(error.code === '23505' ? 'Another round is already open. Close it first.' : error.message)
 }
+
+// ---------- email preferences (…_emails_complete.sql) ----------
+
+/** "Tips and product updates" (lifecycle emails); null when the server doesn't have the migration yet. */
+export async function getMarketingCloud(): Promise<boolean | null> {
+  const { data, error } = await supabase!.rpc('email_prefs_get')
+  if (error) return null
+  return !!(data as { marketing?: boolean } | null)?.marketing
+}
+export async function setMarketingCloud(on: boolean) {
+  const { error } = await supabase!.rpc('email_prefs_set', { p_marketing: on })
+  if (error) throw error
+}
+/** The unsubscribe link from a lifecycle email: the token alone turns tips off (no sign-in). */
+export async function unsubscribeCloud(token: string): Promise<boolean> {
+  const { data, error } = await supabase!.functions.invoke('send-emails', { body: { unsubscribe: token } })
+  if (error) return false
+  return !!(data as { ok?: boolean } | null)?.ok
+}

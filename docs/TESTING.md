@@ -210,14 +210,28 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
 |---|---|---|---|
-| 10b.1 | Settings → Project → **Email me about new feedback** = *When feedback arrives* | Toast "You’ll get an email when feedback arrives" | [ ] |
+| 10b.1 | Settings → **Notifications** → **Email me about “…”** = *When something happens* | Toast "You’ll get an email when something happens" | [ ] |
 | 10b.2 | Browser B (reviewer): buat 2 komentar | Dalam ≤ 5 menit, **satu** email "…: 2 new comments and replies" ke email tim | [ ] |
-| 10b.3 | Klik **Open your comments** di email | Panel → Comments terbuka | [ ] |
+| 10b.3 | Isi email: halaman, elemen (mis. button “Pay”), baris perangkat, kutipan komentar, label *Voice note* untuk voice note, chip round kalau ada. Klik **Open your comments** / **Open comment** | Panel → Comments terbuka | [ ] |
 | 10b.4 | Balas komentar dari panel (sebagai pemilik) | **Tidak** ada email untuk balasan Anda sendiri | [ ] |
 | 10b.5 | Reviewer membalas | Email "a new reply" | [ ] |
 | 10b.6 | Ubah ke *One summary a day*, reviewer berkomentar | Tidak ada email sekarang; ringkasan datang besok 08:00 WIB | [ ] |
 | 10b.7 | Ubah ke *Off*, reviewer berkomentar | Tidak ada email | [ ] |
-| 10b.8 | Daftar akun baru / Forgot password | Email konfirmasi & reset datang dari alamat domain Anda (bukan Supabase) | [ ] |
+| 10b.8 | Daftar akun baru / Forgot password | Email konfirmasi & reset datang dari alamat domain Anda (bukan Supabase), dengan tampilan ourhunch (template di `apps/saas/supabase/email-templates/`) | [ ] |
+| 10b.9 | Partisipan menyelesaikan studi (Research) | Email "…: N new results in “<nama studi>”" + persentase tugas berhasil, tombol **See results** | [ ] |
+| 10b.10 | Rounds aktif, round terbuka; reviewer membuka link review pertama kali | Satu email "your client started reviewing" (sekali per round, bukan untuk browser tim) | [ ] |
+| 10b.11 | Round terbuka dengan due date = besok, belum di-approve | Satu email "<round> is due tomorrow" (sekali per round) | [ ] |
+| 10b.12 | Reviewer klik Approve | Email dengan nama approver, round, versi, jumlah komentar terbuka, tombol **View approval record** membuka record-nya | [ ] |
+| 10b.13 | Pasang script di situs baru (project baru) | Satu email "ourhunch is live on <situs>", tombol **Send your first review link** (sekali per project) | [ ] |
+| 10b.14 | Daftar akun baru dan konfirmasi email | Dalam ≤ 5 menit email **Welcome to ourhunch** (tanda tangan `EMAIL_FOUNDER_NAME`, balasan ke `EMAIL_REPLY_TO`) | [ ] |
+| 10b.15 | Akun baru, ≥ 24 jam, belum pasang script | Email "Add ourhunch in 2 minutes" (jalan harian). Kalau script sudah terpasang: tidak dikirim | [ ] |
+| 10b.16 | Klik **Unsubscribe** di email tips | Halaman "You’re unsubscribed" tanpa login; Settings → Notifications → *Tips and product updates* jadi off | [ ] |
+| 10b.17 | Di Gmail: menu ⋮ → *Unsubscribe* (dari header List-Unsubscribe) | Tips jadi off | [ ] |
+| 10b.18 | Senin, ada aktivitas 7 hari terakhir | Email "Your week on …" ke pemilik akun; tidak ada kalau project di-set *Off* | [ ] |
+| 10b.19 | Settings → Notifications → matikan/nyalakan *Tips and product updates* | Toast "Tips off"/"Tips on"; tersimpan setelah reload | [ ] |
+| 10b.20 | Footer setiap email | Alasan menerima email, link pengaturan, alamat bisnis (kalau `EMAIL_POSTAL_ADDRESS` diisi); email tips juga ada **Unsubscribe** | [ ] |
+
+Pratinjau semua email (gambar): `docs/email-previews/`.
 
 Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.md` (query `cron.job_run_details`, `net._http_response`, log Edge Function).
 
@@ -299,6 +313,8 @@ npm run preview                         # buka http://localhost:4173/ (website) 
 Tes pin (tanpa browser): `node apps/saas/tests/anchor.test.ts` → semua "ok".
 
 Tes database (butuh PostgreSQL 16 lokal): `cd apps/saas/supabase && bash tests/run.sh` → semua file harus "ALL PASS".
+
+Tes email (tanpa server), dari `apps/saas`: `npx esbuild supabase/functions/send-emails/test.ts --bundle --platform=node --format=esm --outfile=/tmp/se.mjs && node /tmp/se.mjs` → "ALL PASS". Pratinjau HTML semua email: sama dengan `preview.ts` lalu `node /tmp/se-preview.mjs /tmp/email-previews` (juga menulis ulang template Auth).
 
 ---
 

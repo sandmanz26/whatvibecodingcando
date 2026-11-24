@@ -59,7 +59,7 @@ export function Privacy() {
         <li><b>Supabase</b>: database, authentication and file storage.</li>
         <li><b>Vercel</b>: hosting of this website and the script.</li>
         {analyticsOn && <li><b>PostHog</b>: product analytics for this website and the app: which pages are opened and which steps are completed (sign-up, onboarding, installing, the first comment), with your account’s id when you’re signed in. No session recordings, no comment text, field values, emails or names; addresses are cleaned of private links before they are sent.</li>}
-        <li><b>Our email provider</b>: sends account emails (confirmation, password reset).</li>
+        <li><b>Our email provider</b> (Resend): sends account emails (confirmation, password reset), emails about your projects to their team (new comments, replies, test results, approvals, round reminders, a weekly summary; change or turn them off per project in Settings → Notifications), and, to the person who signed up, a welcome email and a few setup tips (“Tips and product updates”: on by default for new accounts, at most one a day, never to reviewers or participants). Every tips email has a one-click unsubscribe link that works without logging in; you can also turn tips off in Settings → Notifications. Project emails may quote comments, only to that project’s team.</li>
         <li><b>Google</b>: only if you choose “Continue with Google”, to sign you in.</li>
       </ul>
       <h2>How long, and your choices</h2>

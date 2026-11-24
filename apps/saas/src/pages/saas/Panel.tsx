@@ -9,7 +9,7 @@ import { draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProj
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState, type Notify } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
-import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
+import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, getMarketingCloud, setMarketingCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
 import { PanelNav } from './Nav'
@@ -504,21 +504,11 @@ export function SettingsPage() {
             <div className="lp-field">Website<span className="up-static">{project.siteUrl ? project.siteUrl.replace(/^https?:\/\//, '') : 'Not set'} · <Link to="/app/widget">change in Widget → Website</Link></span></div>
           </div>
           <p className="up-muted">Project id <code>{project.id}</code> can’t change: your snippet and the comments already made are tied to it.</p>
-          <label className="lp-field">Email me about new feedback
-            <select className="up-select" value={project.notify ?? 'instant'} disabled={!cloud} onChange={(e) => {
-              const v = e.target.value as Notify
-              if (setProject((p) => ({ ...p, notify: v }))) toast(v === 'off' ? 'Feedback emails off' : v === 'daily' ? 'You’ll get one summary a day' : 'You’ll get an email when feedback arrives')
-            }}>
-              <option value="instant">When feedback arrives (grouped every few minutes)</option>
-              <option value="daily">One summary a day</option>
-              <option value="off">Off</option>
-            </select>
-            <span className="lp-hint">{cloud ? 'Sent to everyone on this project’s team, for new comments and reviewers’ replies. Your own replies don’t send emails.' : 'Emails need the server: this browser-only beta doesn’t send any.'}</span>
-          </label>
           <div className="up-row"><button className="lp-btn primary sm" disabled={!projectDirty || !pname.trim()} onClick={() => { if (setProject((p) => ({ ...p, name: pname.trim() }))) toast('Saved') }}>Save</button>
             {projectDirty && <button className="lp-btn sm ghost" onClick={() => setPname(project.name)}>Cancel</button>}</div>
         </section>
       )}
+      <NotificationsCard />
       {project && <RoundsCard />}
       {project && <DataCard project={project} />}
       <section className="up-card danger">
@@ -584,6 +574,50 @@ function RoundsCard() {
 }
 
 /** Change the password: the current one first, then the new one twice. */
+/** Settings → Notifications: the project's activity emails, and the account's tips (lifecycle emails). */
+function NotificationsCard() {
+  const { project, setProject } = usePanel()
+  const { toast } = useStore()
+  const [tips, setTips] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!cloud) return
+    let live = true
+    void getMarketingCloud().then((v) => { if (live) setTips(v) })
+    return () => { live = false }
+  }, [])
+  return (
+    <section className="up-card">
+      <h2>Notifications</h2>
+      {project && (
+        <label className="lp-field">Email me about “{project.name}”
+          <select className="up-select" value={project.notify ?? 'instant'} disabled={!cloud} onChange={(e) => {
+            const v = e.target.value as Notify
+            if (setProject((p) => ({ ...p, notify: v }))) toast(v === 'off' ? 'Project emails off' : v === 'daily' ? 'You’ll get one summary a day' : 'You’ll get an email when something happens')
+          }}>
+            <option value="instant">When something happens (grouped every few minutes)</option>
+            <option value="daily">One summary a day</option>
+            <option value="off">Off</option>
+          </select>
+          <span className="lp-hint">{cloud
+            ? 'Sent to everyone on this project’s team: new comments and reviewers’ replies, new test results, approvals, round reminders and the first install. Owners also get a weekly summary on Mondays unless this is off. Your own replies don’t send emails.'
+            : 'Emails need the server: this browser-only beta doesn’t send any.'}</span>
+        </label>
+      )}
+      <div className="up-row">
+        <span className="lp-grow"><b>Tips and product updates</b><br /><span className="up-muted">{cloud
+          ? 'A welcome email and a few short tips while you set up (at most one a day), and the occasional product update. Every one has an unsubscribe link.'
+          : 'Needs the server: this browser-only beta doesn’t send any.'}</span></span>
+        <Switch checked={!!tips} label="Tips and product updates" onChange={() => {
+          if (!cloud || tips === null) return
+          const next = !tips
+          setTips(next)
+          setMarketingCloud(next).then(() => toast(next ? 'Tips on' : 'Tips off'), () => { setTips(!next); toast('Couldn’t save. Try again.') })
+        }} />
+      </div>
+    </section>
+  )
+}
+
 function PasswordCard() {
   const { s, update } = usePanel()
   const { toast } = useStore()

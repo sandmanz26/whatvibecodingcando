@@ -12,6 +12,7 @@ import { Dashboard } from './pages/saas/Dashboard'
 import SharePage from './pages/saas/SharePage'
 import { Privacy, Terms } from './pages/saas/Legal'
 import { Guide } from './pages/saas/Guide'
+import { Unsubscribe } from './pages/saas/Unsubscribe'
 import { RoundsPage, RoundRecord } from './pages/saas/Rounds'
 import { PanelLayout, Products, Install as PanelInstall, Comments, ReviewersPage, SettingsPage } from './pages/saas/Panel'
 
@@ -27,6 +28,7 @@ export default function HostedApp() {
       <Route path="privacy" element={<Privacy />} />
       <Route path="terms" element={<Terms />} />
       <Route path="guide" element={<Guide />} />
+      <Route path="unsubscribe" element={<Unsubscribe />} />
       <Route path="share/:token" element={<SharePage />} />
       <Route path="app/register" element={<Register />} />
       <Route path="app/login" element={<Login />} />
