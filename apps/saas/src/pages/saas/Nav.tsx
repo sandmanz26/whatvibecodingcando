@@ -30,6 +30,8 @@ export function groupsFor(project: Project | null): Group[] {
   const results: Item[] = [
     ...(STUDY_TOOLS.some(on) ? [{ to: '/app/research', label: 'All studies' }] : []),
     ...RESULTS.filter((r) => on(r.product)).map(({ to, label }) => ({ to, label })),
+    // Review rounds: a project setting (Settings → Review rounds), not a tool.
+    ...(project?.rounds?.on ? [{ to: '/app/rounds', label: 'Rounds' }] : []),
   ]
   return [
     { id: 'setup', label: 'Setup', icon: Wrench, items: [

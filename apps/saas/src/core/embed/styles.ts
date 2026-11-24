@@ -158,4 +158,17 @@ export const CSS = `
 .vc-ver { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: var(--vc-soft); color: var(--vc-ink-2); font-size: 11px; font-weight: 600; }
 .vc-audio { width: 100%; height: 36px; }
 .vc-lostface { color: #ffb38a; opacity: 1; font-weight: 700; }
+.vc-round { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 2147483003; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 14px; background: var(--vc-bg); border: 1px solid var(--vc-line); box-shadow: 0 6px 20px rgba(0,0,0,.18); font-size: 12.5px; }
+.vc-round .vc-row { flex-wrap: wrap; }
+.vc-round .vc-btn { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.vc-round-title { display: inline-flex; align-items: center; gap: 2px; border: 0; background: transparent; padding: 0; white-space: nowrap; }
+.vc-round-chev { margin-left: 4px; transition: transform .15s; }
+.vc-round.small .vc-round-chev { transform: rotate(-90deg); }
+.vc-round-ok { display: inline-flex; align-items: center; gap: 3px; color: #237032; font-weight: 600; }
+.vc-round-note { max-width: 520px; padding: 0 6px 4px 0; color: var(--vc-ink-2); white-space: pre-wrap; max-height: 40vh; overflow-y: auto; }
+.vc.left .vc-preview ~ .vc-round, .vc-preview ~ .vc-round { top: 48px; }
+.vc-approve { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2147483005; width: min(380px, calc(100vw - 24px)); background: var(--vc-bg); color: var(--vc-ink); border: 1px solid var(--vc-line); border-radius: 14px; box-shadow: 0 18px 60px rgba(0,0,0,.35); padding: 14px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.vc-field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--vc-ink-2); }
+.vc-field input { height: 32px; border: 1px solid var(--vc-line); border-radius: 8px; padding: 0 9px; background: var(--vc-field); outline: none; }
+.vc-field input:focus { border-color: var(--vc-accent); }
 `

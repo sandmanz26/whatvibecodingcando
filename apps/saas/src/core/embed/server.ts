@@ -9,7 +9,7 @@
  *   - Comments: database functions (supabase/migrations/…_reviewers.sql) that check the site's
  *     origin, the reviewer and rate limits. The script never reads or writes tables directly.
  */
-import { NS, type Backend, type Thread } from './store'
+import { NS, type Backend, type RoundState, type Thread } from './store'
 import { parseConfig, type Release, type WidgetConfig } from './config'
 
 const URL_ = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? ''
@@ -279,6 +279,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** Comments on the server, behind the same Backend interface the widget always used. */
 export class ServerBackend implements Backend {
   readonly where = 'Saved on ourhunch'
+  readonly polls = true
   private last = new Map<string, Thread>()
   constructor(private project: string) {}
   async list() {
@@ -318,5 +319,13 @@ export class ServerBackend implements Backend {
     document.addEventListener('visibilitychange', vis)
     return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', vis) }
   }
+  /** The project's review rounds (current_round checks reviewer, origin and rate limit). A server without rounds yet: off. */
+  async rounds(): Promise<RoundState> {
+    try { return await rpc<RoundState>('current_round', { p_public_id: this.project }) } catch (e) {
+      if (/current_round|does not exist|404/.test((e as Error).message)) return { on: false }
+      throw e
+    }
+  }
+  async approve(roundId: string, name: string) { await rpc('approve_round', { p_public_id: this.project, p_round: roundId, p_name: name, p_confirm: true }) }
   setName(name: string) { void rpc('set_reviewer_name', { p_public_id: this.project, p_name: name }).catch(() => { /* keeps the old name */ }) }
 }

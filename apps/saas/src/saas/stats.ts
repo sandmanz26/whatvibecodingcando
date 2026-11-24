@@ -53,7 +53,7 @@ export function statsOf(threads: Thread[], sites: Stats['sites'] = []): Stats {
 
 /* ---------- the shared comment list ---------- */
 
-export interface SharedThread { page: string; kind?: string | null; version?: string | null; device?: string | null; author: string; text: string; createdAt: string; editedAt?: string | null; resolved: { by: string; at: string } | null; replies: { author: string; text: string; at: string }[] }
+export interface SharedThread { round?: string | null; page: string; kind?: string | null; version?: string | null; device?: string | null; author: string; text: string; createdAt: string; editedAt?: string | null; resolved: { by: string; at: string } | null; replies: { author: string; text: string; at: string }[] }
 export interface SharedList { project: string; site: string; label: string | null; filter: 'all' | 'open' | 'completed'; created_at: string; expires_at: string | null; threads: SharedThread[] }
 export interface ShareRow { id: string; label: string | null; status_filter: 'all' | 'open' | 'completed'; created_at: string; expires_at: string | null; revoked_at: string | null; views: number; last_viewed: string | null }
 
@@ -107,8 +107,8 @@ export function fixPrompt(list: Thread[], siteUrl: string): string {
 }
 
 /** The comment list as CSV (for a spreadsheet). */
-export const threadsCsv = (rows: SharedThread[]) => toCsv(['page', 'kind', 'version', 'device', 'status', 'author', 'comment', 'created', 'replies'],
-  rows.map((t) => [t.page, t.kind ?? 'comment', t.version ?? '', t.device ?? '', t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')]))
+export const threadsCsv = (rows: SharedThread[]) => toCsv(['page', 'kind', 'version', 'round', 'device', 'status', 'author', 'comment', 'created', 'replies'],
+  rows.map((t) => [t.page, t.kind ?? 'comment', t.version ?? '', t.round ?? '', t.device ?? '', t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open', t.author, t.text, t.createdAt, t.replies.map((r) => `${r.author}: ${r.text}`).join(' | ')]))
 export function download(name: string, text: string, type = 'text/csv') {
   const url = URL.createObjectURL(new Blob([text], { type }))
   Object.assign(document.createElement('a'), { href: url, download: name }).click()

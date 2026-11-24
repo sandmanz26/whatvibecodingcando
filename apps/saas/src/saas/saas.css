@@ -527,3 +527,11 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 .up-device { margin: 2px 0 0; font-size: 12px; color: var(--lp-ink-2); font-family: ui-monospace, monospace; }
 .lp-status.soon { background: #f1efe8; color: #6b6558; }
 .lp-check.soon { opacity: .6; cursor: default; }
+
+/* Review rounds */
+.up-timeline { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.up-timeline a, .up-check a { display: inline-flex; align-items: center; gap: 3px; }
+.up-record .up-dl { grid-template-columns: max-content 1fr; }
+.up-record-list { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.up-round-chip { background: #eee6fb; color: #4b2a9b; }
+@media print { .up-beta, .no-print, .toasts { display: none !important; } .up-main { padding: 0 !important; } .up-record { max-width: none; } .up-record a { color: inherit; text-decoration: none; } }

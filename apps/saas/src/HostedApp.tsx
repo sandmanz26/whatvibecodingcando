@@ -12,6 +12,7 @@ import { Dashboard } from './pages/saas/Dashboard'
 import SharePage from './pages/saas/SharePage'
 import { Privacy, Terms } from './pages/saas/Legal'
 import { Guide } from './pages/saas/Guide'
+import { RoundsPage, RoundRecord } from './pages/saas/Rounds'
 import { PanelLayout, Products, Install as PanelInstall, Comments, ReviewersPage, SettingsPage } from './pages/saas/Panel'
 
 /** The hosted product: website pages (guide, legal, share links), sign-in and the user panel. */
@@ -40,6 +41,8 @@ export default function HostedApp() {
         <Route path="research" element={<Research />} />
         <Route path="research/:id" element={<StudyResults />} />
         <Route path="report" element={<PanelReport />} />
+        <Route path="rounds" element={<RoundsPage />} />
+        <Route path="rounds/:id/record" element={<RoundRecord />} />
         <Route path="prompts" element={<Navigate to="/app" replace />} />
         <Route path="reviewers" element={<ReviewersPage />} />
         <Route path="team" element={<Navigate to="/app/reviewers" replace />} />

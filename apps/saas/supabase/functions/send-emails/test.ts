@@ -14,6 +14,10 @@ ok(out[0].html.includes('https://app.test/app#/app/comments') && out[0].html.inc
 ok(out[0].text.includes('Budi replied on /') , 'plain-text version: ' + out[0].text.split('\n')[3])
 const one = render({ ...d, total: 1, items: [d.items[0]] }, 'https://app.test', true)
 ok(one[0].subject === 'Today on Toko <Budi>: a new comment', 'daily subject: ' + one[0].subject)
+const appr = render({ ...d, total: 1, items: [{ id: 9, at: '', type: 'approval', kind: null, page: '', thread_id: null, author: 'Ani <b>', text: 'Round 2', version: '1.4', open_comments: 2, round_n: 2 }] } as any, 'https://app.test', false)
+ok(appr[0].subject === 'Toko <Budi>: Ani <b> approved Round 2', 'approval subject: ' + appr[0].subject)
+ok(appr[0].html.includes('Ani &lt;b&gt;') && appr[0].html.includes('Site version 1.4') && appr[0].html.includes('2 comments were still open') && appr[0].html.includes('/app#/app/rounds'), 'approval email: escaped name, version, open comments, link to Rounds')
+ok(appr[0].text.includes('not a legal signature'), 'approval email says it is a record, not a signature')
 
 // ---- the function: auth, sending, retries
 const envs: Record<string, string> = { SUPABASE_URL: 'https://sb.test', SUPABASE_SERVICE_ROLE_KEY: 'srv', RESEND_API_KEY: 're_x', EMAIL_FROM: 'VC <n@x.test>', EMAIL_CRON_SECRET: 'secret-123', APP_URL: 'https://app.test' }

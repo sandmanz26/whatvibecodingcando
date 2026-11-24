@@ -16,6 +16,7 @@ const SECTIONS = [
   { id: 'concepts', title: 'How it fits together' },
   { id: 'reviewers', title: 'Invite reviewers' },
   { id: 'comments', title: 'Comments' },
+  { id: 'rounds', title: 'Review rounds' },
   { id: 'design', title: 'Design tools' },
   { id: 'research', title: 'Research studies' },
   { id: 'heatmaps', title: 'Heatmaps and eye tracking' },
@@ -98,6 +99,18 @@ export function Guide() {
               <li><b>Device:</b> each comment records the reviewer’s browser, system and window size (for example <i>Chrome 131 · macOS · 1280×800</i>), so you can reproduce what they saw.</li>
               <li><b>Fix it with AI:</b> <i>Copy fix prompt</i> on a comment, or <i>Copy open as AI prompt</i> for the list, gives your AI coding tool the feedback, page, element, device and version, ready to paste. Reviewers’ names stay out.</li>
               <li><b>Share and export:</b> in <i>Results → Comments</i>, share a read-only list with a link (no account needed, revocable) or download a CSV for a spreadsheet.</li>
+            </ul>
+          </section>
+
+          <section id="rounds">
+            <h2>Review rounds</h2>
+            <ul>
+              <li><b>Turn them on:</b> <i>Settings → Review rounds</i>, and set how many rounds your quote includes (1–20, or unlimited). Off by default: projects without rounds work as before.</li>
+              <li><b>Start a round:</b> <i>Results → Rounds → Start round</i>. Give it a name, an optional “What changed” note for your client and an optional due date. One round is open at a time. A round past the number in your quote is labelled <i>Extra round</i>; ourhunch never bills for it.</li>
+              <li><b>Tell your client:</b> after starting a round, copy the ready-made message with the review link. Reviewers have no account, so ourhunch doesn’t email them.</li>
+              <li><b>What reviewers see:</b> a small bar at the top of the widget, e.g. <i>Round 2 of 2 · due 28 Nov</i>, your note, and <i>Approve this version</i>. While no round is open they can read and reply, but not add comments. You and your team (browsers opened with <i>Open my site</i> or <i>Open on site</i>) can always comment.</li>
+              <li><b>Approval:</b> the reviewer types their name and ticks “I’ve reviewed this version and approve it.” It saves the time, round, site version and the comments still open, and closes the round as <i>Approved</i>. Your team gets an email{' '}(when feedback emails aren’t off). It’s a record of approval, not a legal signature.</li>
+              <li><b>Records and filters:</b> each approval has a printable record (<i>Download record</i>). Comments show their round, the inbox filters by round, and the CSV has a round column.</li>
             </ul>
           </section>
 

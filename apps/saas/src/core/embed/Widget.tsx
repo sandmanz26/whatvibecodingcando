@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff, Columns2, Mic, Square, Play } from 'lucide-react'
+import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff, Columns2, Mic, Square, Play, ChevronDown, BadgeCheck } from 'lucide-react'
 import { audioUrl, uploadAudio } from './server'
 import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
-import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, deviceNow, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type Status, type Thread } from './store'
+import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, canCommentNow, deviceNow, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type RoundState, type Status, type Thread } from './store'
 import { takeHint } from './hints'
 
 export interface Config {
@@ -80,6 +80,24 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   }
   const say = useCallback((text: string, error = false) => { setToast({ text, error }); window.setTimeout(() => setToast((t) => (t?.text === text ? null : t)), 3200) }, [])
 
+  /* ---- review rounds (only when the project works in rounds) ---- */
+  const [rounds, setRounds] = useState<RoundState | null>(null)
+  const loadRounds = useCallback(async () => {
+    if (!backend.rounds) return
+    try { setRounds(await backend.rounds()) } catch { /* keep what is shown; the next check retries */ }
+  }, [backend])
+  useEffect(() => {
+    if (!config.comments || !backend.rounds) return
+    void loadRounds()
+    // Rounds change rarely: checked every minute while the tab is in view, and when it comes back.
+    const iv = window.setInterval(() => { if (document.visibilityState === 'visible') void loadRounds() }, 60_000)
+    const vis = () => { if (document.visibilityState === 'visible') void loadRounds() }
+    document.addEventListener('visibilitychange', vis)
+    const off = backend.subscribe(() => { if (!backend.polls) void loadRounds() })
+    return () => { window.clearInterval(iv); document.removeEventListener('visibilitychange', vis); off() }
+  }, [backend, loadRounds, config.comments])
+  const canComment = canCommentNow(rounds)
+
   /* ---- data ---- */
   const reload = useCallback(async () => {
     try { setThreads(await backend.list()) } catch { say('Comments could not be loaded.', true) }
@@ -92,7 +110,10 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const save = async (t: Thread, msg?: string) => {
     const before = threads
     setThreads((l) => (l.some((x) => x.id === t.id) ? l.map((x) => (x.id === t.id ? t : x)) : [...l, t]))
-    try { await backend.upsert(t); if (msg) say(msg) } catch { setThreads(before); say('Not saved: this browser’s storage is full or blocked.', true) }
+    try { await backend.upsert(t); if (msg) say(msg) } catch (e) {
+      setThreads(before)
+      if (/round_closed/.test((e as Error).message)) { say(WAIT_TEXT, true); void loadRounds() } else say('Not saved: this browser’s storage is full or blocked.', true)
+    }
   }
   const remove = async (t: Thread) => {
     const before = threads
@@ -156,6 +177,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const busy = () => { if (draft?.text.trim()) { setNudge((n) => n + 1); return true } return false }
   const start = (kind: Kind = 'comment') => {
     if (busy() || !config.comments) return
+    if (!canComment) { say(WAIT_TEXT, true); return }
     setDraft(null); setOpenId(null); setPanel(false); setTool(null); setPickA(null); setPlacingKind(kind); setPlacing(true)
   }
   const pickTool = (id: ToolId) => {
@@ -256,6 +278,12 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   return (
     <div className={`vc ${config.position} ${config.mode}`} ref={root} onPointerUp={onFieldPointer} style={{ ['--vc-accent' as string]: config.accent }}>
       {config.preview && <div className="vc-preview" role="status">Preview · draft settings <button onClick={config.preview.exit}>Exit preview</button></div>}
+      {config.comments && rounds?.on && <RoundBar s={rounds} name={name} version={config.version} onApprove={async (nm) => {
+        const id = rounds.round?.id
+        if (!id || !backend.approve) return false
+        try { await backend.approve(id, nm, config.version); say('Thank you: your approval was recorded'); void loadRounds(); return true }
+        catch (e) { say(/rate_limited/.test((e as Error).message) ? 'Too many tries. Wait a minute and try again.' : /round_not_open/.test((e as Error).message) ? 'This round is no longer open.' : 'The approval couldn’t be saved. Try again.', true); void loadRounds(); return false }
+      }} />}
       {here.map((t) => {
         const p = place(t.anchor)
         if (p.y < -20 || p.y > window.innerHeight + 20) return null
@@ -329,6 +357,60 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
       </div>}
 
       {toast && <div className={`vc-toast ${toast.error ? 'error' : ''}`} role="status">{toast.text}</div>}
+    </div>
+  )
+}
+
+const WAIT_TEXT = 'The team is working on your feedback. You’ll be able to comment again when the next round opens.'
+const dueText = (d: string | null | undefined) => {
+  if (!d) return ''
+  const x = new Date(`${d}T00:00:00`)
+  return isNaN(x.getTime()) ? '' : x.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
+/**
+ * The review round, at the top of the window, inside the widget (it doesn't move the site's layout):
+ * which round, its due date, the team's "What changed" note, and "Approve this version".
+ */
+function RoundBar({ s, name, version, onApprove }: { s: RoundState; name: string; version?: string; onApprove: (name: string) => Promise<boolean> }) {
+  const [small, setSmall] = useState(() => window.innerWidth < 640)
+  const [note, setNote] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const r = s.round
+  const open = r?.status === 'open'
+  const extra = !!r && s.included != null && r.n > s.included
+  const title = !r ? 'Review rounds' : extra ? `Round ${r.n} · Extra round` : s.included != null ? `Round ${r.n} of ${s.included}` : `Round ${r.n}`
+  const due = open ? dueText(r?.due) : ''
+  return (
+    <div className={`vc-round ${small ? 'small' : ''}`} role="region" aria-label="Review round">
+      <div className="vc-row">
+        <button className="vc-round-title" onClick={() => setSmall((v) => !v)} aria-expanded={!small} title={small ? 'Show the round' : 'Hide the details'}>
+          <b>{title}</b>{due && <span> · due {due}</span>}{r?.status === 'approved' && <span className="vc-round-ok"> · <BadgeCheck size={12} /> Approved</span>}<ChevronDown size={13} className="vc-round-chev" aria-hidden />
+        </button>
+        {!small && open && r.note && <button className="vc-btn" onClick={() => setNote((v) => !v)} aria-expanded={note}>What changed</button>}
+        {open && <button className="vc-btn primary" onClick={() => setAsking(true)}><Check size={13} /> Approve this version</button>}
+      </div>
+      {!small && open && note && r.note && <p className="vc-round-note">{r.note}</p>}
+      {!small && !open && <p className="vc-round-note">{s.team ? 'No round is open. You’re on the team, so you can still comment.' : r?.status === 'approved' ? `Approved. ${WAIT_TEXT.split('. ')[1]}` : WAIT_TEXT}</p>}
+      {asking && r && <ApproveDialog round={title} name={name} version={version} openCount={s.open ?? 0} onClose={() => setAsking(false)} onConfirm={async (nm) => { if (await onApprove(nm)) setAsking(false) }} />}
+    </div>
+  )
+}
+
+function ApproveDialog({ round, name, version, openCount, onClose, onConfirm }: { round: string; name: string; version?: string; openCount: number; onClose: () => void; onConfirm: (name: string) => Promise<void> }) {
+  const [nm, setNm] = useState(name)
+  const [ok, setOk] = useState(false)
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="vc-approve" role="dialog" aria-modal="true" aria-label="Approve this version">
+      <div className="vc-card-head"><b>Approve this version</b><span className="vc-grow" /><button className="vc-icon" onClick={onClose} aria-label="Close"><X size={14} /></button></div>
+      <p className="vc-muted">{round}{version ? ` · site version ${version}` : ''}</p>
+      <label className="vc-field">Your name<input value={nm} onChange={(e) => setNm(e.target.value)} maxLength={80} placeholder="Your name" aria-label="Your name" /></label>
+      {openCount > 0 && <p className="vc-bad">{openCount} comment{openCount === 1 ? ' is' : 's are'} still open.</p>}
+      <label className="vc-check"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> I’ve reviewed this version and approve it.</label>
+      <div className="vc-row"><span className="vc-grow" /><button className="vc-btn" onClick={onClose}>Cancel</button>
+        <button className="vc-btn primary" disabled={!ok || !nm.trim() || busy} onClick={() => { setBusy(true); void onConfirm(nm.trim()).finally(() => setBusy(false)) }}>{busy ? 'Saving…' : 'Confirm'}</button></div>
+      <p className="vc-where">Saves a record for the site’s team: your name, the time, the round and the site version. It closes this round. It’s a record of your approval, not a legal signature.</p>
     </div>
   )
 }

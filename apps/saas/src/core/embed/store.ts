@@ -63,6 +63,8 @@ export interface Thread {
   version?: string
   /** a voice note's audio, in the project's private bucket */
   audio?: string
+  /** the review round it was made in (set by the server; null or absent when rounds are off) */
+  round?: string
 }
 export type Status = 'open' | 'ongoing' | 'completed'
 export const statusOf = (t: Thread): Status => (t.resolved ? 'completed' : t.replies.length ? 'ongoing' : 'open')
@@ -72,6 +74,8 @@ export const MAX_TEXT = 4000
 export interface Backend {
   /** a short, honest description of where the data lives, shown in the widget */
   readonly where: string
+  /** true when the backend checks for changes by polling a server (subscribe is then a timer) */
+  readonly polls?: boolean
   list(): Promise<Thread[]>
   upsert(t: Thread): Promise<void>
   remove(id: string): Promise<void>
@@ -79,6 +83,10 @@ export interface Backend {
   subscribe(cb: () => void): () => void
   /** the reviewer's display name changed (servers keep it per reviewer) */
   setName?(name: string): void
+  /** review rounds, when the project works in rounds (see rounds.ts) */
+  rounds?(): Promise<RoundState>
+  /** "Approve this version": closes the open round as approved */
+  approve?(roundId: string, name: string, version?: string): Promise<void>
 }
 
 /**
@@ -88,10 +96,46 @@ export interface Backend {
  */
 export const NS = 'saas:vibe:'
 
+/** Review rounds as the widget sees them. */
+export interface RoundInfo { id: string; n: number; name: string; note: string; due: string | null; status: 'open' | 'closed' | 'approved'; startedAt: string; closedAt: string | null }
+export interface RoundState {
+  on: boolean
+  /** rounds included in the quote; null: unlimited */
+  included?: number | null
+  /** this browser is the team's (opened through a member's own link): may comment between rounds */
+  team?: boolean
+  /** the latest round, open or not */
+  round?: RoundInfo | null
+  /** open comments in the project */
+  open?: number
+}
+/**
+ * The browser-only demo keeps a project's rounds here, written by the panel (saas/rounds.ts) and
+ * read by the widget on the demo site (same origin).
+ */
+export interface LocalRounds {
+  on: boolean
+  included: number | null
+  rounds: (RoundInfo & { createdBy?: string })[]
+  approvals: { id: string; roundId: string; name: string; version: string | null; statement: string; origin: string; openComments: number; openList: { page: string; author: string; text: string; at: string }[]; at: string }[]
+}
+export const roundsKey = (project: string) => `${NS}${project}:rounds`
+export const APPROVAL_STATEMENT = 'I’ve reviewed this version and approve it.'
+export function readLocalRounds(project: string): LocalRounds {
+  try {
+    const v = JSON.parse(localStorage.getItem(roundsKey(project)) ?? 'null') as LocalRounds | null
+    if (v && typeof v === 'object' && Array.isArray(v.rounds) && Array.isArray(v.approvals)) return v
+  } catch { /* fall through */ }
+  return { on: false, included: 2, rounds: [], approvals: [] }
+}
+export function writeLocalRounds(project: string, v: LocalRounds) { localStorage.setItem(roundsKey(project), toJson(v)) }
+/** Whether this browser may add comments now. */
+export const canCommentNow = (s: RoundState | null) => !s || !s.on || !!s.team || s.round?.status === 'open'
+
 export class LocalBackend implements Backend {
   readonly where = 'Saved in this browser only'
   private key: string
-  constructor(project: string) { this.key = `${NS}${project}:threads` }
+  constructor(project: string) { this.key = `${NS}${project}:threads`; this.project = project }
   private read(): Thread[] {
     try {
       let v: unknown = JSON.parse(localStorage.getItem(this.key) ?? '[]')
@@ -108,16 +152,41 @@ export class LocalBackend implements Backend {
     const back = JSON.parse(localStorage.getItem(this.key) ?? 'null')
     if (!Array.isArray(back) || back.length !== list.length) throw new Error('not saved')
   }
+  private project: string
   async list() { return this.read() }
   async upsert(t: Thread) {
     const list = this.read()
     const i = list.findIndex((x) => x.id === t.id)
-    if (i >= 0) list[i] = t; else list.push(t)
+    if (i >= 0) list[i] = t
+    else {
+      // As on the server: a new comment carries the open round; with rounds on and none open, it waits.
+      const r = readLocalRounds(this.project)
+      const open = r.on ? r.rounds.find((x) => x.status === 'open') : undefined
+      if (r.on && !open) throw new Error('round_closed')
+      list.push(open ? { ...t, round: open.id } : t)
+    }
     this.write(list)
+  }
+  async rounds(): Promise<RoundState> {
+    const r = readLocalRounds(this.project)
+    if (!r.on) return { on: false }
+    const round = [...r.rounds].sort((a, b) => b.n - a.n)[0] ?? null
+    return { on: true, included: r.included, team: false, round, open: this.read().filter((t) => !t.resolved).length }
+  }
+  async approve(roundId: string, name: string, version?: string) {
+    const r = readLocalRounds(this.project)
+    const round = r.rounds.find((x) => x.id === roundId)
+    if (!r.on || !round || round.status !== 'open') throw new Error('round_not_open')
+    const open = this.read().filter((t) => !t.resolved)
+    const at = new Date().toISOString()
+    round.status = 'approved'; round.closedAt = at
+    r.approvals.push({ id: uid(), roundId, name: name.trim().slice(0, 80) || 'Guest', version: version ?? null, statement: APPROVAL_STATEMENT, origin: window.location.origin, openComments: open.length,
+      openList: open.slice(-200).map((t) => ({ page: t.page, author: t.author, text: t.text.slice(0, 300), at: t.createdAt })), at })
+    writeLocalRounds(this.project, r)
   }
   async remove(id: string) { this.write(this.read().filter((x) => x.id !== id)) }
   subscribe(cb: () => void) {
-    const on = (e: StorageEvent) => { if (e.key === this.key) cb() }
+    const on = (e: StorageEvent) => { if (e.key === this.key || e.key === roundsKey(this.project)) cb() }
     window.addEventListener('storage', on)
     return () => window.removeEventListener('storage', on)
   }
@@ -153,7 +222,7 @@ export function isThread(v: unknown): v is Thread {
     && Array.isArray(t.replies) && t.replies.every((r) => !!r && str(r.id, 64) && str(r.author, 80) && str(r.text, MAX_TEXT) && str(r.at, 40))
     && (t.anchor.b === undefined || (!!t.anchor.b && str(t.anchor.b.sel, MAX_SELECTOR) && num(t.anchor.b.rx) && num(t.anchor.b.ry) && num(t.anchor.b.x) && num(t.anchor.b.y) && num(t.anchor.b.vw)))
     && (t.kind === undefined || t.kind === 'comment' || t.kind === 'compare' || t.kind === 'voice')
-    && (t.version === undefined || str(t.version, 20)) && (t.audio === undefined || str(t.audio, 120))
+    && (t.version === undefined || str(t.version, 20)) && (t.audio === undefined || str(t.audio, 120)) && (t.round === undefined || str(t.round, 64))
 }
 
 /**

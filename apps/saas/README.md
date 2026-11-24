@@ -495,6 +495,14 @@ Everything else is the project's **published configuration**, built in the panel
       - counted and revoked.
 
       The shared page (`SharePage.tsx`) groups comments by page, with replies, CSV and print. In the demo, the list travels inside the link.
+  - **Rounds** (`#/app/rounds`, `src/pages/saas/Rounds.tsx`, data in `src/saas/rounds.ts`), shown under Results when **Settings → Review rounds** is on (`projects.rounds_on`, off by default; *Rounds included in your quote* 1–20 or unlimited, default 2, `projects.rounds_included`):
+    - the state (No round open / Round N open / Approved), "Round N of M" or "Extra round", and **Start round N** (name, optional "What changed" note and due date; one open round at a time; a warning when it is past the included number; ourhunch never bills);
+    - after starting: **Copy review link** and a ready-to-send message (reviewers are anonymous and get no email);
+    - the rounds, newest first: status, dates, comments in the round (open/completed), approvals; **Close round**, **Reopen** (latest only), **Edit**;
+    - **Approvals** with a printable record (`#/app/rounds/<approval id>/record`: project, site origin, round, version, approver, time with time zone, the statement confirmed, open comments at that moment);
+    - Comments show a round chip and filter by round (`?round=`); the CSV has a `round` column.
+    - In the widget (only with rounds on): a compact bar at the top of the window, inside the shadow root ("Round 2 of 2 · due 28 Nov", the note, **Approve this version**; collapsible, collapsed on phones). The approve dialog asks for a name and the checkbox "I've reviewed this version and approve it.", shows how many comments are still open, and says it is a record, not a legal signature. With no round open, reviewers read and reply but can't add comments; browsers the team opened with its own one-time link (`reviewers.team`) always can.
+    - Server: `review_rounds` and `round_approvals` (members under row level security; reviewers only through `current_round` and `approve_round`, which check origin, reviewer and a rate limit), `threads.round_id` set by a trigger, an approval email through the outbox (`supabase/migrations/20261124000000_review_rounds.sql`, tests in `supabase/tests/rounds_test.sql`). Demo: the same in this browser (`saas:vibe:<project>:rounds`, read by the demo site's widget).
   - **Team:** invites, kept as pending because no emails are sent yet.
   - **Settings:** account, password, log out, project, **Data** (clear comments, remove all reviewers, revoke review links, clear installation reports; each after typing the project id), and deleting a project or the workspace by typing to confirm (their published settings go too, so the snippet shows nothing). Where the widget runs is set per environment in Widget.
   - Several projects are supported; a project id is fixed once created because the snippet and comments use it.

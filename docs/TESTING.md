@@ -111,12 +111,34 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 6.5 | **Results → Component reviews** / **Voice notes** | Hanya jenis itu yang tampil | [ ] |
 | 6.6 | **Copy fix prompt** pada satu komentar, tempel di editor | Prompt berisi halaman, `Element:` (selector), `Seen on:`, tanpa nama reviewer | [ ] |
 | 6.7 | **Copy open as AI prompt** | Semua komentar terbuka dalam satu prompt bernomor | [ ] |
-| 6.8 | **CSV** | File terunduh; kolom page, kind, version, device, status, author, comment...; buka di Excel tanpa error/rumus aneh | [ ] |
+| 6.8 | **CSV** | File terunduh; kolom page, kind, version, round, device, status, author, comment...; buka di Excel tanpa error/rumus aneh | [ ] |
 | 6.9 | **Share list** → buat link → buka di Browser B (tidak login) | Daftar komentar tampil read-only | [ ] |
 | 6.10 | Cabut (revoke) share link → buka lagi | Link tidak berfungsi | [ ] |
 | 6.11 | **Open on site** pada komentar | Halaman situs terbuka di elemen terkait, sebagai reviewer | [ ] |
 | 6.12 | Hapus satu komentar (ikon tempat sampah) | Hilang setelah konfirmasi | [ ] |
 | 6.13 | Filter lalu **Delete these (n)** | Hanya yang terfilter terhapus | [ ] |
+
+---
+
+## 6b. Review rounds — **Settings → Review rounds**, **Results → Rounds**
+
+| # | Langkah | Hasil yang diharapkan | ✔ |
+|---|---|---|---|
+| 6b.1 | Project lama tanpa mengubah apa pun | Widget & komentar sama seperti sebelumnya, tidak ada bar ronde; menu Rounds tidak muncul | [ ] |
+| 6b.2 | Settings → **Review rounds** On, *Rounds included* = 2 | Toast "Review rounds on"; **Results → Rounds** muncul | [ ] |
+| 6b.3 | Browser B (reviewer) buka situs | Bar atas "Review rounds"/ronde terakhir + pesan "The team is working on your feedback…"; tombol Comment memberi pesan yang sama, tidak bisa komentar baru; balas komentar lama tetap bisa | [ ] |
+| 6b.4 | Pemilik (Open my site) di situs | Tetap bisa berkomentar walau tidak ada ronde | [ ] |
+| 6b.5 | Rounds → **Start round 1** (nama, What changed, due date) | Ronde Open; kotak hijau dengan **Copy message** "Round 1 is ready for your review: <link>" dan **Copy review link** | [ ] |
+| 6b.6 | **Start round** saat ronde lain masih open | Tombol nonaktif ("Close the open round first") | [ ] |
+| 6b.7 | Browser B: muat ulang (≤ 1 menit) | Bar "Round 1 of 2 · due …", **What changed** bisa dibuka, **Approve this version**; komentar baru bisa, chip ronde muncul di Comments panel | [ ] |
+| 6b.8 | Di HP (lebar < 640px) | Bar ringkas (bisa dibuka/tutup), tidak menggeser layout situs | [ ] |
+| 6b.9 | **Approve this version**: isi nama, centang, Confirm | Tampil "N comments are still open" bila ada; setelah Confirm: toast terima kasih, ronde jadi Approved, tidak bisa komentar baru | [ ] |
+| 6b.10 | Panel → Rounds | Ronde "Approved", "Approved by <nama> · waktu"; Approvals timeline; **Download record** → halaman record (project, situs, ronde, versi, nama, waktu + zona waktu, pernyataan, komentar terbuka); Print rapi | [ ] |
+| 6b.11 | Email (server, notifikasi tidak Off) | Dalam ≤ 5 menit email "<project>: <nama> approved Round 1" ke tim, tombol **Open Rounds** | [ ] |
+| 6b.12 | Start round 3 dengan included = 2 | Dialog memperingatkan "This is extra round 1 beyond the 2 included in this project."; label "Round 3 · Extra round" | [ ] |
+| 6b.13 | **Close round**, **Reopen** (hanya ronde terakhir), **Edit** nama/catatan/due | Berubah sesuai; Reopen tidak ada di ronde lama | [ ] |
+| 6b.14 | Comments → filter **Round**; CSV | Hanya komentar ronde itu; CSV punya kolom `round` | [ ] |
+| 6b.15 | Mode demo (tanpa server): ulangi 6b.2–6b.10 di demo site | Sama, data di browser ini | [ ] |
 
 ---
 

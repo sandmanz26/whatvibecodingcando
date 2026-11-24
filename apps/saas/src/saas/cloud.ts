@@ -13,7 +13,8 @@
  */
 import { supabase } from './supabase'
 import { parseConfig, publicConfig, type Release, type Seen } from '../core/embed/config'
-import type { Backend, Thread } from '../core/embed/store'
+import type { Backend, RoundInfo, Thread } from '../core/embed/store'
+import type { Approval } from './rounds'
 import type { Stats, SharedList, ShareRow } from './stats'
 import type { Invite, Notify, Project, SaasState } from './account'
 import { identify } from '../lib/analytics'
@@ -46,8 +47,13 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
     .eq('workspace_id', workspaceId).is('deleted_at', null).order('created_at')
     // Only the newest 50 releases of each project (what History shows), not every one ever published.
     .order('version', { referencedTable: 'releases', ascending: false }).limit(50, { referencedTable: 'releases' })
-  const first = await load('id, public_id, name, site_url, products, draft, notify, created_at, releases(version, config, created_at, created_by)')
-  const { data: rows, error } = (first.error?.code === '42703' ? await load('id, public_id, name, site_url, products, draft, created_at, releases(version, config, created_at, created_by)') : first) as unknown as { data: { id: string; public_id: string; name: string; site_url: string; products: string[] | null; draft: unknown; notify?: Notify; created_at: string; releases: unknown }[] | null; error: typeof first.error }
+  // Newer columns first; a server without a migration yet still loads its projects.
+  type Row = { id: string; public_id: string; name: string; site_url: string; products: string[] | null; draft: unknown; notify?: Notify; rounds_on?: boolean; rounds_included?: number | null; created_at: string; releases: unknown }
+  const rel = 'releases(version, config, created_at, created_by)'
+  let res = await load(`id, public_id, name, site_url, products, draft, notify, rounds_on, rounds_included, created_at, ${rel}`)
+  if (res.error?.code === '42703') res = await load(`id, public_id, name, site_url, products, draft, notify, created_at, ${rel}`)
+  if (res.error?.code === '42703') res = await load(`id, public_id, name, site_url, products, draft, created_at, ${rel}`)
+  const { data: rows, error } = res as unknown as { data: Row[] | null; error: typeof res.error }
   if (error) throw error
   dbIds.clear()
   const projects: Project[] = (rows ?? []).map((r) => {
@@ -61,7 +67,7 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
     return {
       id: r.public_id, name: r.name, siteUrl: r.site_url, products: r.products ?? [],
       widget: { position: 'right', shortcut: true, color: '#e8590c' }, domains: host ? [host] : [],
-      createdAt: r.created_at, ...(r.notify ? { notify: r.notify } : {}), ...(draft ? { config: draft } : {}), ...(releases.length ? { releases } : {}),
+      createdAt: r.created_at, ...(r.notify ? { notify: r.notify } : {}), ...(typeof r.rounds_on === 'boolean' ? { rounds: { on: r.rounds_on, included: r.rounds_included ?? null } } : {}), ...(draft ? { config: draft } : {}), ...(releases.length ? { releases } : {}),
       copiedSnippet: readCopied(r.public_id),
     }
   })
@@ -122,6 +128,10 @@ export async function pushCloud(prev: SaasState, next: SaasState): Promise<void>
       const { error } = await supabase.from('projects').update({ notify: p.notify }).eq('id', dbIds.get(p.id)!)
       if (error) throw error
     }
+    if (old && p.rounds && JSON.stringify(old.rounds) !== JSON.stringify(p.rounds)) {
+      const { error } = await supabase.from('projects').update({ rounds_on: p.rounds.on, rounds_included: p.rounds.included }).eq('id', dbIds.get(p.id)!)
+      if (error) throw error
+    }
     // releases: only ever appended
     const had = old?.releases?.length ?? 0
     const fresh = (p.releases ?? []).filter((r) => r.version > (old?.releases?.[had - 1]?.version ?? 0))
@@ -178,7 +188,7 @@ export const idSuffix = () => Array.from(crypto.getRandomValues(new Uint8Array(3
 interface ThreadRow {
   id: string; page: string; anchor: Thread['anchor']; author_name: string; text: string; created_at: string; edited_at: string | null
   resolved_at: string | null; resolved_by: string | null; replies: { id: string; author_name: string; text: string; created_at: string }[] | null
-  kind?: Thread['kind']; version?: string | null; audio?: string | null
+  kind?: Thread['kind']; version?: string | null; audio?: string | null; round_id?: string | null
 }
 const rowToThread = (r: ThreadRow): Thread => ({
   id: r.id, page: r.page, anchor: r.anchor, author: r.author_name, text: r.text, createdAt: r.created_at,
@@ -186,6 +196,7 @@ const rowToThread = (r: ThreadRow): Thread => ({
   ...(r.resolved_at ? { resolved: { by: r.resolved_by ?? '', at: r.resolved_at } } : {}),
   replies: [...(r.replies ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((x) => ({ id: x.id, author: x.author_name, text: x.text, at: x.created_at })),
   ...(r.kind && r.kind !== 'comment' ? { kind: r.kind } : {}), ...(r.version ? { version: r.version } : {}), ...(r.audio ? { audio: r.audio } : {}),
+  ...(r.round_id ? { round: r.round_id } : {}),
 })
 
 /**
@@ -231,10 +242,13 @@ export class PanelBackend implements Backend {
     const read = (select: string) => paged<ThreadRow>((from, to) => supabase!.from('threads').select(select).eq('project_id', this.id)
       .order('created_at', { ascending: false }).order('id').range(from, to), MAX_LIST)
     let rows: ThreadRow[]
-    try { rows = await read(`${cols}, kind, version, audio`) } catch (e) {
-      // A server without the review kinds yet (migration not run): the comments without them.
+    try { rows = await read(`${cols}, kind, version, audio, round_id`) } catch (e) {
+      // A server without review rounds or review kinds yet (migration not run): the comments without them.
       if ((e as { code?: string }).code !== '42703') throw e
-      rows = await read(cols)
+      try { rows = await read(`${cols}, kind, version, audio`) } catch (e2) {
+        if ((e2 as { code?: string }).code !== '42703') throw e2
+        rows = await read(cols)
+      }
     }
     const list = rows.reverse().map(rowToThread)
     this.last = new Map(list.map((t) => [t.id, t]))
@@ -427,3 +441,33 @@ export async function voiceUrl(path: string): Promise<string> {
   return data.signedUrl
 }
 
+
+/* ---------- review rounds ---------- */
+
+interface RoundRow { id: string; n: number; name: string; note: string; due: string | null; status: RoundInfo['status']; started_at: string; closed_at: string | null }
+interface ApprovalRow { id: string; round_id: string; name: string; version: string | null; statement: string; origin: string; open_comments: number; open_list: Approval['openList']; created_at: string }
+/** A project's rounds (newest first) and approvals, read under the members' row level security. */
+export async function listRoundsCloud(publicId: string): Promise<{ rounds: RoundInfo[]; approvals: Approval[] }> {
+  const id = dbIds.get(publicId)
+  if (!id) return { rounds: [], approvals: [] }
+  const rows = await paged<RoundRow>((from, to) => supabase!.from('review_rounds').select('id, n, name, note, due, status, started_at, closed_at').eq('project_id', id).order('n', { ascending: false }).range(from, to), 5000)
+  const appr = await paged<ApprovalRow>((from, to) => supabase!.from('round_approvals').select('id, round_id, name, version, statement, origin, open_comments, open_list, created_at').eq('project_id', id).order('created_at', { ascending: false }).order('id').range(from, to), 5000)
+  return {
+    rounds: rows.map((r) => ({ id: r.id, n: r.n, name: r.name, note: r.note, due: r.due, status: r.status, startedAt: r.started_at, closedAt: r.closed_at })),
+    approvals: appr.map((a) => ({ id: a.id, roundId: a.round_id, name: a.name, version: a.version, statement: a.statement, origin: a.origin, openComments: a.open_comments, openList: a.open_list ?? [], at: a.created_at })),
+  }
+}
+export async function startRoundCloud(publicId: string, r: { n: number; name: string; note: string; due: string | null }) {
+  const id = dbIds.get(publicId)
+  if (!id) throw new Error('This project isn’t on the server.')
+  const { data: u } = await supabase!.auth.getUser()
+  const { error } = await supabase!.from('review_rounds').insert({ project_id: id, n: r.n, name: r.name, note: r.note, due: r.due, created_by: u.user?.id })
+  if (error) throw new Error(error.code === '23505' ? 'Another round is already open. Close it first.' : error.message)
+}
+export async function updateRoundCloud(roundId: string, patch: { name?: string; note?: string; due?: string | null; status?: 'open' | 'closed' }) {
+  const row: Record<string, unknown> = { ...patch }
+  if (patch.status === 'closed') row.closed_at = new Date().toISOString()
+  if (patch.status === 'open') row.closed_at = null
+  const { error } = await supabase!.from('review_rounds').update(row).eq('id', roundId)
+  if (error) throw new Error(error.code === '23505' ? 'Another round is already open. Close it first.' : error.message)
+}

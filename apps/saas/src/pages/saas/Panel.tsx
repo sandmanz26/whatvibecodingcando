@@ -13,6 +13,7 @@ import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, deleteAccountCloud, lates
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
 import { PanelNav } from './Nav'
+import { roundsOf, serveRounds, useRounds } from '../../saas/rounds'
 import { download, fixPrompt, threadsCsv, toShared } from '../../saas/stats'
 import { LocalBackend, NS, STATUS_LABEL, deviceLine, pageUrl, statusOf, type Status, type Thread } from '../../core/embed/store'
 import '../../saas/saas.css'
@@ -80,7 +81,7 @@ export function PanelLayout() {
   const [exit, setExit] = useState<string | null>(null)
   useEffect(() => { setExit(null) }, [pathname])
   // The script reads each project's published settings (and draft, for previews) from the configuration stand-in.
-  useEffect(() => { for (const p of s.projects) serveProject(p) }, [s.projects])
+  useEffect(() => { for (const p of s.projects) { serveProject(p); serveRounds(p) } }, [s.projects])
   const ready = useSaasReady()
   // A change the server refused: say so (the panel has already been reloaded from the server).
   useEffect(() => {
@@ -340,6 +341,10 @@ export function Comments() {
   const { threads, backend, reload } = useThreads(project?.id, s.account?.name)
   const [q, setQ] = useState('')
   const [ver, setVer] = useState('')
+  const { rounds } = useRounds(project?.rounds?.on || threads.some((t) => t.round) ? project?.id : undefined)
+  const roundName = (id?: string) => rounds.find((r) => r.id === id)?.name
+  const round = params.get('round') ?? ''
+  const setRound = (v: string) => setParams(() => { const n = new URLSearchParams(params); if (v) n.set('round', v); else n.delete('round'); return n }, { replace: true })
   const [deleting, setDeleting] = useState<Thread | null>(null)
   const [bulk, setBulk] = useState(false)
   const status = (params.get('status') ?? 'all') as Status | 'all'
@@ -352,6 +357,7 @@ export function Comments() {
   const versions = [...new Set(threads.map((t) => t.version).filter((v): v is string => !!v))]
   const ofKind = threads.filter((t) => !kind || t.kind === kind)
   const shown = ofKind.filter((t) => !ver || t.version === ver)
+    .filter((t) => !round || (round === 'none' ? !t.round : t.round === round))
     .filter((t) => status === 'all' || statusOf(t) === status)
     .filter((t) => !q.trim() || `${t.text} ${t.author} ${t.page} ${t.replies.map((r) => r.text).join(' ')}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -365,7 +371,7 @@ export function Comments() {
     <div className="up-page">
       <div className="up-head"><div><h1>{kind === 'compare' ? 'Component reviews' : kind === 'voice' ? 'Voice notes' : 'Comments'}</h1><p>{kind === 'compare' ? 'A vs B comparisons your reviewers made' : kind === 'voice' ? 'Spoken notes your reviewers recorded' : 'Everything your reviewers left'} on “{project.name}”.{kind && <> <Link to="/app/comments">See all comments</Link></>}</p></div>
         <span className="up-row">
-          <button className="lp-btn" disabled={!threads.length} onClick={() => { track('comments_exported'); download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(toShared))) }}><Download size={14} /> CSV</button>
+          <button className="lp-btn" disabled={!threads.length} onClick={() => { track('comments_exported'); download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((t) => ({ ...toShared(t), round: roundName(t.round) ?? null })))) }}><Download size={14} /> CSV</button>
           <button className="lp-btn primary" onClick={() => setSharing(true)}><Share2 size={14} /> Share list</button>
         </span></div>
       {cloud
@@ -378,9 +384,10 @@ export function Comments() {
           {(['all', 'open', 'ongoing', 'completed'] as const).map((v) => <button key={v} aria-pressed={status === v} onClick={() => setStatus(v)}>{v === 'all' ? 'All' : STATUS_LABEL[v]} <span>{count(v)}</span></button>)}
         </div>
         {versions.length > 1 && <select className="up-select" value={ver} onChange={(e) => setVer(e.target.value)} aria-label="Version"><option value="">All versions</option>{versions.map((v) => <option key={v} value={v}>v{v}</option>)}</select>}
+        {rounds.length > 0 && <select className="up-select" value={round} onChange={(e) => setRound(e.target.value)} aria-label="Round"><option value="">All rounds</option>{rounds.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}<option value="none">No round</option></select>}
         <input className="up-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search comments" aria-label="Search comments" />
         {shown.some((t) => !t.resolved) && <button className="lp-btn sm" onClick={() => void copyPrompt(shown.filter((t) => !t.resolved))} title="The open comments shown, as one prompt for your AI coding tool"><Sparkles size={13} /> Copy open as AI prompt</button>}
-        {shown.length > 0 && <button className="lp-btn sm ghost danger" onClick={() => setBulk(true)}><Trash2 size={13} /> Delete {shown.length === ofKind.length && !q.trim() && !ver && status === 'all' ? 'all' : 'these'} ({shown.length})</button>}
+        {shown.length > 0 && <button className="lp-btn sm ghost danger" onClick={() => setBulk(true)}><Trash2 size={13} /> Delete {shown.length === ofKind.length && !q.trim() && !ver && !round && status === 'all' ? 'all' : 'these'} ({shown.length})</button>}
       </div>
       {shown.length === 0 ? <div className="up-card up-muted">{ofKind.length === 0 ? (kind === 'compare' ? 'No component reviews yet. Reviewers start one with the A vs B button in the widget.' : kind === 'voice' ? 'No voice notes yet. Reviewers record one with the microphone button in the widget.' : 'No comments yet.') : 'Nothing matches.'}</div> : (
         <ul className="up-inbox">
@@ -388,7 +395,7 @@ export function Comments() {
             const url = openUrl(t)
             return (
               <li key={t.id} className="up-card">
-                <div className="up-row"><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span>{t.kind === 'compare' && <span className="up-badge">A vs B</span>}{t.kind === 'voice' && <span className="up-badge">Voice</span>}{t.version && <span className="up-badge">v{t.version}</span>}<b>{t.author}</b><span className="up-muted">· {ago(t.createdAt)} · <code>{t.page}</code></span></div>
+                <div className="up-row"><span className={`up-badge st-${statusOf(t)}`}>{STATUS_LABEL[statusOf(t)]}</span>{t.kind === 'compare' && <span className="up-badge">A vs B</span>}{t.kind === 'voice' && <span className="up-badge">Voice</span>}{t.version && <span className="up-badge">v{t.version}</span>}{t.round && <span className="up-badge up-round-chip">{roundName(t.round) ?? 'Round'}</span>}<b>{t.author}</b><span className="up-muted">· {ago(t.createdAt)} · <code>{t.page}</code></span></div>
                 <p className="up-text">{t.text}</p>
                 {deviceLine(t.anchor) && <p className="up-device">{deviceLine(t.anchor)}</p>}
                 {t.kind === 'compare' && t.anchor.b && <p className="up-muted">A: <code>{t.anchor.sel}</code> · B: <code>{t.anchor.b.sel}</code></p>}
@@ -501,6 +508,7 @@ export function SettingsPage() {
             {projectDirty && <button className="lp-btn sm ghost" onClick={() => setPname(project.name)}>Cancel</button>}</div>
         </section>
       )}
+      {project && <RoundsCard />}
       {project && <DataCard project={project} />}
       <section className="up-card danger">
         <h2>Danger zone</h2>
@@ -538,6 +546,29 @@ export function SettingsPage() {
         </Modal>
       )}
     </div>
+  )
+}
+
+/** Settings → Review rounds: on or off, and how many rounds the quote includes. */
+function RoundsCard() {
+  const { project, setProject } = usePanel()
+  const { toast } = useStore()
+  if (!project) return null
+  const r = roundsOf(project)
+  const set = (next: { on: boolean; included: number | null }, msg: string) => { if (setProject((p) => ({ ...p, rounds: next }))) { if (next.on !== r.on) track(next.on ? 'rounds_turned_on' : 'rounds_turned_off'); toast(msg) } }
+  return (
+    <section className="up-card">
+      <h2>Review rounds</h2>
+      <div className="up-row"><span className="lp-grow">Work in rounds with your client: they comment while a round is open and can approve the version. Between rounds they can read and reply but not add comments; your team always can.</span>
+        <Switch checked={r.on} onChange={() => set({ ...r, on: !r.on }, r.on ? 'Review rounds off' : 'Review rounds on')} label="Review rounds" /></div>
+      <label className="lp-field">Rounds included in your quote
+        <select className="up-select" value={r.included == null ? 'unlimited' : String(r.included)} disabled={!r.on} onChange={(e) => set({ ...r, included: e.target.value === 'unlimited' ? null : Number(e.target.value) }, 'Saved')}>
+          {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+          <option value="unlimited">Unlimited</option>
+        </select>
+        <span className="lp-hint">Rounds past this number are labelled “Extra round”. ourhunch never bills for rounds. {r.on && <Link to="/app/rounds">Open Rounds</Link>}</span>
+      </label>
+    </section>
   )
 }
 

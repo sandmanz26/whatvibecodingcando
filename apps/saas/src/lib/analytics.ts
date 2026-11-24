@@ -19,7 +19,7 @@ export const analyticsOn = /^phc_[A-Za-z0-9]{20,}$/.test(KEY)
 export type FunnelEvent =
   | 'signup_completed' | 'login_completed' | 'onboarding_completed' | 'snippet_copied' | 'site_updated'
   | 'open_my_site' | 'script_detected' | 'review_link_created' | 'first_comment_received' | 'study_created'
-  | 'comments_exported' | 'fix_prompt_copied'
+  | 'comments_exported' | 'fix_prompt_copied' | 'rounds_turned_on' | 'rounds_turned_off' | 'round_started'
 
 let ph: PostHog | null = null
 let started = false

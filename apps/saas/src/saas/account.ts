@@ -31,6 +31,8 @@ export interface Project {
   releases?: Release[]
   /** how the team hears about new feedback by email (server only; absent = 'instant') */
   notify?: Notify
+  /** review rounds: off by default; rounds included in the quote (null: unlimited) */
+  rounds?: { on: boolean; included: number | null }
   createdAt: string
 }
 export type Notify = 'instant' | 'daily' | 'off'
