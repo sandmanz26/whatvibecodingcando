@@ -8,6 +8,8 @@
  * different threads don't overwrite each other.
  */
 
+import { fingerprint, isFp, type AnchorState, type Fp } from './anchor'
+
 export interface Anchor {
   /** CSS selector of the element the comment was dropped on */
   sel: string
@@ -19,7 +21,11 @@ export interface Anchor {
   y: number
   vw: number
   /** the second element of a comparison (A vs B) */
-  b?: Omit<Anchor, 'b' | 'device'>
+  b?: Omit<Anchor, 'b' | 'device' | 'st'>
+  /** the element's fingerprint, to find it again after a redeploy (anchor.ts); older comments have none */
+  fp?: Fp
+  /** the last state the widget saw: ok, moved ("Moved?") or gone, and the site version it was first seen in */
+  st?: AnchorState
   /** the reviewer's browser, system and window size when they commented (for bug reports; nothing personal) */
   device?: DeviceInfo
 }
@@ -221,6 +227,7 @@ export function isThread(v: unknown): v is Thread {
     && !!t.anchor && str(t.anchor.sel, MAX_SELECTOR) && num(t.anchor.rx) && num(t.anchor.ry) && num(t.anchor.x) && num(t.anchor.y) && num(t.anchor.vw)
     && Array.isArray(t.replies) && t.replies.every((r) => !!r && str(r.id, 64) && str(r.author, 80) && str(r.text, MAX_TEXT) && str(r.at, 40))
     && (t.anchor.b === undefined || (!!t.anchor.b && str(t.anchor.b.sel, MAX_SELECTOR) && num(t.anchor.b.rx) && num(t.anchor.b.ry) && num(t.anchor.b.x) && num(t.anchor.b.y) && num(t.anchor.b.vw)))
+    && (t.anchor.fp === undefined || isFp(t.anchor.fp)) && (t.anchor.st === undefined || (!!t.anchor.st && typeof t.anchor.st === 'object'))
     && (t.kind === undefined || t.kind === 'comment' || t.kind === 'compare' || t.kind === 'voice')
     && (t.version === undefined || str(t.version, 20)) && (t.audio === undefined || str(t.audio, 120)) && (t.round === undefined || str(t.round, 64))
 }
@@ -302,7 +309,19 @@ export function anchorAt(el: Element, clientX: number, clientY: number): Anchor 
     x: clientX + window.scrollX,
     y: clientY + window.scrollY,
     vw: window.innerWidth,
+    fp: fingerprint(el),
   }
+}
+
+/**
+ * The anchor moved onto another element (a confirmed "Moved?" or a re-pick): a fresh selector and
+ * fingerprint, the reviewer's device and comparison kept. Without a click, the spot on the element stays.
+ */
+export function relocate(a: Anchor, el: Element, version?: string, clientX?: number, clientY?: number): Anchor {
+  const r = el.getBoundingClientRect()
+  const cx = clientX ?? r.left + a.rx * r.width, cy = clientY ?? r.top + a.ry * r.height
+  const next = anchorAt(el, cx, cy)
+  return { ...a, ...next, st: { s: 'ok', ...(version ? { v: version } : {}), at: new Date().toISOString() } }
 }
 
 /** Where a pin is now, in viewport pixels. `lost` when its element is no longer on the page. */

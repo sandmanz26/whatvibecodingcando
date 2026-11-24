@@ -350,6 +350,21 @@ The first step towards a hosted product: one script tag adds comments to any sit
   - **Comment text** is rendered as text only (no `innerHTML`).
 - **Storage.** Code is in `src/embed/`. For now there is `LocalBackend` (localStorage per project), so teammates don't see each other's comments yet. The widget only talks to a `Backend` interface (`list`, `upsert` one thread, `remove` one, `subscribe` to changes elsewhere). A shared database needs only a new implementation of that interface, plus decisions on accounts, project keys and allowed domains.
 
+### Pins that survive redeploys
+
+The script's pins find their element again after the customer's site changes (`src/core/embed/anchor.ts`).
+
+- **Saved with every new comment** (inside the anchor JSON, as `anchor.fp`): tag, stable attributes (`data-hunch`, `data-testid`/`data-test`/`data-cy`, id unless it looks generated, `aria-label`, `name`, `role`, link path, `alt`, `title`, `type`), up to 80 characters of visible text (masked; never from form fields, editable areas or anything marked private), four ancestors (tag + stable id/role/test id + one stable class), the index among same-tag siblings, the nearest landmark or heading, and the position on the page. Generated ids and classes (React `:r1:`, hashes, CSS modules, styled-components/emotion `css-…`, Tailwind arbitrary values) are ignored. The old selector and click position stay as they were.
+- **On load, on route changes and after DOM changes** (debounced, when the browser is idle, at most 400 candidates per tag): same-tag elements are scored (`data-hunch` decides alone, then test ids, id, labels, text, ancestors, sibling index, position). Three outcomes:
+  - **confident** (score ≥ 0.72 and clearly ahead of the next): a normal pin;
+  - **uncertain** (≥ 0.42, or two candidates tie): a dashed pin labelled **Moved?**; its card offers **Yes, this one** and **Pick element**;
+  - **not found**: a grey pin at its last position, "Element changed or removed" and what it was on (button “Buy now”), with **Pick element**.
+  A pin never jumps silently to a doubtful element (two buttons with the same label are told apart by ancestors, index and position, and a tie is "Moved?").
+- **Saved state:** the widget reports moved/gone (and ok again) once per comment, and a confirmation or re-pick saves the new anchor, through the Backend: in the browser demo the stored thread, on the server `set_anchor` (migration `20261124000000_anchor_state.sql`; any reviewer of the project, own rate limit; the server sets the site version the state was first seen in, `anchor.st`). Comments made before this keep the old selector behaviour.
+- **Panel:** Comments → **Needs re-pin** lists open comments whose pin was last seen moved or gone ("was on: button “Buy now” · not found since v2.3"); close them, or re-pin on the site (Open on site).
+- **Tip for customers:** `data-hunch="name"` on important elements keeps pins 100% stable (Install page and Guide).
+- **Tests:** `node apps/saas/tests/anchor.test.ts` (Node 22.18+, no dependencies) checks the pure scoring and fingerprint helpers; the database side is `supabase/tests/anchor_test.sql`.
+
 ### Widget settings (0.2)
 
 The snippet carries only the project, so it never has to change:
@@ -502,7 +517,7 @@ Everything else is the project's **published configuration**, built in the panel
     - **Approvals** with a printable record (`#/app/rounds/<approval id>/record`: project, site origin, round, version, approver, time with time zone, the statement confirmed, open comments at that moment);
     - Comments show a round chip and filter by round (`?round=`); the CSV has a `round` column.
     - In the widget (only with rounds on): a compact bar at the top of the window, inside the shadow root ("Round 2 of 2 · due 28 Nov", the note, **Approve this version**; collapsible, collapsed on phones). The approve dialog asks for a name and the checkbox "I've reviewed this version and approve it.", shows how many comments are still open, and says it is a record, not a legal signature. With no round open, reviewers read and reply but can't add comments; browsers the team opened with its own one-time link (`reviewers.team`) always can.
-    - Server: `review_rounds` and `round_approvals` (members under row level security; reviewers only through `current_round` and `approve_round`, which check origin, reviewer and a rate limit), `threads.round_id` set by a trigger, an approval email through the outbox (`supabase/migrations/20261124000000_review_rounds.sql`, tests in `supabase/tests/rounds_test.sql`). Demo: the same in this browser (`saas:vibe:<project>:rounds`, read by the demo site's widget).
+    - Server: `review_rounds` and `round_approvals` (members under row level security; reviewers only through `current_round` and `approve_round`, which check origin, reviewer and a rate limit), `threads.round_id` set by a trigger, an approval email through the outbox (`supabase/migrations/20261124100000_review_rounds.sql`, tests in `supabase/tests/rounds_test.sql`). Demo: the same in this browser (`saas:vibe:<project>:rounds`, read by the demo site's widget).
   - **Team:** invites, kept as pending because no emails are sent yet.
   - **Settings:** account, password, log out, project, **Data** (clear comments, remove all reviewers, revoke review links, clear installation reports; each after typing the project id), and deleting a project or the workspace by typing to confirm (their published settings go too, so the snippet shows nothing). Where the widget runs is set per environment in Widget.
   - Several projects are supported; a project id is fixed once created because the snippet and comments use it.

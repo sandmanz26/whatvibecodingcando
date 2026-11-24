@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff, Columns2, Mic, Square, Play, ChevronDown, BadgeCheck } from 'lucide-react'
 import { audioUrl, uploadAudio } from './server'
 import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
-import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, canCommentNow, deviceNow, pageKey, pageUrl, place, statusOf, uid, type Anchor, type Backend, type Reply, type RoundState, type Status, type Thread } from './store'
+import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, canCommentNow, deviceNow, pageKey, pageUrl, place, relocate, statusOf, uid, type Anchor, type Backend, type Reply, type RoundState, type Status, type Thread } from './store'
 import { takeHint } from './hints'
+import { describe, findAll, isFp, stateOf, type PinState } from './anchor'
 
 export interface Config {
   project: string
@@ -47,6 +48,8 @@ const typing = (e: KeyboardEvent) => {
 }
 
 type Kind = 'comment' | 'compare' | 'voice'
+interface Spot { x: number; y: number; lost: boolean; state: PinState }
+interface Seen { state: 'ok' | 'moved' | 'gone'; el: Element | null }
 interface Draft { anchor: Anchor; page: string; text: string; kind?: Kind; verdict?: string }
 const VERDICTS = ['A is better', 'B is better', 'Both need work']
 
@@ -55,6 +58,10 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const [loaded, setLoaded] = useState(false)
   const [page, setPage] = useState(pageKey)
   const [placing, setPlacing] = useState(false)
+  /** re-picking the element of this comment (a "Moved?" or lost pin) */
+  const [repick, setRepick] = useState<string | null>(null)
+  /** where each fingerprinted comment's element is now, and how sure that is */
+  const [found, setFound] = useState<Map<string, Seen>>(() => new Map())
   const [placingKind, setPlacingKind] = useState<Kind>('comment')
   const [pickA, setPickA] = useState<Anchor | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -203,6 +210,20 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     if (placingKind === 'compare' && pickA) { setDraft({ anchor: { ...pickA, b: at }, page, text: '', kind: 'compare', verdict: VERDICTS[0] }); setPickA(null); return }
     setDraft({ anchor: at, page, text: '', kind: placingKind })
   }
+  const dropRepick = (e: React.MouseEvent) => {
+    const overlay = e.currentTarget as HTMLElement
+    overlay.style.pointerEvents = 'none'
+    const prev = host.style.pointerEvents
+    host.style.pointerEvents = 'none'
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    host.style.pointerEvents = prev
+    overlay.style.pointerEvents = ''
+    const t = threads.find((x) => x.id === repick)
+    setRepick(null)
+    if (!t || !el || el === document.documentElement || el === document.body) { say('Click on the page’s content to pick the element.', true); return }
+    repin(t, el, e.clientX, e.clientY)
+    setOpenId(t.id)
+  }
   const post = () => {
     if (!draft || (!draft.text.trim() && draft.kind !== 'compare')) return
     const text = draft.kind === 'compare' ? `${draft.verdict ?? VERDICTS[0]}${draft.text.trim() ? ` — ${draft.text.trim()}` : ''}` : draft.text.trim()
@@ -224,7 +245,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   }
   const openThread = (id: string) => { if (busy()) return; setDraft(null); setOpenId((cur) => (cur === id ? null : id)) }
   const reveal = (t: Thread) => {
-    const p = place(t.anchor)
+    const p = spot(t)
     if (p.y < 60 || p.y > window.innerHeight - 60) window.scrollBy({ top: p.y - window.innerHeight / 3 })
     setOpenId(t.id)
   }
@@ -257,7 +278,8 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (tool) return
-        if (placing) { setPlacing(false); setPickA(null) }
+        if (repick) setRepick(null)
+        else if (placing) { setPlacing(false); setPickA(null) }
         else if (draft) setDraft(null)
         else if (openId) setOpenId(null)
         else if (panel) setPanel(false)
@@ -272,6 +294,69 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   /* ---- what is on this page ---- */
   const here = useMemo(() => (config.comments ? threads : []).filter((t) => t.page === page).sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [threads, page])
   const number = (t: Thread) => here.indexOf(t) + 1
+
+  /* ---- finding pins again after the page changed (anchor.ts) ---- */
+  // Runs when the comments or the page change and when the host page's DOM changes (at most about
+  // once a second, when the browser is idle). Older comments without a fingerprint keep the selector.
+  const pageAt = useRef(Date.now())
+  useEffect(() => { pageAt.current = Date.now() }, [page])
+  const reported = useRef(new Set<string>())
+  const hereRef = useRef(here)
+  hereRef.current = here
+  useEffect(() => {
+    let timer = 0, idle = 0, alive = true
+    const run = () => {
+      timer = 0
+      if (!alive) return
+      const list = hereRef.current.filter((t) => isFp(t.anchor.fp))
+      if (!list.length) { setFound((m) => (m.size ? new Map() : m)); return }
+      const res = findAll(list.map((t) => ({ fp: t.anchor.fp!, sel: t.anchor.sel })), host)
+      setFound(new Map(list.map((t, k) => [t.id, { state: res[k].state, el: res[k].el }])))
+      // The page may still be drawing: states are reported once it has had a moment to settle.
+      const age = Date.now() - pageAt.current
+      if (age < 1800) { schedule(1900 - age); return }
+      list.forEach((t, k) => report(t, res[k].state))
+    }
+    const schedule = (ms: number) => {
+      if (timer) return
+      timer = window.setTimeout(() => {
+        const ric = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback
+        if (ric) idle = ric(run, { timeout: 1000 }); else run()
+      }, ms)
+    }
+    schedule(120)
+    const mo = new MutationObserver((recs) => { if (recs.some((r) => r.target !== host && !host.contains(r.target))) schedule(900) })
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['id', 'class', 'hidden', 'data-hunch', 'data-testid', 'aria-label', 'href'] })
+    return () => { alive = false; mo.disconnect(); window.clearTimeout(timer); const c = (window as { cancelIdleCallback?: (n: number) => void }).cancelIdleCallback; if (idle && c) c(idle) }
+  }, [here, page, host]) // eslint-disable-line react-hooks/exhaustive-deps
+  /** Tells the panel when a pin needs re-pinning (or is fine again): once per comment and state, quietly. */
+  const report = (t: Thread, state: Seen['state']) => {
+    const was = stateOf(t.anchor.st)?.s ?? 'ok'
+    const key = `${t.id}:${state}`
+    if (was === state || reported.current.has(key)) return
+    reported.current.add(key)
+    const next: Thread = { ...t, anchor: { ...t.anchor, st: { s: state, ...(config.version ? { v: config.version } : {}), at: new Date().toISOString() } } }
+    setThreads((l) => l.map((x) => (x.id === t.id ? next : x)))
+    void backend.upsert(next).catch(() => { /* best effort: reported again next time */ })
+  }
+  /** Where a pin is now, in viewport pixels, and its state. */
+  const spot = (t: Thread): Spot => {
+    const f = found.get(t.id)
+    if (!isFp(t.anchor.fp) || !f) return { ...place(t.anchor), state: 'legacy' }
+    if (f.el && f.el.isConnected) {
+      const r = f.el.getBoundingClientRect()
+      if (r.width || r.height) return { x: r.left + t.anchor.rx * r.width, y: r.top + t.anchor.ry * r.height, lost: false, state: f.state }
+    }
+    const a = t.anchor
+    return { x: a.x * (window.innerWidth / (a.vw || window.innerWidth)) - window.scrollX, y: a.y - window.scrollY, lost: true, state: 'gone' }
+  }
+  /** "Yes, this one" and "Pick element": the anchor moves to the element and is saved for everyone. */
+  const repin = (t: Thread, el: Element, x?: number, y?: number) => {
+    const next: Thread = { ...t, anchor: relocate(t.anchor, el, config.version, x, y) }
+    setFound((m) => new Map(m).set(t.id, { state: 'ok', el }))
+    reported.current.add(`${t.id}:ok`)
+    void save(next, 'Pin updated')
+  }
   const openOnPage = here.filter((t) => !t.resolved).length
   const open = here.find((t) => t.id === openId)
 
@@ -285,13 +370,16 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
         catch (e) { say(/rate_limited/.test((e as Error).message) ? 'Too many tries. Wait a minute and try again.' : /round_not_open/.test((e as Error).message) ? 'This round is no longer open.' : 'The approval couldn’t be saved. Try again.', true); void loadRounds(); return false }
       }} />}
       {here.map((t) => {
-        const p = place(t.anchor)
+        const p = spot(t)
         if (p.y < -20 || p.y > window.innerHeight + 20) return null
+        const moved = p.state === 'moved' && !t.resolved
+        const gone = p.state === 'gone' && !t.resolved
         return (
-          <button key={t.id} className={`vc-pin st-${statusOf(t)} ${openId === t.id ? 'sel' : ''} ${p.lost ? 'lost' : ''}`} style={{ left: p.x, top: p.y }}
-            onClick={() => openThread(t.id)} aria-label={`Comment ${number(t)} by ${t.author}, ${STATUS_LABEL[statusOf(t)]}`}
-            title={p.lost ? 'The element this comment was on is no longer on the page; shown where it was.' : undefined}>
+          <button key={t.id} className={`vc-pin st-${statusOf(t)} ${openId === t.id ? 'sel' : ''} ${p.lost ? 'lost' : ''} ${moved ? 'moved' : ''} ${gone ? 'gone' : ''}`} style={{ left: p.x, top: p.y }}
+            onClick={() => openThread(t.id)} aria-label={`Comment ${number(t)} by ${t.author}, ${STATUS_LABEL[statusOf(t)]}${moved ? ', moved?' : gone ? ', element changed or removed' : ''}`}
+            title={gone ? `Element changed or removed: ${describe(t.anchor.fp)}` : moved ? 'This element may have moved: open to confirm' : p.lost ? 'The element this comment was on is no longer on the page; shown where it was.' : undefined}>
             {t.resolved ? <Check size={12} /> : number(t)}
+            {moved && <span className="vc-pin-tag">Moved?</span>}
           </button>
         )
       })}
@@ -326,12 +414,14 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
       })()}
 
       {open && (() => {
-        const p = place(open.anchor)
+        const p = spot(open)
         const q = open.kind === 'compare' && open.anchor.b ? place(open.anchor.b) : null
-        return <>{q && <><span className="vc-ab" style={{ left: p.x, top: p.y }}>A</span><span className="vc-ab" style={{ left: q.x, top: q.y }}>B</span></>}<Card x={p.x} y={p.y} label={`Comment ${number(open)}`}><ThreadView t={open} n={number(open)} me={me} lost={p.lost} onSave={save} onRemove={remove} onClose={() => setOpenId(null)} /></Card></>
+        return <>{q && <><span className="vc-ab" style={{ left: p.x, top: p.y }}>A</span><span className="vc-ab" style={{ left: q.x, top: q.y }}>B</span></>}<Card x={p.x} y={p.y} label={`Comment ${number(open)}`}><ThreadView t={open} n={number(open)} me={me} lost={p.lost} pin={open.resolved ? 'ok' : p.state}
+          onConfirm={() => { const el = found.get(open.id)?.el; if (el) repin(open, el) }} onRepick={() => { setOpenId(null); setRepick(open.id) }} onSave={save} onRemove={remove} onClose={() => setOpenId(null)} /></Card></>
       })()}
 
       {pickA && placing && (() => { const a = place(pickA); return <span className="vc-ab" style={{ left: a.x, top: a.y }}>A</span> })()}
+      {repick && <div className="vc-overlay" onClick={dropRepick}><div className="vc-hint">Click the element this comment is about · Esc to cancel</div></div>}
       {placing && <div className="vc-overlay" onClick={drop}><div className="vc-hint">{placingKind === 'compare' ? (pickA ? 'Now click the second element (B) · Esc to cancel' : 'Click the first element (A) · Esc to cancel') : placingKind === 'voice' ? 'Click where your voice note is about · Esc to cancel' : 'Click anywhere to comment · Esc to cancel'}</div></div>}
 
       {panel && (
@@ -424,8 +514,8 @@ function Card({ x, y, label, shake, children }: { x: number; y: number; label: s
   return <div key={shake} className={`vc-card ${shake ? 'shake' : ''}`} style={style} role="dialog" aria-label={label}>{children}</div>
 }
 
-function ThreadView({ t, n, me, lost, onSave, onRemove, onClose }: {
-  t: Thread; n: number; me: string; lost: boolean
+function ThreadView({ t, n, me, lost, pin, onConfirm, onRepick, onSave, onRemove, onClose }: {
+  t: Thread; n: number; me: string; lost: boolean; pin: PinState; onConfirm: () => void; onRepick: () => void
   onSave: (t: Thread, msg?: string) => Promise<void>; onRemove: (t: Thread) => Promise<void>; onClose: () => void
 }) {
   const [edit, setEdit] = useState<string | null>(null)
@@ -468,7 +558,13 @@ function ThreadView({ t, n, me, lost, onSave, onRemove, onClose }: {
           </div>
         </div>
       )}
-      {lost && <p className="vc-lost"><MapPinOff size={12} /> The element it was on isn’t on the page now.</p>}
+      {pin === 'moved' ? (
+        <div className="vc-repin"><p className="vc-lost"><MapPinOff size={12} /> Moved? The page changed; this may be the element it was on ({describe(t.anchor.fp)}).</p>
+          <div className="vc-row"><button className="vc-btn primary" onClick={onConfirm}><Check size={13} /> Yes, this one</button><button className="vc-btn" onClick={onRepick}>Pick element</button></div></div>
+      ) : pin === 'gone' ? (
+        <div className="vc-repin"><p className="vc-lost"><MapPinOff size={12} /> Element changed or removed. It was on {describe(t.anchor.fp)}.</p>
+          <div className="vc-row"><button className="vc-btn" onClick={onRepick}>Pick element</button></div></div>
+      ) : lost && <p className="vc-lost"><MapPinOff size={12} /> The element it was on isn’t on the page now.</p>}
       {t.replies.length > 0 && (
         <ol className="vc-replies" aria-label="Replies">
           {t.replies.map((r) => (
