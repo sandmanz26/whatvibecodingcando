@@ -217,6 +217,17 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 
 Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.md` (query `cron.job_run_details`, `net._http_response`, log Edge Function).
 
+## 10c. Panel ops internal (`/app#/ops`, hanya founder)
+
+| # | Langkah | Hasil yang diharapkan | ✔ |
+|---|---|---|---|
+| 1 | Login sebagai user biasa, buka `/app#/ops` | Halaman "Not found"; tidak ada link "Ops" di menu samping | |
+| 2 | Jalankan SQL admin di README Supabase ("Internal ops panel") untuk email Anda, reload panel | Link "Ops" muncul di menu samping | |
+| 3 | Buka Ops | Kotak angka, grafik signup/proyek per hari, funnel dengan persen, meter "Founding seats N / 200", tabel user, log aksi | |
+| 4 | Cari user lewat email, ganti halaman (Next/Previous), klik email | Hasil sesuai; laci detail menampilkan workspace/proyek tanpa teks komentar | |
+| 5 | "Set plan" → Founding + catatan → Save | Badge berubah; baris baru di "Recent admin actions" | |
+| 6 | Build demo (tanpa Supabase), buka `/app#/ops` | "Ops needs the server" | |
+
 ## 11. Keamanan & privasi (cek cepat)
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
