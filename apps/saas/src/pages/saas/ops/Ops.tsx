@@ -8,6 +8,7 @@ import { useStore } from '../../../store/store'
 import {
   PLANS, PLAN_LABEL, WIDGET_HELP, WIDGET_LABEL, WIDGET_STATES, amAdmin, opsEmail, opsSignIn, opsSignOut, opsAudit, opsDaily, opsFunnel, opsOverview, opsSetPlan, opsUserDetail, opsUsers,
   type AuditRow, type Day, type Funnel, type OpsUser, type Overview, type Plan, type UserDetail, type UserSort, type WidgetState,
+  opsBilling, opsBillingFor, type BillingOverview, type SubRow,
 } from '../../../saas/ops'
 
 const PAGE = 50
@@ -115,7 +116,7 @@ function OpsPanel({ onOut }: { onOut: () => void }) {
           <div className="ops-two">
             <section className="up-card"><h2>Signups and new projects per day</h2>{daily ? <DailyChart rows={daily} /> : <p className="up-muted">Loading…</p>}</section>
             <section className="up-card"><h2>Funnel, last {days} days</h2>{funnel ? <FunnelBars f={funnel} /> : <p className="up-muted">Loading…</p>}
-              {ov && <Founding n={ov.plans.founding ?? 0} limit={ov.founding_limit} />}</section>
+              <BillingBox /></section>
           </div>
           <Users onChanged={() => { refresh(); toast('Plan saved') }} />
           <section className="up-card"><h2>Recent admin actions</h2>{audit ? <Audit rows={audit} /> : <p className="up-muted">Loading…</p>}</section>
@@ -192,6 +193,20 @@ function FunnelBars({ f }: { f: Funnel }) {
   )
 }
 
+/** Billing: whether it's on, subscriptions by status, and founding seats from real subscriptions. */
+function BillingBox() {
+  const [b, setB] = useState<BillingOverview | null>(null)
+  useEffect(() => { let live = true; void opsBilling().then((v) => { if (live) setB(v) }).catch(() => { /* older database: no billing yet */ }); return () => { live = false } }, [])
+  if (!b) return null
+  const st = Object.entries(b.by_status)
+  return (
+    <>
+      <Founding n={b.founding_active} limit={b.founding_limit} />
+      <p className="up-muted">Billing {b.billing_enabled ? <b>on</b> : 'off (free beta)'} · {b.founding_held ? `${fmt(b.founding_held)} seat(s) held at checkout · ` : ''}paid sites {fmt(b.paid_sites)}{st.length ? ` · ${st.map(([k, v]) => `${k} ${fmt(v)}`).join(', ')}` : ' · no subscriptions'}</p>
+    </>
+  )
+}
+
 function Founding({ n, limit }: { n: number; limit: number }) {
   return (
     <div className="ops-founding">
@@ -212,6 +227,8 @@ function Users({ onChanged }: { onChanged: () => void }) {
   const [n, setN] = useState(0)
   const [wstate, setWstate] = useState<WidgetState | ''>('')
   const [sort, setSort] = useState<UserSort>('created')
+  const [subs, setSubs] = useState<Record<string, SubRow[]>>({})
+  useEffect(() => { if (!data?.rows.length) return; let live = true; void opsBillingFor(data.rows.map((u) => u.id)).then((v) => { if (live) setSubs(v ?? {}) }).catch(() => { /* older database */ }); return () => { live = false } }, [data])
   useEffect(() => { const t = window.setTimeout(() => { setSearch(q.trim()); setOffset(0) }, 300); return () => window.clearTimeout(t) }, [q])
   useEffect(() => {
     let live = true
@@ -228,7 +245,7 @@ function Users({ onChanged }: { onChanged: () => void }) {
       {err && <div className="up-warn">{err}</div>}
       <div className="ops-tablewrap">
         <table className="ops-table">
-          <thead><tr><th>Email</th><th>Widget</th><th>Last script seen</th><th>Last activity</th><th>Last comment</th><th className="num" title="Last 7 days / total">Comments 7d / all</th><th className="num">Reviewers</th><th className="num" title="Studies / finished results">Studies / results</th><th>Rounds</th><th>Signed up</th><th>Last sign-in</th><th>Via</th><th className="num">Projects</th><th>Plan</th><th /></tr></thead>
+          <thead><tr><th>Email</th><th>Widget</th><th>Last script seen</th><th>Last activity</th><th>Last comment</th><th className="num" title="Last 7 days / total">Comments 7d / all</th><th className="num">Reviewers</th><th className="num" title="Studies / finished results">Studies / results</th><th>Rounds</th><th>Signed up</th><th>Last sign-in</th><th>Via</th><th className="num">Projects</th><th>Plan</th><th>Subscription</th><th /></tr></thead>
           <tbody>
             {data?.rows.map((u) => (
               <tr key={u.id}>
@@ -239,10 +256,11 @@ function Users({ onChanged }: { onChanged: () => void }) {
                 <td>{date(u.created_at)}</td><td>{date(u.last_sign_in_at)}</td><td>{u.provider}</td>
                 <td className="num">{fmt(u.projects)}</td>
                 <td><span className={`up-badge plan-${u.plan}`}>{PLAN_LABEL[u.plan] ?? u.plan}</span></td>
+                <td>{subs[u.id]?.length ? subs[u.id].map((x) => `${x.status} · ${x.quantity} site${x.quantity === 1 ? '' : 's'} · ${x.price_tier}`).join('; ') : '—'}</td>
                 <td><button className="lp-btn sm" onClick={() => setPlanFor(u)}>Set plan</button></td>
               </tr>
             ))}
-            {data && !data.rows.length && <tr><td colSpan={15} className="up-muted">No users match.</td></tr>}
+            {data && !data.rows.length && <tr><td colSpan={16} className="up-muted">No users match.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -270,7 +288,7 @@ function SetPlan({ user, onClose, onSaved }: { user: OpsUser; onClose: () => voi
     try { await opsSetPlan(user.id, plan, note.trim()); onSaved() } catch (e) { toast(`Not saved: ${(e as Error).message}`, 'error') } finally { setBusy(false) }
   }
   return (
-    <Modal title="Set plan" description={`For ${user.email ?? user.id}. Billing is not built: this only changes the label. Logged.`} onClose={onClose}
+    <Modal title="Set plan" description={`For ${user.email ?? user.id}. An override: a workspace with an active subscription follows the subscription instead. With billing on, Pro / Pro beta / Founding here mean no site limit. Logged.`} onClose={onClose}
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={() => void save()}>Save plan</button></>}>
       <div className="stack gap-12">
         <div className="field"><label htmlFor="ops-plan">Plan</label>

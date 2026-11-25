@@ -27,6 +27,8 @@ Analytics hanya ada di website (`/`, `apps/landing/src/analytics.ts`) dan aplika
 | `rounds_turned_on/off`, `round_started` | app | `n` | Review rounds dipakai? |
 | `round_approved_seen` | app | `n` | Klien menyetujui (sekali per ronde) |
 | `settings_notify_changed` | app | `notify` (instant/daily/off) | Apakah email terlalu banyak? |
+| `checkout_started` | app | `sites`, `tier` (founding/normal) | Berapa yang mulai bayar? (hanya saat billing aktif) |
+| `subscription_activated` | app | `plan`, `tier`, `sites`, `workspace` (id) | Berapa yang benar-benar berlangganan? |
 
 **Nama yang diganti** (data lama tetap dengan nama lama; di insight pakai keduanya bila perlu melihat masa lalu):
 `get_started_clicked` / `login_clicked` / `demo_opened` → `cta_clicked` (target signup/login/demo) · `script_detected` → `install_detected` · `comments_exported` → `csv_exported` · `site_updated` → `widget_published` · properti `mode` di signup → `method`.

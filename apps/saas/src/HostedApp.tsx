@@ -14,6 +14,8 @@ import { Privacy, Terms } from './pages/saas/Legal'
 import { Guide } from './pages/saas/Guide'
 import { Unsubscribe } from './pages/saas/Unsubscribe'
 import { RoundsPage, RoundRecord } from './pages/saas/Rounds'
+import { BillingPage } from './pages/saas/Billing'
+import { openPendingCheckout } from './saas/billing'
 import { PanelLayout, Products, Install as PanelInstall, Comments, ReviewersPage, SettingsPage } from './pages/saas/Panel'
 
 // Internal ops panel (founder only): its own download, never linked for normal users.
@@ -21,6 +23,8 @@ const Ops = lazy(() => import('./pages/saas/ops/Ops'))
 
 /** The hosted product: website pages (guide, legal, share links), sign-in and the user panel. */
 export default function HostedApp() {
+  // Paddle's checkout comes back to /app?_ptxn=…: only then is Paddle.js loaded (src/saas/billing.ts).
+  useEffect(() => { openPendingCheckout() }, [])
   return (
     <Routes>
       {/* The hosted product's website and user panel: their own look, no research tools. */}
@@ -53,6 +57,7 @@ export default function HostedApp() {
         <Route path="reviewers" element={<ReviewersPage />} />
         <Route path="team" element={<Navigate to="/app/reviewers" replace />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="billing" element={<BillingPage />} />
       </Route>
       {/* The app's root and unknown addresses open the panel (its guards send signed-out people to log in). */}
       <Route path="*" element={<Navigate to="/app" replace />} />

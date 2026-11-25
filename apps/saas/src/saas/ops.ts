@@ -103,4 +103,8 @@ export const opsUsers = (search: string, limit: number, offset: number, state: W
   rpc<{ total: number; states: Partial<Record<WidgetState, number>>; rows: OpsUser[] }>('ops_users', { p_search: search || null, p_limit: limit, p_offset: offset, p_state: state || null, p_sort: sort })
 export const opsUserDetail = (id: string) => rpc<UserDetail | null>('ops_user_detail', { p_user: id })
 export const opsAudit = (limit = 30) => rpc<AuditRow[]>('ops_audit_recent', { p_limit: limit })
+export interface BillingOverview { billing_enabled: boolean; founding_active: number; founding_held: number; founding_limit: number; by_status: Record<string, number>; paid_sites: number }
+export interface SubRow { workspace_id: string; status: string; price_tier: 'founding' | 'normal'; quantity: number; current_period_end: string | null; cancel_at: string | null; provider: string }
+export const opsBilling = () => rpc<BillingOverview>('ops_billing_overview')
+export const opsBillingFor = (ids: string[]) => rpc<Record<string, SubRow[]>>('ops_billing_for_users', { p_users: ids })
 export const opsSetPlan = (id: string, plan: Plan, note: string) => rpc<unknown>('ops_set_plan', { p_user: id, p_plan: plan, p_note: note || null })
