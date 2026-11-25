@@ -6,8 +6,13 @@
 -- 3. Tables and functions created later are not granted to anon by default.
 revoke truncate, trigger, references on all tables in schema public from anon, authenticated;
 revoke all on all tables in schema public from anon;
-revoke execute on function public.add_owner() from public, anon, authenticated;
-revoke execute on function public.projects_fixed() from public, anon, authenticated;
+-- Every trigger function in public (add_owner, projects_fixed, billing checks, …).
+do $$ declare f regprocedure; begin
+  for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.prorettype = 'trigger'::regtype loop
+    execute format('revoke execute on function %s from public, anon, authenticated', f);
+  end loop;
+end $$;
 alter default privileges in schema public revoke all on tables from anon;
 alter default privileges in schema public revoke all on functions from anon;
 alter default privileges in schema public revoke truncate, trigger, references on tables from authenticated;

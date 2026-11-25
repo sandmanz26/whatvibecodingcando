@@ -27,7 +27,7 @@ Tidak ditemukan celah kritis atau tinggi yang bisa dieksploitasi dari luar. Semu
 
 ## Yang sudah diperbaiki
 
-- **Database** — `apps/saas/supabase/migrations/20261126120000_security_hardening.sql`, satu kali tempel: `apps/saas/supabase/catch-up/2026-11-26-security.sql` (begin/commit, aman dijalankan berulang; diuji di database yang dibangun dari semua migrasi sebelumnya). Tes baru `tests/security_hardening_test.sql` memeriksa: tidak ada TRUNCATE/TRIGGER/REFERENCES untuk role API, anon tanpa hak tabel, fungsi trigger tidak bisa dipanggil, setiap `security definer` punya `search_path`, setiap tabel ber-RLS, dan hanya `get_share`, `report_seen`, `study_info` yang terbuka untuk anon. `tests/run.sh` lulus.
+- **Database** — `apps/saas/supabase/migrations/20261126230000_security_hardening.sql`, satu kali tempel: `apps/saas/supabase/catch-up/2026-11-26-security.sql` (begin/commit, aman dijalankan berulang; diuji di database yang dibangun dari semua migrasi sebelumnya). Tes baru `tests/security_hardening_test.sql` memeriksa: tidak ada TRUNCATE/TRIGGER/REFERENCES untuk role API, anon tanpa hak tabel, fungsi trigger tidak bisa dipanggil, setiap `security definer` punya `search_path`, setiap tabel ber-RLS, dan hanya `get_share`, `report_seen`, `study_info` yang terbuka untuk anon. `tests/run.sh` lulus.
 - **Header (`vercel.json`)** — CSP penuh untuk semua halaman kita: `default-src 'self'`; `script-src 'self' 'wasm-unsafe-eval'` + hash SHA-256 setiap script inline + Turnstile + aset PostHog; `connect-src` hanya Supabase proyek kita, PostHog, model MediaPipe; `frame-ancestors 'self'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `upgrade-insecure-requests`. CSP ketat terpisah untuk `/embed/session.html` (`default-src 'none'`). `X-Robots-Tag: noindex` untuk `/app` dan halaman sesi, `Permissions-Policy` lebih lengkap, `X-Permitted-Cross-Domain-Policies: none`. Header `/embed/*` (CORS `*`, CORP cross-origin) tetap, karena script dimuat di situs pelanggan.
 - **Cek CSP otomatis** — `scripts/check-csp.mjs` dijalankan di akhir `npm run build`: build gagal jika ada script inline yang hash-nya tidak ada di `vercel.json` (mencegah CSP diam-diam memblokir halaman).
 - **Build** — semua config Vite: `sourcemap: false`, `esbuild.drop: ['debugger']`, `console.log/debug/info` dibuang, `legalComments: 'none'`; chunk lazy di `/app` diberi nama hash saja.
@@ -47,7 +47,7 @@ Tidak ditemukan celah kritis atau tinggi yang bisa dieksploitasi dari luar. Semu
 
 ## Yang harus dilakukan owner
 
-1. **Jalankan** `apps/saas/supabase/catch-up/2026-11-26-security.sql` di Supabase → SQL Editor (satu kali tempel).
+1. **Jalankan** `apps/saas/supabase/catch-up/2026-11-26-security.sql` di Supabase → SQL Editor (satu kali tempel), setelah `2026-11-26-billing.sql`.
 2. **Jadikan repositori GitHub private** (Settings → General → Danger Zone).
 3. **Pasang Turnstile** (CAPTCHA) untuk sign-up dan sesi anonim — `apps/saas/supabase/README.md` langkah 4. Juga cek Supabase → Auth → Rate Limits (sign-in anonim per jam).
 4. **2FA di mana-mana**: GitHub, Vercel, Supabase, Resend, PostHog, Cloudflare, registrar domain, email owner.
