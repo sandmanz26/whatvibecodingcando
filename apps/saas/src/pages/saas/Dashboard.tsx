@@ -8,6 +8,7 @@ import { lastSeen } from '../../core/embed/config'
 import { productOf } from '../../saas/products'
 import { liveOf, setLiveOn } from '../../saas/widget'
 import { cloud } from '../../saas/supabase'
+import { safeHttpUrl } from '../../saas/safe-url'
 import { listStudies, projectStats, type StudyRow } from '../../saas/cloud'
 import { statsOf, type Stats } from '../../saas/stats'
 import { AnonWarning, ago, openDemo, openMySite, usePanel, useThreads } from './Panel'
@@ -77,7 +78,7 @@ export function Dashboard() {
         </div>
       )}
       <div className="up-head">
-        <div><h1>{project.name}</h1><p>Project id <code>{project.id}</code>{project.siteUrl && <> · <a href={project.siteUrl} target="_blank" rel="noopener">{project.siteUrl.replace(/^https?:\/\//, '')} <ExternalLink size={12} /></a></>}</p></div>
+        <div><h1>{project.name}</h1><p>Project id <code>{project.id}</code>{safeHttpUrl(project.siteUrl) && <> · <a href={safeHttpUrl(project.siteUrl)} target="_blank" rel="noopener">{project.siteUrl.replace(/^https?:\/\//, '')} <ExternalLink size={12} /></a></>}</p></div>
       </div>
 
       <AnonWarning />

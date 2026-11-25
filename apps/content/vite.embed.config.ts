@@ -8,8 +8,11 @@ import { fileURLToPath } from 'node:url'
  */
 export default defineConfig({
   plugins: [react()],
+  // Production hardening (docs/SECURITY.md): no debugger statements, console.log/debug/info removed, no licence/comment banners.
+  esbuild: { drop: ['debugger'], pure: ['console.log', 'console.debug', 'console.info'], legalComments: 'none' },
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
+    sourcemap: false,
     outDir: '../../dist/content/embed',
     emptyOutDir: false,
     copyPublicDir: false,

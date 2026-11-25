@@ -12,6 +12,8 @@ export default defineConfig(({ mode }) => {
   const sb = supabaseEnv(mode)
   return {
     plugins: [react()],
+  // Production hardening (docs/SECURITY.md): no debugger statements, console.log/debug/info removed, no licence/comment banners.
+  esbuild: { drop: ['debugger'], pure: ['console.log', 'console.debug', 'console.info'], legalComments: 'none' },
     base: './',
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(sb.url),
@@ -20,7 +22,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       // Never publish source maps: they would hand out the original source (docs/SECURITY.md).
-      sourcemap: false, outDir: '../../dist', emptyOutDir: false, rollupOptions: { input: 'app.html' } },
+      sourcemap: false, outDir: '../../dist', emptyOutDir: false, // Lazy chunks are named by hash only, so file names don't map out the app (e.g. the ops page).
+      rollupOptions: { input: 'app.html', output: { chunkFileNames: 'assets/[hash].js' } } },
     server: { open: '/app.html' },
   }
 })

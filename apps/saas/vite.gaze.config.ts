@@ -19,6 +19,8 @@ function copyMediapipe(): Plugin {
 }
 export default defineConfig({
   plugins: [copyMediapipe()],
+  // Production hardening (docs/SECURITY.md): no debugger statements, console.log/debug/info removed, no licence/comment banners.
+  esbuild: { drop: ['debugger'], pure: ['console.log', 'console.debug', 'console.info'], legalComments: 'none' },
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
   build: {
       // Never publish source maps: they would hand out the original source (docs/SECURITY.md).

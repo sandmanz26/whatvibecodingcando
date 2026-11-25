@@ -30,6 +30,8 @@ function asciiOnly(): Plugin {
     const sb = supabaseEnv(mode)
     return {
     plugins: [react(), asciiOnly()],
+  // Production hardening (docs/SECURITY.md): no debugger statements, console.log/debug/info removed, no licence/comment banners.
+  esbuild: { drop: ['debugger'], pure: ['console.log', 'console.debug', 'console.info'], legalComments: 'none' },
     // The script talks to the same Supabase project as the panel (see supabase-env.ts).
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),

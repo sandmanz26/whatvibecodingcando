@@ -8,6 +8,8 @@ import react from '@vitejs/plugin-react'
  */
 export default defineConfig({
   plugins: [react()],
+  // Production hardening (docs/SECURITY.md): no debugger statements, console.log/debug/info removed, no licence/comment banners.
+  esbuild: { drop: ['debugger'], pure: ['console.log', 'console.debug', 'console.info'], legalComments: 'none' },
   base: '/landing/',
   build: {
       // Never publish source maps: they would hand out the original source (docs/SECURITY.md).

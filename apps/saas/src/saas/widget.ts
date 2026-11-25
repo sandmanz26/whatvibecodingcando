@@ -68,6 +68,7 @@ export const unserveProject = (id: string) => unserve(id)
 /** Puts a review token into a page address (#vibe_t=…), keeping the page's own hash route after it. */
 function withToken(url: string, token: string) {
   const u = new URL(url)
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('not_http')
   const rest = u.hash.replace(/^#/, '')
   u.hash = `vibe_t=${token}${rest ? `&${rest}` : ''}`
   return u.href
@@ -84,6 +85,7 @@ async function reviewToken(projectId: string, preview: boolean): Promise<string 
  * The tab opens at once (so pop-up blockers allow it) and goes to the site when the token is ready.
  */
 export async function openAsReviewer(projectId: string, url: string, preview = false): Promise<boolean> {
+  if (!/^https?:\/\//i.test(url)) return false
   const w = window.open('', '_blank')
   if (w) w.opener = null
   const token = await reviewToken(projectId, preview)

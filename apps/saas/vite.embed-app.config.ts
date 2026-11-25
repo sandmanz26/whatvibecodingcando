@@ -20,6 +20,8 @@ export default defineConfig(({ mode }) => {
   const sb = supabaseEnv(mode)
   return {
     plugins: [react(), asciiOnly()],
+  // Production hardening (docs/SECURITY.md): no debugger statements, console.log/debug/info removed, no licence/comment banners.
+  esbuild: { drop: ['debugger'], pure: ['console.log', 'console.debug', 'console.info'], legalComments: 'none' },
     define: {
       'process.env.NODE_ENV': JSON.stringify('production'),
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(sb.url),

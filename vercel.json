@@ -81,6 +81,10 @@
         {
           "key": "Strict-Transport-Security",
           "value": "max-age=63072000; includeSubDomains"
+        },
+        {
+          "key": "X-Permitted-Cross-Domain-Policies",
+          "value": "none"
         }
       ]
     },
@@ -93,11 +97,11 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-ICinzQIfslZy3pcjkFd1yTIGtpRPqy0ljvvna9JmI+A=' 'sha256-BnuhiqSzC8Zo0193EIw17d4lKQLjzK6m7d02xK5D5iE=' 'sha256-M/tJE61H4Q7uYu9IYEa7gITwFKuOLqTcUO/aWiP8nM0=' 'sha256-ljMPAXH87SnxIBXVYMWOJt7Ke7l48zlxcVCeWXhcL9I=' 'sha256-H/ll42/pbWPVjH49sZMSdnnmKmumA1GzvNcylaOyJKM=' 'sha256-4GBi0mqd4TXMi6Qe9DQZYJcPZ5WAgGOHv57Wap4Zj1I=' 'sha256-o9BoiIQlo+LyZWO4277ueAVJ/aRrrWl6EskhILH05t8=' https://challenges.cloudflare.com https://us-assets.i.posthog.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; media-src 'self' blob: https://nxrmvaehrjgpbkmfuzry.supabase.co; connect-src 'self' https://nxrmvaehrjgpbkmfuzry.supabase.co wss://nxrmvaehrjgpbkmfuzry.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com https://storage.googleapis.com; frame-src 'self' https: http://localhost:* https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; upgrade-insecure-requests"
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()"
+          "value": "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=(), interest-cohort=()"
         },
         {
           "key": "Cross-Origin-Opener-Policy",
@@ -119,6 +123,32 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=300, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/embed/session.html",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'unsafe-inline'; connect-src https://nxrmvaehrjgpbkmfuzry.supabase.co; frame-src https://challenges.cloudflare.com; img-src data:; base-uri 'none'; form-action 'none'"
+        },
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/app",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
         }
       ]
     },

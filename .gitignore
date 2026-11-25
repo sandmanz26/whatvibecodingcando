@@ -9,3 +9,13 @@ pitch/*.mp4
 
 # Local working copies made by coding agents
 .claude/worktrees/
+
+# Secrets: never commit (docs/SECURITY.md)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.vercel
+**/supabase/.temp/
+**/supabase/.branches/
