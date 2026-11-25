@@ -109,6 +109,38 @@
     // (A real site has just the one tag above, with its own project id.)
     const want = new URLSearchParams(location.search).get('project')
     if (want && /^[\w-]{1,64}$/.test(want)) document.querySelector('script[src="./embed/vibe.js"]').dataset.project = want
+    // ?products=… (the onboarding's "Try it on the demo site"): the widget runs the products just picked,
+    // and this note says honestly where each one lives (only before the project has published settings).
+    const picked = new URLSearchParams(location.search).get('products')
+    if (picked !== null && /^[a-z,]{0,300}$/.test(picked)) {
+      document.querySelector('script[src="./embed/vibe.js"]').dataset.products = picked
+      const NAMES = { comments: 'Comments', compare: 'Component review', inspect: 'Inspect', dscheck: 'Design system check', tokens: 'Design tokens', heatmap: 'Heatmaps',
+        narration: 'Narration', insights: 'Participant paths', usability: 'Usability tests', fivesec: '5-second tests', gaze: 'Eye tracking', report: 'Reports & insights' }
+      const WHERE = {
+        comments: 'in the widget', compare: 'in the widget (Compare, beside Comments)', inspect: 'in the widget', dscheck: 'in the widget', tokens: 'in the widget', heatmap: 'in the widget',
+        narration: 'needs your project on our server (voice notes are kept there); it is off on this trial',
+        insights: 'a study: start it in your panel (Research), participants then open this site with their link',
+        usability: 'a study: start it in your panel (Research), participants then open this site with their link',
+        fivesec: 'a study: start it in your panel (Research), participants then open this site with their link',
+        gaze: 'part of usability tests (Labs): turn it on for a test in your panel',
+        report: 'in your panel (Reports)',
+      }
+      const ids = picked.split(',').filter((id) => NAMES[id])
+      if (ids.length) {
+        const box = document.createElement('aside')
+        box.id = 'trial'
+        box.setAttribute('aria-label', 'What you picked')
+        box.style.cssText = 'position:fixed;left:16px;bottom:16px;max-width:340px;z-index:10;padding:12px 14px;background:#fff;border:1px solid #e5e2da;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.08);font:13px/1.45 system-ui,sans-serif;color:#333'
+        const h = document.createElement('b'); h.textContent = 'You picked'; box.appendChild(h)
+        const ul = document.createElement('ul'); ul.style.cssText = 'margin:6px 0 0;padding-left:18px'
+        for (const id of ids) { const li = document.createElement('li'); const n = document.createElement('b'); n.textContent = NAMES[id]; li.append(n, ': ' + WHERE[id]); ul.appendChild(li) }
+        box.appendChild(ul)
+        const x = document.createElement('button'); x.type = 'button'; x.textContent = 'Hide'; x.setAttribute('aria-label', 'Hide this note')
+        x.style.cssText = 'all:unset;cursor:pointer;margin-top:8px;display:inline-block;color:#555;text-decoration:underline'
+        x.onclick = () => box.remove(); box.appendChild(x)
+        addEventListener('DOMContentLoaded', () => document.body.appendChild(box))
+      }
+    }
   </script>
 </body>
 </html>

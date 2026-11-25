@@ -5,6 +5,7 @@ import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, CATEGORIES, CAT_HELP, PRODUCTS, productOf, statusLabel, WEBSITE } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
+import { WithPreview } from './ProductPreview'
 import { draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProject, unserveProject } from '../../saas/widget'
 import { lastSeen } from '../../core/embed/config'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState, type Notify } from '../../saas/account'
@@ -220,7 +221,8 @@ export function Products() {
           const on = project.products.includes(p.id)
           const Icon = p.icon
           return (
-            <article key={p.id} className={`up-product ${on ? 'on' : ''}`}>
+            <WithPreview key={p.id} p={p} className="up-pv" selected={on} onSelect={p.soon ? undefined : () => toggle(p.id)}>
+            <article className={`up-product ${on ? 'on' : ''}`}>
               <span className="lp-icon" style={{ background: p.hue }}><Icon size={17} /></span>
               <div className="lp-grow">
                 <h3>{p.name}{p.labs && <span className="lp-labs">Labs</span>} {p.soon ? <span className="lp-status soon">Coming soon</span> : <span className={`lp-status ${p.status}`}>{statusLabel(p.status, 'panel')}</span>}</h3>
@@ -232,6 +234,7 @@ export function Products() {
                 <small>{on ? (p.status !== 'console' ? 'On' : 'Requested') : 'Off'}</small>
               </span>}
             </article>
+            </WithPreview>
           )
         })}
       </div>

@@ -25,7 +25,7 @@ import { Widget, OPEN_EVENT, type Config, type OpenWhat } from './Widget'
 import { TOOL_IDS, type ToolId } from './Tools'
 import { LocalBackend, NS, type Backend } from './store'
 import { CSS } from './styles'
-import { LocalConfigSource, anyModule, envFor, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
+import { LocalConfigSource, anyModule, envFor, modulesOf, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
 import * as server from './server'
 import { frameMain } from './frame'
 import { Participant } from './Research'
@@ -141,7 +141,7 @@ interface Mode {
   reportSeen(shown: boolean, why: string): void
 }
 
-function localMode(project: string, legacy: WidgetConfig | null): Mode {
+function localMode(project: string, legacy: WidgetConfig | null, trial = false): Mode {
   const source: ConfigSource = new LocalConfigSource()
   let token: ReviewerSession | null = null
   const subs = new Set<() => void>()
@@ -149,7 +149,7 @@ function localMode(project: string, legacy: WidgetConfig | null): Mode {
     sessions: false,
     snapshot() {
       const s = source.get(project)
-      const reviewer = !!readSession(project) || !!token
+      const reviewer = !!readSession(project) || !!token || (trial && !s.live)
       return { live: s.live?.config ?? legacy, draft: s.draft, preview: ss.get(previewKey(project)) === '1', reviewer, invited: reviewer, gone: !!s.gone, skipEnvs: !s.live && !!legacy }
     },
     subscribe(cb) { subs.add(cb); const off = source.subscribe(project, cb); return () => { subs.delete(cb); off() } },
@@ -307,14 +307,19 @@ export async function boot(given?: HTMLScriptElement | null) {
     const first = new LocalConfigSource().get(project)
     if (first.gone) { console.info('[ourhunch] this project was deleted; nothing to show.'); reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown: false, why: 'The project was deleted.' }); return }
     // Before the project has published settings, the snippet's own data- attributes apply, as in 0.1.
+    // data-products picks the modules (the onboarding's "Try it on the demo site" passes the products just picked).
+    const picked = d.products === undefined ? null : d.products.split(',').map((x) => x.trim())
+    const legacyModules = modulesOf((id) => (picked ? picked.includes(id) : id === 'comments'))
     const legacy: WidgetConfig | null = first.live ? null : {
-      v: 1, on: d.products === undefined || d.products.split(',').map((x) => x.trim()).includes('comments'),
-      modules: { comments: true },
+      v: 1, on: anyModule(legacyModules),
+      modules: legacyModules,
       theme: { accent: /^#[0-9a-f]{6}$/i.test(d.color ?? '') ? d.color! : '#e8590c', mode: 'light' },
       launcher: { kind: 'floating', position: d.position === 'left' ? 'left' : 'right', label: 'Comment', shortcut: d.shortcut !== 'off' },
       audience: 'everyone', envs: [],
     }
-    mode = localMode(project, legacy)
+    // Trying products on our own demo site before the project is published: the visitor is the
+    // project's owner, so the reviewers' tools show too (they read only this page's styles).
+    mode = localMode(project, legacy, demo && !!legacy && picked !== null)
   }
   const m = mode
   window.__vibeCollab.server = m.sessions

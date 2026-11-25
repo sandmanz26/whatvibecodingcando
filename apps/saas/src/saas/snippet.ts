@@ -2,8 +2,16 @@
 
 const here = () => window.location.href.split('#')[0]
 export const scriptUrl = () => new URL('embed/vibe.js', here()).href
-/** The demo site; with a project id, comments made there belong to that project. */
-export const demoUrl = (project?: string) => new URL(`embed-demo.html${project && validProjectId(project) ? `?project=${project}` : ''}`, here()).href
+/**
+ * The demo site; with a project id, comments made there belong to that project. With products (the
+ * onboarding's try, before anything is published) the widget runs exactly those.
+ */
+export const demoUrl = (project?: string, products?: string[]) => {
+  const u = new URL('embed-demo.html', here())
+  if (project && validProjectId(project)) u.searchParams.set('project', project)
+  if (products) u.searchParams.set('products', products.filter((id) => /^[a-z]{1,20}$/.test(id)).join(','))
+  return u.href
+}
 export const DEFAULT_COLOR = '#e8590c'
 export const validProjectId = (id: string) => /^[\w-]{1,64}$/.test(id)
 

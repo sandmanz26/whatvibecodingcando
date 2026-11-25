@@ -65,6 +65,11 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 | 3.3 | Isi "Where is the site online?" dengan `trms-zeta.vercel.app` | Muncul "The widget will show on trms-zeta.vercel.app" | [ ] |
 | 3.4 | Isi alamat salah (mis. `abc`) | Pesan contoh format yang benar | [ ] |
 | 3.5 | Langkah 3: **Copy snippet** | Snippet berisi `src=".../embed/vibe.js"` dan `data-project="..."` saja | [ ] |
+| 3.5b | Langkah 1: pilih 4 tool (mis. Comments, Inspect, Design tokens, Heatmaps), lanjut ke langkah 3, klik **Try it on the demo site** | Dock widget di situs demo berisi **keempat** tool itu (Comment, Inspect, Design tokens, Heatmap), bukan hanya Comments | [ ] |
+| 3.5c | Sama, tapi pilih juga **Usability tests** / **Reports** | Catatan "You picked" di kiri bawah situs demo menjelaskan tool itu dijalankan dari panel (Research / Reports), bukan dari dock | [ ] |
+| 3.5d | Desktop: arahkan mouse (atau Tab) ke kartu tool, tunggu sebentar | Muncul popover berisi video pendek (tanpa suara, berulang), nama dan deskripsi; Esc menutupnya; halaman tidak bergeser | [ ] |
+| 3.5e | HP: ketuk **Preview** pada kartu | Bottom sheet dengan video, deskripsi dan tombol **Select**; Select memilih tool dan menutup sheet; ketuk kartunya sendiri tetap memilih/membatalkan | [ ] |
+| 3.5f | Aktifkan "kurangi gerakan" (reduce motion) di sistem | Popover/sheet hanya menampilkan gambar diam, tanpa video | [ ] |
 | 3.6 | **Finish** | Masuk ke Overview dengan sambutan "Welcome, ..." | [ ] |
 
 ---
@@ -168,6 +173,7 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 8.1 | **Setup → Products**: nyalakan satu tool | Muncul peringatan dengan tombol **Update site** | [ ] |
 | 8.2 | Klik **Update site** di situ | Peringatan hilang; tool aktif di situs | [ ] |
 | 8.3 | Fake doors | "Coming soon", tidak ada saklar | [ ] |
+| 8.3b | Arahkan mouse ke kartu produk di **Products** | Popover video pratinjau yang sama seperti di onboarding | [ ] |
 | 8.4 ⚡ | **Overview** | Angka Open/Ongoing/Completed, grafik 14 hari, halaman terbanyak, "Where the script runs" sesuai data | [ ] |
 | 8.5 | Sidebar: lipat **Setup** / **Results**, refresh | Status lipatan diingat | [ ] |
 | 8.6 | Results hanya menampilkan tool yang aktif | Tool yang mati tidak muncul di Results | [ ] |

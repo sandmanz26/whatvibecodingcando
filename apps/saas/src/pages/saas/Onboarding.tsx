@@ -4,6 +4,7 @@ import { Check, ArrowLeft, ArrowRight, Copy, ExternalLink, LogOut } from 'lucide
 import { BRAND, PRODUCTS, inScript, parseProducts, productOf, statusLabel, CATEGORIES, CAT_HELP, WEBSITE } from '../../saas/products'
 import { SAAS_ERROR, settled, freeId, isOnboarded, isSignedIn, newProject, originOf, slug, useSaas, useSaasReady } from '../../saas/account'
 import { copyText, demoUrl, installSnippet } from '../../saas/snippet'
+import { WithPreview } from './ProductPreview'
 import { publish } from '../../saas/widget'
 import { cloud } from '../../saas/supabase'
 import '../../saas/saas.css'
@@ -109,11 +110,13 @@ export default function Onboarding() {
                   const Icon = p.icon
                   const on = products.includes(p.id)
                   return (
-                    <button type="button" key={p.id} className={`lp-check ${on ? 'on' : ''} ${p.soon ? 'soon' : ''}`} onClick={() => !p.soon && toggle(p.id)} aria-pressed={on} disabled={p.soon}>
+                    <WithPreview key={p.id} p={p} selected={on} onSelect={p.soon ? undefined : () => toggle(p.id)}>
+                    <button type="button" className={`lp-check ${on ? 'on' : ''} ${p.soon ? 'soon' : ''}`} onClick={() => !p.soon && toggle(p.id)} aria-pressed={on} disabled={p.soon}>
                       <span className="lp-icon sm" style={{ background: p.hue }}><Icon size={15} /></span>
                       <span className="lp-grow"><b>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</b><small>{p.soon ? 'Coming soon' : statusLabel(p.status)}</small></span>
                       <span className="lp-tick">{on && <Check size={13} />}</span>
                     </button>
+                    </WithPreview>
                   )
                 })}
               </div>
@@ -149,7 +152,7 @@ export default function Onboarding() {
               <pre className="lp-code" aria-label="Your snippet">{code}</pre>
               <div className="lp-row">
                 <button type="button" className="lp-btn" onClick={() => void copy()}>{copied === code ? <><Check size={15} /> Copied</> : <><Copy size={15} /> Copy snippet</>}</button>
-                <a className="lp-btn ghost" href={demoUrl(draft.id)} target="_blank" rel="noopener">Try it on the demo site <ExternalLink size={14} /></a>
+                <a className="lp-btn ghost" href={demoUrl(draft.id, products)} target="_blank" rel="noopener">Try it on the demo site <ExternalLink size={14} /></a>
               </div>
               <p className="lp-hint">It starts for <b>reviewers only</b>{originOf(site) ? <> on <code>{new URL(originOf(site)!).host}</code></> : ''}: visitors don’t see it. Invite reviewers, add staging or preview sites, and change the look in Widget.</p>
               {products.some((id) => productOf(id)?.status === 'console') && <p className="lp-hint">In the script today: {inScript()}. The other tools you picked are marked early access.</p>}
