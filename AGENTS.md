@@ -33,6 +33,7 @@ cd apps/saas && npx esbuild supabase/functions/send-emails/test.ts --bundle --pl
 
 ## Rules that matter most
 
+- **Billing (SaaS):** ready but OFF (`docs/BILLING.md`): Paddle (merchant of record) behind the `BillingProvider` interface in `supabase/functions/billing/`; only the webhook writes `subscriptions`; limits apply only while `app_settings.billing_enabled` is on, and never delete data (sites beyond the plan stop collecting new comments). While off, the UI says "Free during the beta" and nothing claims billing exists.
 1. **Security** (`docs/SECURITY.md`): never put the Supabase service role key, database password, Resend key, email cron secret or Turnstile secret in the code, the repository or a chat. Row level security on every table, no anon access; writes go through SQL functions that check origin, reviewer and rate limits. No source maps. Internal ops (`/app#/admin`): admins only via `platform_admins` (by hand in SQL), all data through admin-checked `security definer` `ops_*` functions, writes audited; own sign-in at `/app#/admin`, never linked from the panel.
 2. **Database changes** = a new file in `apps/saas/supabase/migrations/` (timestamped, never edit an applied one) + a test in `supabase/tests/`. The owner runs migrations by hand in the Supabase SQL Editor: give them the SQL and say so.
 3. **Scale:** Supabase returns at most 1,000 rows per request — read longer lists with `paged()` (`apps/saas/src/saas/cloud.ts`); bound lists in SQL; index every query filtered by project; poll only while the tab is visible.

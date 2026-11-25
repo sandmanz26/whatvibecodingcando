@@ -498,6 +498,10 @@ export function SettingsPage() {
         }}>Save</button>
           {accountDirty && <button className="lp-btn sm ghost" onClick={() => { setName(s.account!.name); setEmail(s.account!.email) }}>Cancel</button>}</div>
       </section>
+      <section className="up-card">
+        <h2>Plan and billing</h2>
+        <div className="up-row"><span className="lp-grow">{cloud ? 'Your plan, sites used and, once billing is on, invoices and payment.' : 'Free during the beta.'}</span><Link className="lp-btn sm" to="/app/billing">Open billing</Link></div>
+      </section>
       <PasswordCard />
       {project && (
         <section className="up-card">

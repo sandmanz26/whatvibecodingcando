@@ -23,6 +23,8 @@ const BUCKET = 'widget-config'
 /** The project's database id, by its public id (the snippet's data-project). */
 const dbIds = new Map<string, string>()
 let workspaceId: string | null = null
+/** The signed-in account's workspace on the server (null in the demo or before loading). */
+export const currentWorkspace = () => workspaceId
 
 const EMPTY: SaasState = { account: null, projects: [], current: null, invites: [] }
 
