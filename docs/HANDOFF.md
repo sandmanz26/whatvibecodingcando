@@ -40,7 +40,7 @@ Centang di sini setiap kali selesai. ✅ = sudah dikonfirmasi pemilik/tes, ⬜ =
 | `2026-11-26-heatmap-v4.sql` | heatmap v4 (akurasi) | ✅ |
 | `2026-11-26-billing.sql` | pembayaran (mati) | ❓ |
 | `2026-11-26-security.sql` | pengerasan keamanan (setelah billing) | ❓ |
-| `2026-11-27-install-flow.sql` | alur instalasi baru (kalau ada) | ⬜ |
+| `2026-11-27-install-flow.sql` | alur instalasi: banner alamat localhost baru (jalankan setelah security) | ⬜ |
 
 Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into public.platform_admins (user_id) select id from auth.users where email = '<email>';` ✅
 
@@ -85,7 +85,13 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 ### 27 Nov 2026
 - **Heatmap kosong di situs asli**: panel heatmap sekarang menjelaskan kenapa kosong dan langkah membuat studi, dengan tombol **Start a study** ke panel (sebelumnya hanya "No eye tracking on this page yet").
 - **Heatmap di halaman demo**: menampilkan contoh data berlabel "Sample data" (sebelumnya error "Open the site through a review link").
-- **Alur instalasi** (sedang diselesaikan): alamat situs/localhost ditanya saat onboarding dan otomatis dipublikasikan, checklist 3 langkah, cek instalasi otomatis, banner alamat baru. Catatan detail menyusul di sini setelah selesai.
+- **Alur instalasi diperbaiki** (masalah: daftar → salin script → pasang di localhost → widget tidak muncul):
+  - Onboarding bertanya *"Where will you add it?"*: alamat lokal (pilihan cepat localhost:3000/5173/8080) dan situs live. Alamat langsung disimpan dan widget **otomatis dipublikasikan**.
+  - Langkah pasang: snippet + checklist ① tempel sebelum `</body>` ② **Open my site** (token tim) ③ "Visitors won't see anything".
+  - Cek instalasi otomatis ("Waiting for your site…" → "✓ Installed on localhost:3000"); setelah 2 menit muncul kartu bantuan (snippet, `data-project`, host CSP yang perlu diizinkan, ad-blocker).
+  - Tips sekali tampil di widget saat dibuka dari panel; banner "ourhunch saw your script on localhost:3001 — Add it".
+  - Laporan pertama tiap browser selalu dikirim (dulu hanya 5%), supaya cek instalasi tidak meleset.
+  - **Perlu SQL** `2026-11-27-install-flow.sql`. Belum diuji di Supabase live, belum dicek tampilan HP.
 - Dokumen ini dibuat; aturan "selalu tulis handoff" ditambahkan ke `CLAUDE.md` dan `AGENTS.md`.
 
 ### 26 Nov 2026
