@@ -235,6 +235,14 @@ Pratinjau semua email (gambar): `docs/email-previews/`.
 
 Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.md` (query `cron.job_run_details`, `net._http_response`, log Edge Function).
 
+## 10b-2. Email selamat datang (sekali, dalam ±5 menit setelah login pertama)
+
+| # | Langkah | Hasil yang diharapkan | ✔ |
+|---|---|---|---|
+| 1 | Daftar dengan email, klik link konfirmasi | Email "welcome" datang dalam ±5 menit, hanya sekali | |
+| 2 | Daftar dengan Google (akun baru) | Email "welcome" dalam ±5 menit | |
+| 3 | Daftar dengan kode email (OTP), jangan masukkan kodenya | Tidak ada welcome; setelah kode dimasukkan → welcome dalam ±5 menit | |
+
 ## 10c. Panel ops internal (`/app#/admin`, hanya founder)
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
@@ -245,6 +253,11 @@ Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.
 | 4 | Cari user lewat email, ganti halaman (Next/Previous), klik email | Hasil sesuai; laci detail menampilkan workspace/proyek tanpa teks komentar | |
 | 5 | "Set plan" → Founding + catatan → Save | Badge berubah; baris baru di "Recent admin actions" | |
 | 6 | Build demo (tanpa Supabase), buka `/app#/admin` | "Ops needs the server" | |
+| 7 | Tabel user: kolom **Widget** | Not installed (script belum pernah lapor dari situs asli) / Installed (script terlihat, belum ada aktivitas) / In use (komentar, reviewer, studi dalam 14 hari) / Inactive (lebih dari 14 hari sepi); arahkan kursor ke badge untuk penjelasan | |
+| 8 | Filter "Widget" → In use, lalu Sort → Last activity | Hanya user In use (angka per status di menu); yang paling baru aktif di atas | |
+| 9 | Kolom Last script seen, Last activity, Last comment, Comments 7d / all, Reviewers, Studies / results, Rounds | Terisi sesuai data; "—" bila belum ada | |
+| 10 | Klik email → laci detail | Per proyek: origin, status widget, last seen, komentar, reviewer, studi, aktivitas terakhir | |
+| 11 | Kotak angka | Ada "Sites in use (14d)" | |
 
 ## 11. Keamanan & privasi (cek cepat)
 
@@ -265,8 +278,13 @@ Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.
 | # | Langkah | Hasil yang diharapkan | ✔ |
 |---|---|---|---|
 | 12.1 | Buka `/` → PostHog **Activity** | `$pageview` muncul dalam ±30 detik | [ ] |
-| 12.2 | Klik Get started, daftar akun uji, selesaikan onboarding | Berurutan: `get_started_clicked`, `signup_completed`, `onboarding_completed` (+ `snippet_copied`) | [ ] |
+| 12.2 | Klik Get started, daftar akun uji, selesaikan onboarding | Berurutan: `cta_clicked` (location, target=signup), `signup_started`, `signup_completed` (method=email), `onboarding_completed` (products = id saja) (+ `snippet_copied`) | [ ] |
+| 12.2b | Gulir ke Pricing di `/` | `pricing_viewed` sekali | [ ] |
+| 12.2c | PostHog → Persons → akun uji | distinct id = id akun; properti `plan`, `signup_method`, `created_at`, `projects`, `products`; tanpa email/nama; `$initial_utm_source` terisi bila datang dari `/?utm_source=tes` | [ ] |
+| 12.2d | PostHog → Groups → workspace | Satu grup per workspace (id, `projects`, `plan`), tanpa nama | [ ] |
+| 12.2e | Daftar dengan Google | `signup_completed` method=google (login berikutnya: `login_completed` method=google) | [ ] |
 | 12.3 | Buka satu event → **Properties** | Tidak ada email, nama, isi komentar; alamat share berbentuk `#/share/:token` | [ ] |
+| 12.3b | Pasang script, dapat komentar pertama, selesaikan komentar, salin AI prompt, buat studi, buka hasil, ekspor CSV, ganti notifikasi | `install_detected`, `first_comment_received` (sekali per proyek), `comment_resolved`, `fix_prompt_copied`, `study_created`, `study_results_viewed`, `csv_exported`, `settings_notify_changed` | [ ] |
 | 12.4 | DevTools → Network → filter `posthog` di halaman situs pelanggan (bukan `/app`) | **Tidak ada** permintaan ke PostHog dari script widget | [ ] |
 
 ---

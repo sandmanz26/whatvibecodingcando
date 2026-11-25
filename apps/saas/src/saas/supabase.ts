@@ -93,7 +93,9 @@ export async function finishAuthReturn() {
   if (err || !data.session) route = `#/app/login?link=${what === 'oauth' ? 'google' : err ? 'expired' : 'other-browser'}`
   else if (what === 'recovery') route = '#/app/reset'
   else if (what === 'oauth') {
-    track('login_completed', { method: 'google' })
+    // A Google account made in the last few minutes signed up; otherwise it signed in.
+    const fresh = Date.now() - new Date(data.session.user.created_at).getTime() < 10 * 60_000
+    track(fresh ? 'signup_completed' : 'login_completed', { method: 'google' })
     // Where the login page was asked to go next (an invite, a deep link); only an in-app path.
     let next = ''
     try { next = sessionStorage.getItem('vibe.auth.next') ?? ''; sessionStorage.removeItem('vibe.auth.next') } catch { /* ignore */ }

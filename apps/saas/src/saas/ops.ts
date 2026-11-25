@@ -24,17 +24,32 @@ export const PLAN_LABEL: Record<Plan, string> = { free: 'Free', pro_beta: 'Pro b
 
 export interface Overview {
   users_total: number; users_24h: number; users_7d: number; users_30d: number; active_7d: number
-  projects_total: number; sites_seen: number; sites_shown: number
+  projects_total: number; sites_seen: number; sites_shown: number; sites_in_use: number
   comments_total: number; comments_7d: number; studies_7d: number; runs_7d: number; reviewers_total: number
   email_pending: number; email_stuck: number; plans: Partial<Record<Plan, number>>; founding_limit: number
 }
 export interface Day { day: string; signups: number; projects: number }
 export interface Funnel { days: number; signed_up: number; onboarded: number; installed: number; commented: number }
-export interface OpsUser { id: string; email: string | null; created_at: string; last_sign_in_at: string | null; provider: string; projects: number; comments: number; plan: Plan }
+/** Does the user actually use the widget: none (not installed), installed (script seen, no activity), in_use (activity in 14 days), inactive. */
+export type WidgetState = 'none' | 'installed' | 'in_use' | 'inactive'
+export const WIDGET_STATES: WidgetState[] = ['in_use', 'installed', 'inactive', 'none']
+export const WIDGET_LABEL: Record<WidgetState, string> = { none: 'Not installed', installed: 'Installed', in_use: 'In use', inactive: 'Inactive' }
+export const WIDGET_HELP: Record<WidgetState, string> = {
+  none: 'The script never reported from a real site',
+  installed: 'Script seen, no reviewer or study activity yet',
+  in_use: 'Reviewer or study activity in the last 14 days',
+  inactive: 'Was in use, nothing in 14 days or more',
+}
+interface Usage {
+  widget: WidgetState; last_seen: string | null; last_activity: string | null; comments: number; comments_7d: number
+  reviewers: number; studies: number; results: number; rounds_on: boolean
+}
+export interface OpsUser extends Usage { id: string; email: string | null; created_at: string; last_sign_in_at: string | null; provider: string; projects: number; last_comment_at: string | null; plan: Plan }
+export type UserSort = 'created' | 'activity'
 export interface UserDetail {
   id: string; email: string | null; created_at: string; last_sign_in_at: string | null; provider: string
   plan: { plan: Plan; note: string | null; updated_at: string } | null
-  workspaces: { id: string; name: string; role: string; created_at: string; projects: { id: string; name: string; origin: string; public_id: string; created_at: string; installed: boolean; comments: number }[] }[]
+  workspaces: { id: string; name: string; role: string; created_at: string; projects: ({ id: string; name: string; origin: string; public_id: string; created_at: string; installed: boolean } & Usage)[] }[]
 }
 export interface AuditRow { id: number; admin: string | null; action: string; target: string | null; detail: Record<string, unknown>; at: string }
 
@@ -84,8 +99,8 @@ export async function opsSignOut() { await admin()?.auth.signOut({ scope: 'local
 export const opsOverview = () => rpc<Overview>('ops_overview')
 export const opsDaily = (days: number) => rpc<Day[]>('ops_signups_daily', { p_days: days })
 export const opsFunnel = (days: number) => rpc<Funnel>('ops_funnel', { p_days: days })
-export const opsUsers = (search: string, limit: number, offset: number) =>
-  rpc<{ total: number; rows: OpsUser[] }>('ops_users', { p_search: search || null, p_limit: limit, p_offset: offset })
+export const opsUsers = (search: string, limit: number, offset: number, state: WidgetState | '' = '', sort: UserSort = 'created') =>
+  rpc<{ total: number; states: Partial<Record<WidgetState, number>>; rows: OpsUser[] }>('ops_users', { p_search: search || null, p_limit: limit, p_offset: offset, p_state: state || null, p_sort: sort })
 export const opsUserDetail = (id: string) => rpc<UserDetail | null>('ops_user_detail', { p_user: id })
 export const opsAudit = (limit = 30) => rpc<AuditRow[]>('ops_audit_recent', { p_limit: limit })
 export const opsSetPlan = (id: string, plan: Plan, note: string) => rpc<unknown>('ops_set_plan', { p_user: id, p_plan: plan, p_note: note || null })

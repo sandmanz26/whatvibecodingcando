@@ -39,7 +39,7 @@ cd apps/saas && npx esbuild supabase/functions/send-emails/test.ts --bundle --pl
 4. **The embed script** runs on customers' sites: keep the loader (`src/core/embed/main.ts`) tiny with no React; keep the widget in its shadow root; never read form values; never add analytics to it; the snippet carries only `data-project`.
 5. **Two modes:** the app works with a Supabase project in the build (server) and without one (browser-only demo). Keep both working; text that mentions "no server" must depend on the mode.
 6. **Honesty:** no invented customers, numbers, testimonials or ratings; never claim a feature that isn't built (product list: `apps/saas/src/saas/products.ts`).
-7. **Analytics (PostHog):** website and `/app` only, named funnel events only, no autocapture or recordings, no names, emails or comment text.
+7. **Analytics (PostHog):** website and `/app` only, named funnel events only, no autocapture or recordings, no names, emails or comment text; identify by account id, safe person/workspace-group properties only (`docs/POSTHOG.md`).
 8. **Git:** push finished work to `main` (and the working branch if any). No pull requests unless the owner asks.
 
 ## Systems at a glance

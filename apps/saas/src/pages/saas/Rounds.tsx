@@ -8,7 +8,7 @@ import { cloud } from '../../saas/supabase'
 import { copyText, demoUrl } from '../../saas/snippet'
 import { liveOf } from '../../saas/widget'
 import { roundLabel, roundsOf, startRound, updateRound, useRounds, type Approval, type RoundInfo } from '../../saas/rounds'
-import { track } from '../../lib/analytics'
+import { track, trackOnce } from '../../lib/analytics'
 
 const day = (iso: string | null | undefined) => (iso ? new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '')
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })
@@ -33,6 +33,7 @@ export function RoundsPage() {
   const settings = roundsOf(project)
   const latest = rounds[0] ?? null
   const open = rounds.find((r) => r.status === 'open') ?? null
+  if (latest?.status === 'approved') trackOnce('round_approved_seen', latest.id, { n: latest.n })
   const next = (latest?.n ?? 0) + 1
   const chip = open ? `Round ${open.n} open` : latest?.status === 'approved' ? 'Approved' : 'No round open'
   const act = async (fn: () => Promise<void>, msg: string) => { try { await fn(); reload(); toast(msg) } catch (e) { toast(`Not saved: ${(e as Error).message}`, 'error') } }

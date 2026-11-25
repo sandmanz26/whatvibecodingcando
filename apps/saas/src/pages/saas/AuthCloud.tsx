@@ -67,6 +67,7 @@ function GoogleButton({ before }: { before?: () => void }) {
 }
 
 export function CloudRegister() {
+  useEffect(() => { track('signup_started', { method: 'email' }) }, [])
   const [params] = useSearchParams()
   const [state] = useSaas()
   const ready = useSaasReady()
@@ -94,7 +95,7 @@ export function CloudRegister() {
     const { data, error: e } = await sb().auth.signUp({ email: email.trim(), password: pw, options: { data: { name: name.trim().slice(0, 40), onboarded: false }, emailRedirectTo: authReturnUrl('signup'), captchaToken: await captcha() } })
     setBusy(false)
     if (e) { setError(authMessage(e)); return }
-    track('signup_completed', { mode: 'server', products: products.length })
+    track('signup_completed', { method: 'email', products: products.length })
     // With email confirmation off, the account is signed in at once; otherwise it waits for the link.
     if (data.session) { await refreshCloud(); return }
     setSent(true)
@@ -151,7 +152,7 @@ export function CloudLogin() {
     const { error: e } = await sb().auth.signInWithPassword({ email: email.trim(), password: pw, options: { captchaToken: await captcha() } })
     if (e) { setBusy(false); setPw(''); setError(authMessage(e)); return }
     await refreshCloud()
-    track('login_completed')
+    track('login_completed', { method: 'email' })
     nav(next, { replace: true })
   }
   return (

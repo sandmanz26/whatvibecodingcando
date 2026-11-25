@@ -15,11 +15,20 @@ const KEY: string = import.meta.env.VITE_POSTHOG_KEY ?? ''
 const HOST: string = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
 export const analyticsOn = /^phc_[A-Za-z0-9]{20,}$/.test(KEY)
 
-/** The events of the funnel (website → sign-up → installed → first feedback). */
+/**
+ * The named events, object_action in snake_case (docs/POSTHOG.md lists what each answers).
+ * Journey: signup_started → signup_completed → onboarding_completed → snippet_copied → install_detected
+ * → review_link_created → first_comment_received → comment_resolved / fix_prompt_copied, plus research
+ * (study_created, study_results_viewed), rounds (round_started, round_approved_seen) and settings.
+ */
 export type FunnelEvent =
-  | 'signup_completed' | 'login_completed' | 'onboarding_completed' | 'snippet_copied' | 'site_updated'
-  | 'open_my_site' | 'script_detected' | 'review_link_created' | 'first_comment_received' | 'study_created'
-  | 'comments_exported' | 'fix_prompt_copied' | 'rounds_turned_on' | 'rounds_turned_off' | 'round_started'
+  | 'signup_started' | 'signup_completed' | 'login_completed' | 'onboarding_completed' | 'snippet_copied'
+  | 'widget_published' | 'open_my_site' | 'install_detected' | 'review_link_created' | 'first_comment_received'
+  | 'comment_resolved' | 'fix_prompt_copied' | 'csv_exported' | 'study_created' | 'study_results_viewed'
+  | 'rounds_turned_on' | 'rounds_turned_off' | 'round_started' | 'round_approved_seen' | 'settings_notify_changed'
+export type Props = Record<string, string | number | boolean | string[]>
+/** How the account signed up or in. */
+export type Method = 'email' | 'google' | 'demo'
 
 let ph: PostHog | null = null
 let started = false
@@ -61,13 +70,34 @@ function start() {
 }
 
 export const pageview = () => run((p) => p.capture('$pageview'))
-export const track = (event: FunnelEvent, props?: Record<string, string | number | boolean>) => run((p) => p.capture(event, props))
-/** The signed-in account, by its id only (never email or name). */
-export const identify = (id: string) => run((p) => { if (p.get_distinct_id() !== id) p.identify(id) })
+export const track = (event: FunnelEvent, props?: Props) => run((p) => p.capture(event, props))
+
+/**
+ * Safe person properties: ids, counts, dates and choices only. Never email, name or anything typed.
+ * plan, signup_method, created_at, projects, has_installed, products (the tool ids picked).
+ */
+export interface PersonProps {
+  plan?: string; signup_method?: Method; created_at?: string; projects?: number; has_installed?: boolean; products?: string[]
+}
+/** The signed-in account, by its id only (never email or name), with safe person properties. */
+export const identify = (id: string, props?: PersonProps) => run((p) => {
+  if (p.get_distinct_id() !== id) p.identify(id)
+  if (props) {
+    const { created_at, signup_method, ...rest } = props
+    // created_at and the signup method never change: set once; the rest follows the account.
+    p.setPersonProperties(clean(rest), clean({ created_at, signup_method }))
+  }
+})
+/** Updates safe person properties of the signed-in account (e.g. has_installed once a script is seen). */
+export const setPerson = (props: PersonProps) => run((p) => p.setPersonProperties(clean({ ...props })))
+/** The workspace as a PostHog group (group analytics): its id and counts only, never its name. */
+export const group = (workspaceId: string, props: { projects: number; plan?: string }) =>
+  run((p) => p.group('workspace', workspaceId, clean(props)))
+const clean = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined))
 export const resetAnalytics = () => { if (ph) ph.reset() }
 
-/** An event that counts once per project in this browser (first comment, script first seen). */
-export function trackOnce(event: FunnelEvent, project: string, props?: Record<string, string | number | boolean>) {
+/** An event that counts once per project (or per account) in this browser: first comment, install seen. */
+export function trackOnce(event: FunnelEvent, project: string, props?: Props) {
   if (!analyticsOn) return
   const k = `vibe.analytics.${event}.${project}`
   try { if (localStorage.getItem(k)) return; localStorage.setItem(k, '1') } catch { /* still count it */ }
