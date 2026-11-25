@@ -271,13 +271,44 @@ export const ToolIcon = ({ id }: { id: ToolId }) => { const I = TOOL_META[id].Ic
 
 type HeatPt = RawPt
 const HEAT_ERRORS: Record<string, string> = {
-  not_invited: 'Open the site through a review link to see its heatmap.',
+  not_invited: 'Only your team and invited reviewers can see heatmaps. Open this site from your panel (Open my site) or through a review link.',
   origin_not_allowed: 'The Heatmap product isn’t on for this address (Widget → Website, Products).',
   rate_limited: 'Too many requests. Wait a minute.',
 }
 /** Above this many clicks in one view, the map is drawn from the server's bins of all clicks (full data). */
 const RAW_MAX = 20000
+/** Our own demo page: the trial has no study yet, so the heatmap shows labelled sample data instead of an error. */
+const onDemoPage = () => /\/embed-demo\.html$/.test(window.location.pathname)
+
+/** Inside a fixed or sticky overlay (notes, banners): not part of the page itself. */
+function floating(el: Element) {
+  for (let e: Element | null = el; e && e !== document.body; e = e.parentElement) { const pos = getComputedStyle(e).position; if (pos === 'fixed' || pos === 'sticky') return true }
+  return false
+}
+
+/** Labelled sample clicks around the demo page's links, buttons and headings (deterministic, no real people). */
+function samplePoints(): HeatPt[] {
+  let seed = 7
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 }
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd())
+  const vw = window.innerWidth
+  const targets = [...document.querySelectorAll('a[href], button, h1, h2, h3, img, [role="button"]')]
+    .filter((el) => !el.closest('[data-vibe], vibe-collab') && el.getBoundingClientRect().width > 0 && !floating(el)).slice(0, 14)
+  const out: HeatPt[] = []
+  targets.forEach((el, i) => {
+    const r = el.getBoundingClientRect()
+    const cx = r.left + r.width / 2 + window.scrollX, cy = r.top + r.height / 2 + window.scrollY
+    const n = Math.round(30 / (1 + i * 0.45))
+    for (let k = 0; k < n; k++) {
+      out.push({ x: cx + gauss() * Math.min(r.width / 3, 40), y: cy + gauss() * Math.min(r.height / 3, 18), vw, sel: null, ex: null, ey: null,
+        rage: false, dead: false, p: Math.floor(rnd() * 24), t: k, dev: null, label: null, ver: null })
+    }
+  })
+  return out
+}
+
 function HeatmapTool({ project, onClose }: { project: string; onClose: () => void }) {
+  const [sample, setSample] = useState(false)
   const [data, setData] = useState<{ studies: { id: string; name: string }[]; points: HeatPt[]; anchors: Anchor[]; summary: Summary | null } | null>(null)
   const [study, setStudy] = useState('')
   const [error, setError] = useState('')
@@ -303,7 +334,11 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
     const sum = kind === 'click' ? server.rpc<unknown>('heatmap_summary', { p_public_id: project, p_page: page, p_study: study || null }).then(cleanSummary).catch(() => null) : Promise.resolve(null)
     Promise.all([pts, sum])
       .then(([d, summary]) => { if (live) setData({ studies: d.studies ?? [], points: d.points ?? [], anchors: d.anchors ?? [], summary }) })
-      .catch((e: Error) => { if (live) setError(HEAT_ERRORS[e.message] ?? `The heatmap couldn’t load (${e.message}).`) })
+      .catch((e: Error) => {
+        if (!live) return
+        if (onDemoPage() && kind === 'click') { setSample(true); setData({ studies: [], points: samplePoints(), anchors: [], summary: null }); return }
+        setError(HEAT_ERRORS[e.message] ?? `The heatmap couldn’t load (${e.message}).`)
+      })
     return () => { live = false }
   }, [project, page, study, kind])
   // Versions: never mixed. The busiest version on this device is shown first; the reviewer can pick another.
@@ -387,6 +422,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
         <div className="vc-card-head"><b>Heatmap · {page}</b><span className="vc-grow" /><button className="vc-icon" onClick={onClose} aria-label="Close"><X size={14} /></button></div>
         {error ? <p className="vc-bad">{error}</p> : !data ? <p className="vc-empty">Loading…</p> : (
           <>
+            {sample && <p className="vc-sample"><b>Sample data.</b> This is what a click heatmap looks like. Yours fills with real clicks from people who join a heatmap study: in your panel, open Research → All studies → New study → Heatmap visit, then share its link.</p>}
             <div className="vc-seg"><button aria-pressed={kind === 'click'} onClick={() => setKind('click')}>Clicks</button><button aria-pressed={kind === 'gaze'} onClick={() => setKind('gaze')}>Where people looked</button></div>
             <div className="vc-seg" role="group" aria-label="Device">{(['all', 'desktop', 'tablet', 'mobile'] as Device[]).map((d) => <button key={d} aria-pressed={device === d} onClick={() => setDevice(d)}>{d === 'all' ? 'All' : d[0].toUpperCase() + d.slice(1)}</button>)}</div>
             {versions.length > 1 && (
