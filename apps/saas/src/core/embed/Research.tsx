@@ -11,7 +11,7 @@ import { Recorder, pageOf, cleanConfig, finishRun, pageMatches, saveRun, startRu
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const KIND_LABEL = { usability: 'tasks on this site', fivesec: 'a 5-second test', browse: 'a short visit' } as const
 
-export function Participant({ project, initial, accent, doorsOn = false, gazeUrl = '' }: { project: string; initial: RunState; accent: string; doorsOn?: boolean; gazeUrl?: string }) {
+export function Participant({ project, initial, accent, doorsOn = false, gazeUrl = '', version = '' }: { project: string; initial: RunState; accent: string; doorsOn?: boolean; gazeUrl?: string; version?: string }) {
   const recRef = useRef<Recorder | null>(null)
   // Hooks first, before any return below: React needs the same hooks in the same order every render.
   const [faceLost, setFaceLost] = useState(false)
@@ -66,7 +66,7 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
         setSt(next); saveRun(project, next)
         const rule = s.kind === 'usability' ? s.config?.tasks?.[s.index]?.success : undefined
         if (rule?.kind === 'page' && pageMatches(rule.page, page)) window.setTimeout(() => endTask('success'), 300)
-      })
+      }, version)
     recRef.current = rec
     rec.start(() => (stRef.current.kind === 'usability' ? stRef.current.config?.tasks?.[stRef.current.index]?.id : stRef.current.kind), (el) => {
       const rule = stRef.current.config?.tasks?.[stRef.current.index]?.success

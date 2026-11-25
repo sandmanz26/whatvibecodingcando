@@ -140,7 +140,10 @@ export class OneEuro {
   private x: number | null = null
   private dx = 0
   private t = 0
-  constructor(private minCutoff = 0.8, private beta = 0.012, private dCutoff = 1) {}
+  private minCutoff: number
+  private beta: number
+  private dCutoff: number
+  constructor(minCutoff = 0.8, beta = 0.012, dCutoff = 1) { this.minCutoff = minCutoff; this.beta = beta; this.dCutoff = dCutoff }
   private alpha(cutoff: number, dt: number) { const tau = 1 / (2 * Math.PI * cutoff); return 1 / (1 + tau / dt) }
   filter(v: number, tMs: number) {
     if (this.x === null) { this.x = v; this.t = tMs; return v }

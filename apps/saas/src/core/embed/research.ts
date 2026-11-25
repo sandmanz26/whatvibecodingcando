@@ -103,7 +103,7 @@ export function pageOf(path: string): string {
 
 /* ---------- the click recorder ---------- */
 
-interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze'; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
+interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze' | 'seen' | 'depth'; version?: string; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [onclick], [contenteditable=""], [contenteditable=true]'
 /**
@@ -134,7 +134,8 @@ export class Recorder {
   private timer = 0
   private stop: (() => void) | null = null
   private lastPage = ''
-  constructor(private run: string, private t0: number, private onClick: (e: { el: Element; page: string }) => void, private onPage: (page: string) => void) {
+  private exposure: Exposure | null = null
+  constructor(private run: string, private t0: number, private onClick: (e: { el: Element; page: string }) => void, private onPage: (page: string) => void, private version = '') {
     // Clicks the previous page of this tab couldn't send before it closed.
     try {
       const kept = JSON.parse(sessionStorage.getItem(this.backlogKey) ?? '[]')
@@ -180,15 +181,18 @@ export class Recorder {
     }
     const look = () => {
       const p = window.location.pathname
-      if (p === this.lastPage) return
+      if (p === this.lastPage) { this.exposure?.scan(); return }
+      if (this.exposure) this.exposure.end()
       this.lastPage = p
       this.push({ t: now(), task: task?.(), kind: 'page', page: p })
+      this.exposure = new Exposure((e) => this.push({ t: now(), task: task?.(), page: p, ...e }))
       this.onPage(p)
     }
     // The tab is hidden or closing: send what is queued now. Going to another page of the site: keep it
     // in this tab for the next page to send (a request from a page that is unloading can be dropped).
-    const hidden = () => { if (document.visibilityState === 'hidden') void this.flush(true) }
+    const hidden = () => { if (document.visibilityState === 'hidden') { this.exposure?.depthNow(); void this.flush(true) } }
     const leave = () => {
+      this.exposure?.end(); this.exposure = null
       if (!this.queue.length) return
       try { sessionStorage.setItem(this.backlogKey, JSON.stringify(this.queue.splice(0))) } catch { void this.flush(true) }
     }
@@ -203,6 +207,7 @@ export class Recorder {
       document.removeEventListener('visibilitychange', hidden)
       window.removeEventListener('pagehide', leave)
       window.clearInterval(iv); window.clearInterval(this.timer)
+      this.exposure?.end(); this.exposure = null
     }
   }
   end() { this.stop?.(); this.stop = null; return this.flush() }
@@ -218,12 +223,75 @@ export class Recorder {
   door(d: { page: string; sel: string; label: string }, hit: boolean, task?: string) {
     this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'door', page: window.location.pathname, sel: d.sel.slice(0, 400), label: d.label.slice(0, 80), hit })
   }
-  private push(e: Ev) { if (this.queue.length < 1000) this.queue.push({ ...e, page: pageOf(e.page) }) }
+  private push(e: Ev) { if (this.queue.length < 1000) this.queue.push({ ...e, page: pageOf(e.page), ...(this.version ? { version: this.version } : {}) }) }
   async flush(leaving = false) {
     if (!this.queue.length) return
     if (leaving) { while (this.queue.length) server.rpcOnLeave('log_events', { p_run: this.run, p_events: this.queue.splice(0, 200) }); return }
     const batch = this.queue.splice(0, 200)
     try { await server.rpc('log_events', { p_run: this.run, p_events: batch }) } catch { if (this.queue.length < 800) this.queue.unshift(...batch) }
+  }
+}
+
+/* ---------- exposure: what each participant actually saw ---------- */
+
+/** Elements whose exposure is recorded: what people can click, plus headings, images and sections. */
+const EXPOSED = `${INTERACTIVE}, h1, h2, h3, img, picture, video, section, [data-vibe-id]`
+/** At most this many elements are watched, and this many "seen" events sent, per page visit. */
+const MAX_WATCH = 300, MAX_SEEN = 150
+/**
+ * Exposure for one page visit: an element counts as seen once ≥ 50% of it was visible for ≥ 500 ms
+ * (IntersectionObserver), sent once with its selector only, never its content. The deepest point of
+ * the page reached (bottom of the viewport) is sent when the visit ends. Elements inside our widget
+ * and private parts of the page are left out.
+ */
+class Exposure {
+  private io: IntersectionObserver | null = null
+  private watched = new Set<Element>()
+  private timers = new Map<Element, number>()
+  private sent = 0
+  private deepest = 0
+  private onScroll = () => { this.deepest = Math.max(this.deepest, window.scrollY + window.innerHeight) }
+  private done = false
+  constructor(private emit: (e: Omit<Ev, 't' | 'page'>) => void) {
+    this.onScroll()
+    window.addEventListener('scroll', this.onScroll, { passive: true, capture: true })
+    if (typeof IntersectionObserver === 'undefined') return
+    this.io = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        const el = en.target
+        if (en.intersectionRatio >= 0.5) {
+          if (!this.timers.has(el)) this.timers.set(el, window.setTimeout(() => this.seen(el), 500))
+        } else { window.clearTimeout(this.timers.get(el)); this.timers.delete(el) }
+      }
+    }, { threshold: [0, 0.5, 1] })
+    this.scan()
+  }
+  /** Watches new elements (the page can add them later), up to MAX_WATCH. */
+  scan() {
+    if (!this.io || this.done) return
+    for (const el of Array.from(document.querySelectorAll(EXPOSED))) {
+      if (this.watched.size >= MAX_WATCH) break
+      if (this.watched.has(el) || el.closest('vibe-collab, [id^=vibe-collab]') || el.closest(PRIVATE)) continue
+      this.watched.add(el); this.io.observe(el)
+    }
+  }
+  private seen(el: Element) {
+    this.timers.delete(el); this.io?.unobserve(el)
+    if (this.done || this.sent >= MAX_SEEN || !el.isConnected) return
+    this.sent++
+    this.emit({ kind: 'seen', sel: redact(selectorFor(el)).slice(0, 400), vw: window.innerWidth })
+  }
+  depthNow() {
+    this.onScroll()
+    this.emit({ kind: 'depth', y: Math.round(this.deepest), vw: window.innerWidth, doc_h: document.documentElement.scrollHeight })
+  }
+  end() {
+    if (this.done) return
+    this.depthNow()
+    this.done = true
+    this.io?.disconnect()
+    for (const t of this.timers.values()) window.clearTimeout(t)
+    window.removeEventListener('scroll', this.onScroll, { capture: true })
   }
 }
 

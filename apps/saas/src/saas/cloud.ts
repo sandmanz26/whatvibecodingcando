@@ -236,7 +236,7 @@ async function eventsOf(ids: string[], max = 20000): Promise<EventRow[]> {
   const events: EventRow[] = []
   for (let i = 0; i < ids.length && events.length < max; i += 100) {
     const chunk = ids.slice(i, i + 100)
-    events.push(...await paged<EventRow>((from, to) => supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit')
+    events.push(...await paged<EventRow>((from, to) => supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit').in('kind', ['click', 'page', 'gaze', 'door'])
       .in('run_id', chunk).order('run_id').order('t').order('id').range(from, to), max - events.length))
   }
   return events
@@ -433,6 +433,12 @@ export async function studyResults(id: string): Promise<{ runs: RunRow[]; events
   if (error) throw error
   const events = await eventsOf((runs ?? []).map((r) => r.id as string))
   return { runs: runs as RunRow[], events }
+}
+/** A page's heatmap pre-aggregated on the server over every event of the study (bounded: bins, elements, depth). */
+export async function studyHeatmap(id: string, page: string): Promise<unknown> {
+  const { data, error } = await supabase!.rpc('study_heatmap', { p_study: id, p_page: page })
+  if (error) throw error
+  return data
 }
 export async function deleteRun(id: string) { const { error } = await supabase!.from('runs').delete().eq('id', id); if (error) throw error }
 /** Clears a study's results (every participant's run, with their clicks, gaze and answers, so its heatmap too); the study and its link stay. */

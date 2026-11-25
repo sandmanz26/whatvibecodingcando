@@ -291,7 +291,7 @@ export async function boot(given?: HTMLScriptElement | null) {
     }
     if (study && study.phase !== 'declined') {
       const file = await server.fetchSettings(project)
-      mountAlone(<Participant project={project} initial={study as RunState} accent={file.live?.config.theme.accent ?? '#e8590c'} doorsOn={!!file.live?.config.modules.doors} gazeUrl={script?.src ? new URL('gaze.js', script.src).href : ''} />)
+      mountAlone(<Participant project={project} initial={study as RunState} accent={file.live?.config.theme.accent ?? '#e8590c'} doorsOn={!!file.live?.config.modules.doors} version={file.live?.config.version ?? ''} gazeUrl={script?.src ? new URL('gaze.js', script.src).href : ''} />)
       return
     }
   }

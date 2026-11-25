@@ -5,7 +5,7 @@
  */
 
 /** w: how much the point counts (1 by default), e.g. a fixation's duration or one person's share. */
-import { bandwidth, colourise, kde, type Scaling } from './density'
+import { bandwidth, colourise, kde, kdeGroups, type Density, type Scaling } from './density'
 
 export interface HeatPoint { x: number; y: number; w?: number }
 
@@ -36,6 +36,12 @@ export function drawHeat(canvas: HTMLCanvasElement, points: HeatPoint[], scale: 
   const pts = points.map((p) => ({ x: p.x * k, y: p.y * k, w: p.w ?? 1 }))
   const hPage = bandwidth(points, Math.max(5, radius * 0.4), Math.max(8, radius * 0.6))
   const d = kde(pts, { width: w, height: h, h: hPage * k, adaptive: true })
+  paint(canvas, ctx, d, opacity, scaling)
+  const cellPage = d.cell / k
+  return { n: points.length, h: Math.round(hPage), top: d.vmax * (2500 / (cellPage * cellPage)), ms: performance.now() - t0 }
+}
+
+function paint(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, d: Density, opacity: number, scaling: Scaling) {
   let buf = buffers.get(canvas)
   if (!buf) { buf = { off: document.createElement('canvas') }; buffers.set(canvas, buf) }
   if (buf.off.width !== d.gw) buf.off.width = d.gw
@@ -45,8 +51,27 @@ export function drawHeat(canvas: HTMLCanvasElement, points: HeatPoint[], scale: 
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(buf.off, 0, 0, d.gw * d.cell, d.gh * d.cell)
+}
+
+/**
+ * Like drawHeat, but each group has its own bandwidth in page px (e.g. each eye-tracking run blurred
+ * by that run's own measured error, never by one global value).
+ */
+export function drawHeatGroups(canvas: HTMLCanvasElement, groups: { points: HeatPoint[]; h: number }[], scale: number, opacity: number, scaling: Scaling = 'sqrt'): HeatStats {
+  const t0 = performance.now()
+  const dpr = Math.min(2, window.devicePixelRatio || 1)
+  const w = Math.max(1, Math.round(canvas.clientWidth * dpr)), h = Math.max(1, Math.round(canvas.clientHeight * dpr))
+  if (canvas.width !== w) canvas.width = w
+  if (canvas.height !== h) canvas.height = h
+  const ctx = canvas.getContext('2d')
+  ctx?.clearRect(0, 0, w, h)
+  const n = groups.reduce((s, g) => s + g.points.length, 0)
+  if (!ctx || !n) return { n: 0, h: 0, top: 0, ms: 0 }
+  const k = scale * dpr
+  const d = kdeGroups(groups.map((g) => ({ h: g.h * k, points: g.points.map((p) => ({ x: p.x * k, y: p.y * k, w: p.w ?? 1 })) })), { width: w, height: h })
+  paint(canvas, ctx, d, opacity, scaling)
   const cellPage = d.cell / k
-  return { n: points.length, h: Math.round(hPage), top: d.vmax * (2500 / (cellPage * cellPage)), ms: performance.now() - t0 }
+  return { n, h: Math.round(d.h / k), top: d.vmax * (2500 / (cellPage * cellPage)), ms: performance.now() - t0 }
 }
 
 /* ---------- sample data ---------- */

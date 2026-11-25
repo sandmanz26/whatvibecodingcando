@@ -618,3 +618,17 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 @keyframes pv-up { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
 @media (prefers-reduced-motion: reduce) { .pv-pop, .pv-sheet { animation: none; } }
 .pv-wrap > .up-product { height: 100%; box-sizing: border-box; }
+
+/* study results: heatmap numbers (v4) */
+.up .rs-heatgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin: 8px 0 12px; }
+.up .rs-heatgrid h3 { font-size: 13px; margin: 0 0 6px; }
+.up .rs-heatprev { display: block; max-width: 100%; height: 300px; margin: 0 auto; background: #1d1b26; border-radius: 8px; }
+.up .rs-legend { height: 6px; border-radius: 3px; margin: 6px 0; }
+.up .rs-reach { display: grid; gap: 3px; font-size: 12px; }
+.up .rs-reach > div { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 8px; color: var(--lp-ink-2); }
+.up .rs-reach i { display: block; height: 10px; border-radius: 3px; background: var(--lp-ink-2); min-width: 1px; }
+.up .rs-reach b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.up .rs-faint td { opacity: .45; }
+.up .db-table td.rs-ci { white-space: nowrap; }
+.up .db-table th { white-space: nowrap; }
+@media (max-width: 720px) { .up .rs-heatgrid { grid-template-columns: 1fr; } }

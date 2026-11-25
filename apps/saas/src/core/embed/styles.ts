@@ -147,6 +147,16 @@ export const CSS = `
 .vc-heat { position: fixed; inset: 0; z-index: 2147482994; pointer-events: none; width: 100vw; height: 100vh; }
 .vc-heatpanel { top: auto; bottom: 74px; height: auto; max-height: 60vh; }
 .vc-legend { height: 8px; border-radius: 4px; }
+.vc-heatpanel { overflow-y: auto; }
+.vc-heatpanel > * { flex-shrink: 0; }
+.vc-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.vc-table th, .vc-table td { text-align: left; padding: 3px 4px; border-bottom: 1px solid var(--vc-soft); vertical-align: top; }
+.vc-table th { font-weight: 600; color: var(--vc-ink-2); }
+.vc-faint td { opacity: .45; }
+.vc-reach { display: grid; gap: 2px; font-size: 11px; }
+.vc-reach-row { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 6px; color: var(--vc-ink-2); }
+.vc-reach-row i { display: block; height: 8px; border-radius: 3px; background: var(--vc-accent); min-width: 1px; }
+.vc-reach-row b { font-weight: 600; text-align: right; }
 .vc-q select, .vc-q input[type=range] { font: inherit; }
 .vc-door { position: fixed; z-index: 2147482997; height: 30px; padding: 0 12px; border-radius: 999px; border: 0; background: var(--vc-accent); color: #fff; font: 600 13px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.2); cursor: pointer; }
 .vc-door span { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; background: rgba(255,255,255,.25); padding: 2px 5px; border-radius: 4px; }

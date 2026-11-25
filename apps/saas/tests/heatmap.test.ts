@@ -133,3 +133,156 @@ test('mixed devices are never mixed by the maths: callers filter, density keeps 
   assert.equal(d.grid[Math.floor(100 / d.cell) * d.gw + Math.floor(100 / d.cell)], 0)
   assert.ok(kde([...desk, ...mob], { width: 1200, height: 300, h: 10 }).grid[Math.floor(100 / d.cell) * d.gw + Math.floor(100 / d.cell)] > 0)
 })
+
+/* ---------- v4: meaning, not just maths ---------- */
+// The app's modules import each other without extensions (Vite style): resolve those for Node here.
+import { register } from 'node:module'
+register('data:text/javascript,' + encodeURIComponent(`export async function resolve(s, c, next) { try { return await next(s, c) } catch (e) { if (/^\\.\\.?\\//.test(s) && !/\\.[cm]?[jt]sx?$/.test(s)) return next(s + '.ts', c); throw e } }`))
+const { binPoints, binsToPoints, compareShares, ctrPerView, cleanGaze, driftOf, exposureWeight, fmtShare, normCdf, pairsOf, place, reachCurve, reachFrom, rowOf, smoothGaze, wilson, BINS_ACROSS } = await import('../src/core/heatstats.ts')
+const { prepare } = await import('../src/core/embed/heatmath.ts')
+const { viewOf, cleanSummary } = await import('../src/core/embed/heatsummary.ts')
+
+test('wilson: textbook values, edges, never outside 0–1', () => {
+  const a = wilson(38, 100)
+  assert.ok(Math.abs(a.lo - 0.2910) < 0.001 && Math.abs(a.hi - 0.4779) < 0.001, `${a.lo} ${a.hi}`)
+  const z = wilson(0, 10); assert.equal(z.lo, 0); assert.ok(Math.abs(z.hi - 0.2775) < 0.001)
+  const f = wilson(10, 10); assert.equal(f.hi, 1); assert.ok(f.lo > 0.69 && f.lo < 0.73)
+  assert.deepEqual(wilson(0, 0), { p: 0, lo: 0, hi: 0, half: 0 })
+  assert.equal(fmtShare(38, 100), '38% ± 9')
+  assert.equal(fmtShare(1, 0), '–')
+  assert.ok(wilson(5, 10).half > wilson(500, 1000).half, 'more people → narrower')
+})
+
+test('normal CDF and two-proportion z-test: known values, plain words', () => {
+  assert.ok(Math.abs(normCdf(1.96) - 0.975) < 1e-4)
+  assert.ok(Math.abs(normCdf(0) - 0.5) < 1e-6)
+  // 45/100 vs 30/100: z ≈ 2.19, p ≈ 0.029
+  const c = compareShares(30, 100, 45, 100, ['v1', 'v2'])
+  assert.ok(Math.abs(c.z - 2.19) < 0.02, String(c.z)); assert.ok(Math.abs(c.p - 0.0285) < 0.002, String(c.p))
+  assert.equal(c.real, true); assert.match(c.words, /v2 is 15 points higher than v1: likely a real difference/)
+  const same = compareShares(30, 100, 33, 100)
+  assert.equal(same.real, false); assert.match(same.words, /could be chance/)
+  assert.match(compareShares(1, 3, 2, 3).words, /Too few people/)
+})
+
+test('exposure: CTR per view divides by people who saw it; reach curve; weights capped', () => {
+  const c = ctrPerView(6, 12)
+  assert.equal(c.p, 0.5); assert.equal(c.ok, true)
+  assert.equal(ctrPerView(2, 3).ok, false, 'too few exposures greyed')
+  assert.equal(ctrPerView(5, 2).p, 1, 'never above 100% (clickers always saw it)')
+  // 20 people: 12 reached row 200, 8 stopped at row 50
+  const reach = reachFrom([{ row: 200, people: 12 }, { row: 50, people: 8 }])
+  assert.equal(reach(0), 1); assert.equal(reach(100), 0.6); assert.equal(reach(201), 0)
+  assert.ok(Math.abs(exposureWeight(0.6, 12) - 1 / 0.6) < 1e-9)
+  assert.equal(exposureWeight(0.1, 2), 1, 'too few people there: no adjustment')
+  assert.equal(exposureWeight(0.05, 50), 5, 'capped at 5×')
+  const curve = reachCurve([1, 1, 0.5, 0.25], 4)
+  assert.deepEqual(curve.map((x) => x.share), [1, 1, 0.75, 0.5, 0.5])
+  assert.equal(rowOf(1600, 1280), 100)
+})
+
+test('exposure: below-the-fold element is no longer unfairly cold', () => {
+  // Top button: 40 of 100 people click it. Bottom button: only 20 people saw it, 10 clicked.
+  const top = ctrPerView(40, 100), bottom = ctrPerView(10, 20)
+  assert.ok(bottom.p > top.p, 'per view, the bottom button converts better')
+  assert.ok(wilson(10, 100).p < wilson(40, 100).p, 'raw share of everyone says the opposite')
+})
+
+test('placement: unresolved or changed elements are counted, not drawn at stale coordinates', () => {
+  const pts = [
+    { sel: '#buy', x: 900, y: 100, ex: 0.5, ey: 0.5, vw: 1280, tag: 'button' },
+    { sel: '#gone', x: 300, y: 300, ex: 0.5, ey: 0.5, vw: 1280, tag: 'a' },
+    { sel: '#swap', x: 10, y: 10, ex: 0.5, ey: 0.5, vw: 1280, tag: 'button' },
+    { sel: null, x: 640, y: 50, vw: 1280 },
+  ]
+  const els: Record<string, { left: number; top: number; width: number; height: number; tag: string }> = { '#buy': { left: 100, top: 200, width: 100, height: 40, tag: 'button' }, '#swap': { left: 0, top: 0, width: 50, height: 50, tag: 'img' } }
+  const r = place(pts, (s) => els[s] ?? null, 640)
+  assert.equal(r.unplaced, 2)
+  assert.equal(r.placed.length, 2)
+  assert.deepEqual([r.placed[0].px, r.placed[0].py], [150, 220], 'follows its element on this layout')
+  assert.deepEqual([r.placed[1].px, r.placed[1].py], [320, 50], 'a click on bare page is scaled by width')
+})
+
+test('versions are never mixed by prepare', () => {
+  const pts = [...Array.from({ length: 5 }, (_, i) => ({ x: 10, y: 10, vw: 1280, sel: null, ex: null, ey: null, rage: null, dead: null, p: i, t: i, ver: 'v1' })),
+    ...Array.from({ length: 3 }, (_, i) => ({ x: 900, y: 10, vw: 1280, sel: null, ex: null, ey: null, rage: null, dead: null, p: 10 + i, t: i, ver: 'v2' }))]
+  const a = prepare(pts, { kind: 'click', device: 'all', equal: true, maxAcc: null, version: 'v1' })
+  assert.equal(a.people, 5); assert.ok(a.pts.every((p) => p.ver === 'v1'))
+  assert.equal(prepare(pts, { kind: 'click', device: 'all', equal: true, maxAcc: null, version: 'v2' }).people, 3)
+})
+
+test('binned KDE equals point KDE within tolerance', () => {
+  const vw = 1280
+  const pts = Array.from({ length: 4000 }, (_, i) => ({ x: Math.min(1279, Math.max(0, 640 + gauss() * 200)), y: Math.max(0, 900 + gauss() * 300), vw, p: i % 50 }))
+  const bins = binPoints(pts)
+  assert.equal(bins.reduce((s, b) => s + b.n, 0), 4000, 'every point in a bin')
+  const fromBins = binsToPoints(bins, vw, false)
+  const o = { width: vw, height: 2200, h: 40 }
+  const a = kde(pts, o), b = kde(fromBins, o)
+  let diff = 0, tot = 0
+  for (let i = 0; i < a.grid.length; i++) { diff += Math.abs(a.grid[i] - b.grid[i]); tot += a.grid[i] }
+  const rel = diff / tot
+  assert.ok(rel < 0.03, `L1 difference ${(rel * 100).toFixed(2)}% (bin ${vw / BINS_ACROSS} px, bandwidth 40 px)`)
+  console.log(`  binned vs point KDE: L1 difference ${(rel * 100).toFixed(2)}%`)
+  // equal weighting uses distinct people per bin
+  assert.ok(binsToPoints(bins, vw, true).every((p, i) => p.w === bins[i].people))
+})
+
+test('gaze cleaning drops off-page, blink and low-confidence samples; smoothing reduces jitter', () => {
+  const s = [{ t: 0, x: 100, y: 100 }, { t: 200, x: 0, y: 0 }, { t: 400, x: -500, y: 10 }, { t: 600, x: NaN, y: 1 }, { t: 800, x: 50, y: 50, c: 0.1 }, { t: 1000, x: 60, y: 60, c: 0.9 }]
+  assert.deepEqual(cleanGaze(s, 1280, 5000).map((g) => g.t), [0, 1000])
+  const noisy = Array.from({ length: 60 }, (_, i) => ({ t: i * 200, x: 500 + gauss() * 40, y: 300 + gauss() * 40 }))
+  const sm = smoothGaze(noisy)
+  const sd = (xs: number[]) => { const m = xs.reduce((a, b) => a + b, 0) / xs.length; return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length) }
+  assert.ok(sd(sm.slice(5).map((g) => g.x)) < sd(noisy.slice(5).map((g) => g.x)), 'smoothed is steadier')
+})
+
+test('drift correction recovers a known offset from clicks (with outliers)', () => {
+  const offset = { dx: -63, dy: 41 } // the correction (click − gaze) the method should find
+  const gaze: { t: number; x: number; y: number }[] = []
+  const clicks: { t: number; x: number; y: number }[] = []
+  for (let k = 0; k < 12; k++) {
+    const cx = 100 + k * 90, cy = 200 + (k % 4) * 150, t = 5000 + k * 3000
+    clicks.push({ t, x: cx, y: cy })
+    // 3 of 12 clicks were made without looking (gaze elsewhere): outliers
+    const away = k % 4 === 3
+    for (let j = 1; j <= 4; j++) gaze.push({ t: t - j * 150, x: (away ? 900 : cx) - offset.dx + gauss() * 25, y: (away ? 900 : cy) - offset.dy + gauss() * 25 })
+  }
+  const pairs = pairsOf(gaze, clicks)
+  assert.equal(pairs.length, 12)
+  const d = driftOf(pairs)
+  assert.equal(d.applied, true)
+  const err = Math.hypot(d.dx - offset.dx, d.dy - offset.dy)
+  console.log(`  drift recovery: true (${offset.dx}, ${offset.dy}) → estimated (${d.dx.toFixed(1)}, ${d.dy.toFixed(1)}), error ${err.toFixed(1)} px; residual ${d.residual.toFixed(1)} px (before ${d.before.toFixed(1)} px)`)
+  assert.ok(err < 15, `recovered within 15 px (got ${err.toFixed(1)})`)
+  assert.ok(d.residual < d.before / 2)
+  assert.equal(driftOf(pairs.slice(0, 4)).applied, false, 'fewer than 5 pairs: not applied')
+})
+
+test('prepare (gaze): drift applied per run and each run gets its own bandwidth', () => {
+  const pts: Parameters<typeof prepare>[0] = []
+  const anchors: { p: number; t: number; x: number; y: number }[] = []
+  for (let k = 0; k < 8; k++) {
+    const t = 2000 + k * 2000, cx = 200 + k * 100, cy = 400
+    anchors.push({ p: 1, t, x: cx, y: cy })
+    for (let j = 1; j <= 5; j++) pts.push({ x: cx + 80, y: cy - 50, vw: 1280, sel: null, ex: null, ey: null, rage: null, dead: null, p: 1, t: t - j * 120, acc: 150 })
+  }
+  for (let j = 0; j < 20; j++) pts.push({ x: 600, y: 600, vw: 1280, sel: null, ex: null, ey: null, rage: null, dead: null, p: 2, t: j * 200, acc: 200 })
+  const r = prepare(pts, { kind: 'gaze', device: 'all', equal: false, maxAcc: null, anchors })
+  const d1 = r.drift.find((d) => d.p === 1)!, d2 = r.drift.find((d) => d.p === 2)!
+  assert.equal(d1.applied, true); assert.ok(d1.residual < 20, String(d1.residual))
+  assert.equal(d2.applied, false)
+  assert.ok(r.groups.find((g) => g.p === 1)!.h < r.groups.find((g) => g.p === 2)!.h, 'the corrected run is drawn sharper')
+})
+
+test('summary view: per device and version, intervals, reach', () => {
+  const s = cleanSummary({ bin: 80, groups: [{ dev: 'desktop', ver: 'v1', people: 20, clicks: 15 }, { dev: 'desktop', ver: 'v2', people: 10, clicks: 0 }],
+    bins: [{ dev: 'desktop', ver: 'v1', bx: 40, by: 150, n: 12, people: 6 }],
+    elements: [{ dev: 'desktop', ver: 'v1', sel: '#buy', label: 'button “Buy”', clicks: 12, people: 6, first: 6, rage: 0, dead: 0, seen: 12 }],
+    depth: [{ dev: 'desktop', ver: 'v1', row: 200, frac: 1, people: 12 }, { dev: 'desktop', ver: 'v1', row: 50, frac: 0.25, people: 8 }] })
+  const v = viewOf(s, 'all', 'v1')
+  assert.equal(v.people, 20); assert.equal(v.elements[0].perView.p, 0.5); assert.equal(v.elements[0].ofPeople.p, 0.3)
+  assert.equal(v.reach(100), 0.6); assert.equal(v.reachedAt(100), 12)
+  assert.equal(viewOf(s, 'all', 'v2').elements.length, 0)
+  assert.deepEqual(cleanSummary(null).bins, [])
+})

@@ -11,6 +11,7 @@ import { clearStudyResults, deleteRun, deleteStudy, listStudies, projectSessions
 import { ago, usePanel } from './Panel'
 import { download, toCsv } from '../../saas/stats'
 import { track } from '../../lib/analytics'
+import { PageAccuracy } from './HeatNumbers'
 
 const fileName = (s: string) => s.replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'study'
 /** One row per participant: when, device, eye-tracking accuracy, and each task's outcome and time, or their answers. */
@@ -377,6 +378,7 @@ export function StudyResults() {
               <tbody>{pages.map(([p, [n, rage, dead]]) => <tr key={p}><td><code>{p}</code></td><td>{n}</td><td>{rage}</td><td>{dead}</td><td>{heatOn && <button className="lp-btn sm" onClick={() => openHeat(p)}>Heatmap <ExternalLink size={12} /></button>}</td></tr>)}</tbody>
             </table>
           </section>
+          {pages.length > 0 && <PageAccuracy study={id!} pages={pages.map(([p]) => p)} />}
           <section className="up-card">
             <h2>Participants</h2>
             <p className="up-muted">Each participant’s path: the pages they opened and what they clicked, in order. Rage clicks are three or more quick clicks in one spot.</p>
@@ -484,4 +486,5 @@ function Sessions({ studies }: { studies: StudyRow[] }) {
     </>
   )
 }
+
 

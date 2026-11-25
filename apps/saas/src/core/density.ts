@@ -146,6 +146,30 @@ export function kde(points: DPt[], o: KdeOpts): Density {
   return { grid, gw, gh, cell, h: o.h, vmax: robustMax(grid) }
 }
 
+/**
+ * Several groups of points, each with its own bandwidth (e.g. each eye-tracking run blurred by its own
+ * measured error), on one grid: the sum of fixed-bandwidth KDEs. Groups whose bandwidths round to the
+ * same 4 px share one blur, so the cost stays bounded.
+ */
+export function kdeGroups(groups: { points: DPt[]; h: number }[], o: { width: number; height: number; maxCells?: number }): Density {
+  const live = groups.filter((g) => g.points.length && g.h > 0)
+  const hMin = live.length ? Math.min(...live.map((g) => g.h)) : 10
+  const maxCells = o.maxCells ?? 160_000
+  let cell = Math.max(1, hMin / 2)
+  if ((o.width / cell) * (o.height / cell) > maxCells) cell = Math.sqrt((o.width * o.height) / maxCells)
+  const gw = Math.max(1, Math.ceil(o.width / cell)), gh = Math.max(1, Math.ceil(o.height / cell))
+  const grid = new Float32Array(gw * gh), tmp = new Float32Array(gw * gh)
+  const byH = new Map<number, Float32Array>()
+  for (const g of live) {
+    const k = Math.max(4, Math.round(g.h / 4) * 4)
+    let L = byH.get(k)
+    if (!L) { L = new Float32Array(gw * gh); byH.set(k, L) }
+    for (const p of g.points) if ((p.w ?? 1) > 0) splat(L, gw, gh, p.x / cell, p.y / cell, p.w ?? 1)
+  }
+  for (const [h, L] of byH) { blur(L, gw, gh, h / cell, tmp); for (let i = 0; i < grid.length; i++) grid[i] += L[i] }
+  return { grid, gw, gh, cell, h: hMin, vmax: robustMax(grid) }
+}
+
 /** The value that reads as the top of the scale: the 99th percentile of the cells that have any heat (so one extreme spot doesn't wash out the rest). */
 export function robustMax(grid: Float32Array): number {
   let peak = 0

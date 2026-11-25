@@ -207,7 +207,13 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 9.11a | Heatmap (dock) dengan < 10 peserta | Muncul **Early signal: N people so far**; legenda berwarna ungu → kuning dengan satuan "per 50 px square" | [ ] |
 | 9.11b | Satu peserta klik 100× di halaman yang sama | Heatmap menghitung maksimal 60 klik orang itu; daftar **Most clicked elements** menampilkan % orang dan first click | [ ] |
 | 9.11c | Klik 3× cepat di gambar yang tidak bisa diklik | Dihitung sebagai rage dan dead click; klik dari script (`el.click()`) tidak tercatat | [ ] |
-| 9.11d | `node apps/saas/tests/heatmap.test.ts` | Semua tes lulus (0/1 titik, titik sama, 100k titik, perangkat campur) | [ ] |
+| 9.11d | `node apps/saas/tests/heatmap.test.ts` | Semua tes lulus (0/1 titik, titik sama, 100k titik, perangkat campur, Wilson CI, z-test, exposure, koreksi drift, KDE bin ≈ KDE titik, klik yang tidak bisa ditempatkan) | [ ] |
+| 9.11e | Peserta scroll setengah halaman lalu selesai; buka Results → **Heatmap numbers, every click** | Kurva **How far people scrolled** turun di bawah 100%; kolom **Per view** = yang klik ÷ yang melihat elemen; angka tampil sebagai "38% ± 9" | [ ] |
+| 9.11f | Centang **Adjust for how many people saw it** | Panas di bagian bawah halaman naik (tidak lagi "dingin" karena sedikit yang scroll); legenda menulis "(adjusted)" | [ ] |
+| 9.11g | Ubah **Version** di Widget, kumpulkan klik baru, hapus satu elemen dari halaman | Pilihan **Site version** muncul, versi tidak pernah dicampur; klik di elemen yang hilang dihitung sebagai "N clicks couldn't be placed", tidak digambar di posisi lama | [ ] |
+| 9.11h | **Compare with** versi lain | Tiap elemen ada kalimat: "likely a real difference (p = …)" atau "it could be chance" | [ ] |
+| 9.11i | (Labs) Peserta eye tracking yang klik ≥ 5 kali; buka heatmap **Where people looked** | Muncul "Drift-corrected with their own clicks … error after ≈ N px"; tanpa 5 klik: "Not drift-corrected" | [ ] |
+| 9.11j | SQL v4: jalankan `apps/saas/supabase/catch-up/2026-11-26-heatmap-v4.sql` di SQL editor, lalu `PGHOST=… bash apps/saas/supabase/tests/run.sh` lokal | Tanpa error; `heatmap_v4_test.sql` ALL PASS (hitungan benar, maksimal 20.000 bin, hanya member/reviewer) | [ ] |
 | 9.12 | Hapus studi | Hilang beserta datanya | [ ] |
 
 ---

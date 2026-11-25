@@ -7,10 +7,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Flame, Palette, RotateCcw, ScanSearch, SquareDashedMousePointer, TriangleAlert, Upload, X } from 'lucide-react'
 import { HOST_TAG, MAX_FILE, RULE_LABEL, applyTokens, dropProbe, inspect, pageTokens, parseTokenFile, removeTokens, scanPage, type Group, type Scan, type Tokens } from './design'
 import { NS } from './store'
-import { drawHeat, LEGEND } from '../heat'
+import { drawHeat, drawHeatGroups, LEGEND } from '../heat'
 import * as server from './server'
-import { deviceOf, prepare, type Device, type RawPt } from './heatmath'
-import { pageOf } from './research'
+import { deviceOf, prepare, type Anchor, type Device, type RawPt } from './heatmath'
+import { binsToPoints, exposureWeight, fmtShare, place, rowOf, tagOfLabel, type Resolve } from '../heatstats'
+import { cleanSummary, compareViews, MIN_EXPOSURES, verName, versionsOf, viewOf, type Summary } from './heatsummary'
+import { labelOf, pageOf } from './research'
 import { takeHint } from './hints'
 
 export type ToolId = 'inspect' | 'dscheck' | 'tokens' | 'heatmap'
@@ -273,8 +275,10 @@ const HEAT_ERRORS: Record<string, string> = {
   origin_not_allowed: 'The Heatmap product isn’t on for this address (Widget → Website, Products).',
   rate_limited: 'Too many requests. Wait a minute.',
 }
+/** Above this many clicks in one view, the map is drawn from the server's bins of all clicks (full data). */
+const RAW_MAX = 20000
 function HeatmapTool({ project, onClose }: { project: string; onClose: () => void }) {
-  const [data, setData] = useState<{ studies: { id: string; name: string }[]; points: HeatPt[] } | null>(null)
+  const [data, setData] = useState<{ studies: { id: string; name: string }[]; points: HeatPt[]; anchors: Anchor[]; summary: Summary | null } | null>(null)
   const [study, setStudy] = useState('')
   const [error, setError] = useState('')
   const [opacity, setOpacity] = useState(0.75)
@@ -286,17 +290,37 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
   const [device, setDevice] = useState<Device>(deviceOf(window.innerWidth))
   const [equal, setEqual] = useState(true)
   const [goodOnly, setGoodOnly] = useState(true)
+  const [exposed, setExposed] = useState(false)
+  const [ver, setVer] = useState<string | null>(null)
+  const [vs, setVs] = useState<string | null>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [top, setTop] = useState(0)
-  const prep = useMemo(() => (data ? prepare(data.points, { kind, device, equal, maxAcc: goodOnly ? 220 : null }) : null), [data, kind, device, equal, goodOnly])
+  const [unplaced, setUnplaced] = useState(0)
   useEffect(() => {
     let live = true
     setData(null); setError('')
-    server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null, p_kind: kind })
-      .then((d) => { if (live) setData({ studies: d.studies ?? [], points: d.points ?? [] }) })
+    const pts = server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[]; anchors?: Anchor[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null, p_kind: kind })
+    const sum = kind === 'click' ? server.rpc<unknown>('heatmap_summary', { p_public_id: project, p_page: page, p_study: study || null }).then(cleanSummary).catch(() => null) : Promise.resolve(null)
+    Promise.all([pts, sum])
+      .then(([d, summary]) => { if (live) setData({ studies: d.studies ?? [], points: d.points ?? [], anchors: d.anchors ?? [], summary }) })
       .catch((e: Error) => { if (live) setError(HEAT_ERRORS[e.message] ?? `The heatmap couldn’t load (${e.message}).`) })
     return () => { live = false }
   }, [project, page, study, kind])
+  // Versions: never mixed. The busiest version on this device is shown first; the reviewer can pick another.
+  const versions = useMemo(() => {
+    if (!data) return []
+    if (data.summary?.groups.length) return versionsOf(data.summary, device)
+    const m = new Map<string, Set<number>>()
+    for (const p of data.points) if (device === 'all' || !p.dev || p.dev === device) { const k = p.ver ?? ''; const v = m.get(k) ?? new Set<number>(); v.add(p.p ?? 0); m.set(k, v) }
+    return [...m].map(([v, ps]) => ({ ver: v, people: ps.size })).sort((a, b) => b.people - a.people)
+  }, [data, device])
+  const version = ver != null && versions.some((v) => v.ver === ver) ? ver : (versions[0]?.ver ?? '')
+  const view = useMemo(() => (data?.summary ? viewOf(data.summary, device, version) : null), [data, device, version])
+  const other = vs != null && vs !== version && versions.some((v) => v.ver === vs) ? vs : null
+  const compared = useMemo(() => (view && other != null && data?.summary ? compareViews(view, viewOf(data.summary, device, other), [verName(version), verName(other)]) : []), [view, other, data, device, version])
+  const prep = useMemo(() => (data ? prepare(data.points, { kind, device, equal, maxAcc: goodOnly ? 220 : null, version, anchors: data.anchors }) : null), [data, kind, device, equal, goodOnly, version])
+  // Big studies: the server's bins of every click (in 1/80-width units), not the newest 20,000.
+  const binned = kind === 'click' && !!view && (view.clicks > RAW_MAX || (data?.points.length ?? 0) >= RAW_MAX)
   useEffect(() => {
     if (!prep) return
     let raf = 0
@@ -305,16 +329,36 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
       if (!c) return
       const W = window.innerWidth, H = window.innerHeight
       const found = new Map<string, Element | null>()
-      const at = (sel: string) => { if (!found.has(sel)) { let el: Element | null = null; try { el = document.querySelector(sel) } catch { el = null } found.set(sel, el) } return found.get(sel) }
-      const pts: { x: number; y: number; w: number }[] = []
-      for (const p of prep.pts) {
-        let x: number, y: number
-        const el = p.sel ? at(p.sel) : null
-        const r = el?.getBoundingClientRect()
-        if (r && r.width > 0 && r.height > 0 && p.ex != null && p.ey != null) { x = r.left + p.ex * r.width; y = r.top + p.ey * r.height }
-        else { x = p.x * (W / (p.vw || W)) - window.scrollX; y = p.y - window.scrollY }
-        if (x > -100 && x < W + 100 && y > -100 && y < H + 100) pts.push({ x, y, w: p.w })
+      const resolve: Resolve = (sel) => {
+        if (!found.has(sel)) { let el: Element | null = null; try { el = document.querySelector(sel) } catch { el = null } found.set(sel, el) }
+        const el = found.get(sel)
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        return { left: r.left + window.scrollX, top: r.top + window.scrollY, width: r.width, height: r.height, tag: tagOfLabel(labelOf(el)) ?? undefined }
       }
+      // Exposure: a click where only some people scrolled counts for the people who didn't get there.
+      const weigh = (y: number, vw: number) => (exposed && view ? exposureWeight(view.reach(rowOf(y, vw)), view.reachedAt(rowOf(y, vw))) : 1)
+      const vis = (x: number, y: number) => x > -100 && x < W + 100 && y > -100 && y < H + 100
+      if (binned && view) {
+        const pts = binsToPoints(view.bins, W, equal).map((p) => ({ x: p.x - window.scrollX, y: p.y - window.scrollY, w: p.w * weigh(p.y, W) })).filter((p) => vis(p.x, p.y))
+        setUnplaced(0)
+        setTop(drawHeat(c, pts, 1, prep.radius, opacity).top)
+        return
+      }
+      if (kind === 'gaze') {
+        let lost = 0
+        const groups = prep.groups.map((g) => {
+          const pl = place(g.pts.map((p) => ({ ...p, tag: tagOfLabel(p.label) })), resolve, W)
+          lost += pl.unplaced
+          return { h: g.h, points: pl.placed.map((p) => ({ x: p.px - window.scrollX, y: p.py - window.scrollY, w: p.w })).filter((p) => vis(p.x, p.y)) }
+        })
+        setUnplaced(lost)
+        setTop(drawHeatGroups(c, groups, 1, opacity).top)
+        return
+      }
+      const pl = place(prep.pts.map((p) => ({ ...p, tag: tagOfLabel(p.label) })), resolve, W)
+      setUnplaced(pl.unplaced)
+      const pts = pl.placed.map((p) => ({ x: p.px - window.scrollX, y: p.py - window.scrollY, w: p.w * weigh(p.py, W) })).filter((p) => vis(p.x, p.y))
       setTop(drawHeat(c, pts, 1, prep.radius, opacity).top)
     }
     let tm = 0
@@ -328,10 +372,14 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', key)
     return () => { cancelAnimationFrame(raf); window.clearTimeout(tm); window.removeEventListener('scroll', redraw, true); window.removeEventListener('resize', resized); window.clearInterval(iv); window.removeEventListener('keydown', key) }
-  }, [prep, opacity, page, onClose])
+  }, [prep, opacity, page, onClose, kind, binned, view, equal, exposed])
   const n = data?.points.length ?? 0
-  const rage = data?.points.filter((p) => p.rage).length ?? 0
-  const dead = data?.points.filter((p) => p.dead).length ?? 0
+  const units = binned && view ? view.clicks : prep?.units ?? 0
+  const people = binned && view ? view.people : prep?.people ?? 0
+  const rage = binned && view ? view.elements.reduce((a, e) => a + e.rage, 0) : prep?.pts.filter((p) => p.rage).length ?? 0
+  const dead = binned && view ? view.elements.reduce((a, e) => a + e.dead, 0) : prep?.pts.filter((p) => p.dead).length ?? 0
+  const corrected = prep?.drift.filter((d) => d.applied) ?? []
+  const resid = corrected.length ? Math.round(corrected.map((d) => d.residual).sort((a, b) => a - b)[Math.floor(corrected.length / 2)]) : 0
   return (
     <>
       <canvas ref={canvas} className="vc-heat" aria-hidden />
@@ -341,10 +389,18 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
           <>
             <div className="vc-seg"><button aria-pressed={kind === 'click'} onClick={() => setKind('click')}>Clicks</button><button aria-pressed={kind === 'gaze'} onClick={() => setKind('gaze')}>Where people looked</button></div>
             <div className="vc-seg" role="group" aria-label="Device">{(['all', 'desktop', 'tablet', 'mobile'] as Device[]).map((d) => <button key={d} aria-pressed={device === d} onClick={() => setDevice(d)}>{d === 'all' ? 'All' : d[0].toUpperCase() + d.slice(1)}</button>)}</div>
-            <p className={`vc-sum ${prep?.units ? '' : 'bad'}`}>{prep?.units
-              ? `${prep.people} ${prep.people === 1 ? 'person' : 'people'} · ${kind === 'gaze' ? `${prep.units} fixation${prep.units === 1 ? '' : 's'}` : `${prep.units} click${prep.units === 1 ? '' : 's'}`}${prep.hidden ? ` · ${prep.hidden} with poor eye tracking left out` : ''}${n >= 20000 ? ' (the latest 20,000 points)' : ''}`
-              : n ? `Nothing on ${device === 'all' ? 'any device' : device} for this page${prep?.hidden ? ` (${prep.hidden} left out for poor eye tracking)` : ''}` : kind === 'gaze' ? 'No eye tracking on this page yet' : 'No clicks on this page yet'}{prep?.units && kind === 'click' ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
+            {versions.length > 1 && (
+              <label className="vc-q">Site version (never mixed)
+                <select value={version} onChange={(e) => setVer(e.target.value)}>{versions.map((v) => <option key={v.ver} value={v.ver}>{verName(v.ver)} · {v.people} {v.people === 1 ? 'person' : 'people'}</option>)}</select>
+              </label>
+            )}
+            <p className={`vc-sum ${units ? '' : 'bad'}`}>{units
+              ? `${kind === 'click' && view && view.people > people ? `${people} of ${view.people} people clicked` : `${people} ${people === 1 ? 'person' : 'people'}`} · ${kind === 'gaze' ? `${units} fixation${units === 1 ? '' : 's'}` : `${units} click${units === 1 ? '' : 's'}`}${prep?.hidden ? ` · ${prep.hidden} with poor eye tracking left out` : ''}${binned ? ' · all clicks (server bins)' : n >= RAW_MAX ? ' (the latest 20,000 points)' : ''}`
+              : n ? `Nothing on ${device === 'all' ? 'any device' : device} for this page${prep?.hidden ? ` (${prep.hidden} left out for poor eye tracking)` : ''}` : kind === 'gaze' ? 'No eye tracking on this page yet' : 'No clicks on this page yet'}{units && kind === 'click' ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
+            {unplaced > 0 && <p className="vc-muted"><TriangleAlert size={12} /> {unplaced} {kind === 'gaze' ? 'fixation' : 'click'}{unplaced === 1 ? '' : 's'} couldn’t be placed on this version of the page (their element isn’t here now), so {unplaced === 1 ? 'it is' : 'they are'} left off the map.</p>}
+            {kind === 'gaze' && !!prep?.drift.length && <p className={corrected.length ? 'vc-sum' : 'vc-muted'}>{corrected.length ? `Drift-corrected with their own clicks: ${corrected.length} of ${prep.drift.length} ${prep.drift.length === 1 ? 'person' : 'people'} · error after ≈ ${resid} px` : 'Not drift-corrected (needs 5 clicks with gaze just before them)'} · each person drawn at their own accuracy</p>}
             <label className="vc-check"><input type="checkbox" checked={equal} onChange={(e) => setEqual(e.target.checked)} /> Each person counts the same</label>
+            {kind === 'click' && view && view.depthPeople > 0 && <label className="vc-check"><input type="checkbox" checked={exposed} onChange={(e) => setExposed(e.target.checked)} /> Adjust for how many people saw it (scrolled that far)</label>}
             {kind === 'gaze' && <label className="vc-check"><input type="checkbox" checked={goodOnly} onChange={(e) => setGoodOnly(e.target.checked)} /> Leave out eye tracking calibrated worse than 220 px</label>}
             {data.studies.length > 0 && (
               <label className="vc-q">Study
@@ -356,11 +412,30 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
             )}
             <label className="vc-q">Opacity <input type="range" min={0.2} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label>
             {prep?.note && <p className="vc-bad">{prep.note}</p>}
-            {!!prep?.capped && kind === 'click' && <p className="vc-muted">{prep.capped} repeated or excess clicks left out (at most 60 per person on a page).</p>}
-            <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>few</span><span className="vc-grow" /><span>{kind === 'gaze' ? 'longest looked at' : top > 0 ? `≈ ${top < 10 ? top.toFixed(1) : Math.round(top)} ${equal ? 'people' : 'clicks'} per 50 px square` : 'most clicks'}</span></div>
-            {kind === 'click' && !!prep?.ranking.length && (
-              <details className="vc-q"><summary>Most clicked elements</summary>
-                <ol className="vc-muted">{prep.ranking.map((r) => <li key={r.sel}>{r.label} · {Math.round(r.share * 100)}% of people · first click {Math.round(r.firstShare * 100)}%{r.dead ? ` · ${r.dead} dead` : ''}</li>)}</ol>
+            {!binned && !!prep?.capped && kind === 'click' && <p className="vc-muted">{prep.capped} repeated or excess clicks left out (at most 60 per person on a page).</p>}
+            <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>few</span><span className="vc-grow" /><span>{kind === 'gaze' ? 'longest looked at' : top > 0 ? `≈ ${top < 10 ? top.toFixed(1) : Math.round(top)} ${equal ? 'people' : 'clicks'} per 50 px square${exposed ? ' (adjusted)' : ''}` : 'most clicks'}</span></div>
+            {kind === 'click' && view && view.depthPeople > 0 && (
+              <details className="vc-q"><summary>How far people scrolled ({view.depthPeople} people)</summary>
+                <div className="vc-reach" role="img" aria-label="Share of people who reached each depth of the page">
+                  {view.curve.map((c) => <div key={c.at} className="vc-reach-row"><span>{Math.round(c.at * 100)}%</span><i style={{ width: `${Math.round(c.share * 100)}%` }} /><b>{Math.round(c.share * 100)}%</b></div>)}
+                </div>
+                <p className="vc-muted">Left: depth of the page. Right: share of people who got at least that far.</p>
+              </details>
+            )}
+            {kind === 'click' && view && view.elements.length > 0 && (
+              <details className="vc-q" open><summary>Elements: who clicked, who saw them</summary>
+                <table className="vc-table"><thead><tr><th>Element</th><th title="People who clicked it, of everyone on this page (95% interval)">Of people</th><th title="People who clicked it, of the people who saw it (95% interval)">Per view</th></tr></thead>
+                  <tbody>{view.elements.slice(0, 10).map((e) => (
+                    <tr key={e.sel} className={e.perView.ok ? '' : 'vc-faint'} title={e.perView.ok ? '' : `Seen by fewer than ${MIN_EXPOSURES} people: too few to trust`}>
+                      <td>{e.label}{e.dead ? ` · ${e.dead} dead` : ''}</td><td>{fmtShare(e.people, view.people)}</td><td>{e.seen || e.people ? `${fmtShare(e.people, Math.max(e.seen, e.people))} of ${Math.max(e.seen, e.people)}` : '–'}</td>
+                    </tr>))}</tbody></table>
+                <p className="vc-muted">± is the 95% range: with few people it is wide. Greyed: seen by fewer than {MIN_EXPOSURES}.</p>
+                {versions.length > 1 && (
+                  <label className="vc-q">Compare with
+                    <select value={other ?? ''} onChange={(e) => setVs(e.target.value || null)}><option value="">—</option>{versions.filter((v) => v.ver !== version).map((v) => <option key={v.ver} value={v.ver}>{verName(v.ver)}</option>)}</select>
+                  </label>
+                )}
+                {compared.length > 0 && <ul className="vc-muted">{compared.map((c) => <li key={c.sel}><b>{c.label}:</b> {c.c.words}</li>)}</ul>}
               </details>
             )}
           </>
@@ -370,4 +445,3 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
     </>
   )
 }
-
