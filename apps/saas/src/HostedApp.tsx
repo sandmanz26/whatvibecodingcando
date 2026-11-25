@@ -54,6 +54,8 @@ export default function HostedApp() {
         <Route path="team" element={<Navigate to="/app/reviewers" replace />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
+      {/* The app's root and unknown addresses open the panel (its guards send signed-out people to log in). */}
+      <Route path="*" element={<Navigate to="/app" replace />} />
     </Routes>
   )
 }

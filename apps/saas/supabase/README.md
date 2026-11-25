@@ -97,6 +97,11 @@ The SaaS's backend, in this app only (`apps/saas/supabase`).
    - A Google account with the same email as an existing email-and-password account is linked to it automatically (Google has verified the address). Someone who joined with Google can set a password later in Settings → Password.
 5. **Database → Extensions → pg_cron** (optional, before running the third migration): enables the hourly cleanup.
 6. **Auth → SMTP.** Use your own provider (Resend, Postmark, SES). With Resend: host `smtp.resend.com`, port `465`, username `resend`, password = a Resend API key, sender = an address on a domain verified in Resend. Supabase's built-in email is limited to a few messages an hour, which isn't enough for sign-up, invites and password resets.
+6b. **Sign-in with a one-time code (email users).** Login and register send a 6-digit code (`signInWithOtp`, then `verifyOtp` type `email`); Google stays one click and passwords stay as "Use a password instead". In Supabase:
+   - Authentication → Sign In / Providers → **Email**: enabled, "Confirm email" on, **Email OTP Length = 6**, **Email OTP Expiration = 600** seconds.
+   - The **Magic Link** and **Confirm signup** templates must show `{{ .Token }}` (the files in `email-templates/` do; the link stays as a fallback). Without it people get a link but no code.
+   - Attack Protection / Rate Limits: emails per hour (raise it with your own SMTP, e.g. 100+), "OTP / magic link" minimum interval 60 s (the page waits 60 s before "Send a new code"), token verifications per 5 min (default 30 is fine). Too many tries shows "Too many tries".
+   - Login uses `shouldCreateUser: false`, and the page shows the same "If this email has an account…" answer for unknown addresses.
 7. **Auth → Email Templates.** Use the branded files in `email-templates/` (subjects and steps: "Email notifications" step 8). Their links use the `token_hash` form, so they work on any device (the default links only work in the browser that asked):
    - **Confirm signup:** `https://ourhunch.com/app#/app/confirm?token_hash={{ .TokenHash }}&type=email`
    - **Reset Password:** `https://ourhunch.com/app#/app/confirm?token_hash={{ .TokenHash }}&type=recovery`
@@ -146,7 +151,7 @@ Every email: 600px table layout with inline styles, preheader, one button, plain
 
 1. **Resend:** create an account at resend.com → **Domains → Add domain** (`ourhunch.com`) → add the DNS records it shows (SPF, DKIM, and a DMARC record such as `v=DMARC1; p=none;`) at your domain registrar → wait for *Verified*. Without your own domain Resend only sends to your own address.
 2. **Resend → API Keys → Create** (permission: Sending access). Keep it in Resend and Supabase only.
-3. **Run the migrations** in the SQL Editor, in order: `migrations/20261122000000_email.sql`, then (after the others) `migrations/20261125000000_emails_complete.sql`. A database that already has everything up to `…_ops.sql` can run the one-paste file **`catch-up/2026-11-25-emails.sql`** instead.
+3. **Run the migrations** in the SQL Editor, in order: `migrations/20261122000000_email.sql`, then (after the others) `migrations/20261125000000_emails_complete.sql`. A database that already has everything up to `…_ops.sql` can run the one-paste file **`catch-up/2026-11-25-emails.sql`** instead. Then **`catch-up/2026-11-25-ops-usage.sql`** (or `migrations/20261125120000_ops_usage.sql`): the ops panel's Widget column, and the welcome email only after the first sign-in (email confirmed, email code entered, or Google).
 4. **Deploy the function** — either:
    - CLI, from `apps/saas`: `npx supabase login`, `npx supabase link --project-ref <ref>`, `npx supabase functions deploy send-emails --no-verify-jwt`; or
    - Dashboard: **Edge Functions → Deploy a new function → Via editor**, name `send-emails`, add the files `index.ts` and `render.ts` from `functions/send-emails/` (not `test.ts` or `preview.ts`), deploy, then in its settings turn **Enforce JWT verification off** (the function checks its own secret; the unsubscribe request is checked by its token).
@@ -198,9 +203,9 @@ Every email: 600px table layout with inline styles, preheader, one button, plain
 
      | Template | File | Subject |
      |---|---|---|
-     | Confirm signup | `email-templates/confirm-signup.html` | Confirm your email for ourhunch |
+     | Confirm signup | `email-templates/confirm-signup.html` | Your ourhunch code: {{ .Token }} |
      | Reset Password | `email-templates/reset-password.html` | Set a new password for ourhunch |
-     | Magic Link | `email-templates/magic-link.html` | Your ourhunch login link |
+     | Magic Link | `email-templates/magic-link.html` | Your ourhunch code: {{ .Token }} |
      | Change Email Address | `email-templates/change-email.html` | Confirm your new email for ourhunch |
      | Invite user | `email-templates/invite.html` | You’re invited to ourhunch |
 

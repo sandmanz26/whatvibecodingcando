@@ -26,7 +26,7 @@ export function OrderDetail() {
         ) })}
         <div className="line" style={{ gridTemplateColumns: '1fr auto' }}><b>Total paid</b><b className="num">{rp(o.total)}</b></div>
       </div>
-      <div className="row" style={{ gap: 8, marginTop: 16 }}><Link to="/" className="btn primary">Keep shopping</Link><Link to="/orders" className="btn">All orders</Link></div>
+      <div className="row" style={{ gap: 8, marginTop: 16 }}><Link to="/shop" className="btn primary">Keep shopping</Link><Link to="/orders" className="btn">All orders</Link></div>
     </div>
   )
 }
@@ -36,7 +36,7 @@ export default function Orders() {
   return (
     <div style={{ marginTop: 24, maxWidth: 760 }}>
       <h1>Orders</h1>
-      {orders.length === 0 ? <div className="card" style={{ marginTop: 16 }}><Empty title="No orders yet"><Link className="btn sm primary" to="/">Start shopping</Link></Empty></div> : (
+      {orders.length === 0 ? <div className="card" style={{ marginTop: 16 }}><Empty title="No orders yet"><Link className="btn sm primary" to="/shop">Start shopping</Link></Empty></div> : (
         <div className="stack" style={{ gap: 12, marginTop: 16 }}>
           {orders.map((o) => (
             <Link key={o.id} to={`/orders/${o.id}`} className="card card-body order-row">

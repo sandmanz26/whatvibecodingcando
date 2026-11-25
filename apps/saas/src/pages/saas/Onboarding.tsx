@@ -70,7 +70,7 @@ export default function Onboarding() {
     if (cloud) setSaving(true)
     const ok = update((x) => ({ ...x, projects: [...x.projects, p], current: p.id, onboarded: true }))
     if (!ok) { setSaving(false); setFinished(false); setError('This browser’s storage is full or blocked, so the workspace couldn’t be saved.'); return }
-    track('onboarding_completed', { products: products.length, site: !!site.trim(), copied: copied === code })
+    track('onboarding_completed', { products, products_count: products.length, site: !!site.trim(), copied: copied === code })
     if (cloud) void settled().then(() => setSaving(false))
   }
   const next = () => {

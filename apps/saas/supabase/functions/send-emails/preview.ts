@@ -39,13 +39,15 @@ files['13-day7-research'] = life('day7')
 const link = (type: string) => `${APP}/app#/app/confirm?token_hash={{ .TokenHash }}&type=${type}`
 const authFoot = { why: 'You get this because this address was used on ourhunch. If that wasn’t you, ignore this email: nothing changes.', settingsUrl: `${APP}/app#/app/settings`, settingsLabel: 'Account settings' }
 const t = (x: string) => ({ html: x, text: x })
+/** The 6-digit sign-in code, big and easy to copy (the page asks for it; the link below is a fallback). */
+const code = { html: `<div class="oh-soft" style="background:#f6f2e8;border:1px solid #e7e2d6;border-radius:10px;padding:16px 14px;text-align:center;font-family:Menlo,Consolas,monospace;font-size:32px;line-height:1.2;font-weight:700;letter-spacing:8px;color:#16130f">{{ .Token }}</div>`, text: 'Your code: {{ .Token }}' }
 const auth: Record<string, { subject: string; f: ReturnType<typeof frame> }> = {
-  'confirm-signup': { subject: 'Confirm your email for ourhunch', f: frame({ ...authFoot, subject: 'Confirm your email for ourhunch', preheader: 'One click and your account is ready.', heading: 'Confirm your email',
-    intro: [t('Thanks for signing up for ourhunch. Confirm this address and you’re in.')], button: { label: 'Confirm your email', url: link('email') }, after: [t('The link works once and expires after a while. If it has expired, sign up or log in again to get a new one.')] }) },
+  'confirm-signup': { subject: 'Your ourhunch code: {{ .Token }}', f: frame({ ...authFoot, subject: 'Your ourhunch code: {{ .Token }}', preheader: 'Enter this code to finish creating your account.', heading: 'Your sign-up code',
+    intro: [t('Thanks for signing up for ourhunch. Enter this code on the page where you signed up:')], block: code, button: { label: 'Or confirm with one click', url: link('email') }, after: [t('The code and the link work once and expire after 10 minutes. If they have expired, ask for a new code.')] }) },
   'reset-password': { subject: 'Set a new password for ourhunch', f: frame({ ...authFoot, subject: 'Set a new password for ourhunch', preheader: 'Someone asked to reset the password for this address.', heading: 'Set a new password',
     intro: [t('Someone (hopefully you) asked to reset the password for your ourhunch account.')], button: { label: 'Set a new password', url: link('recovery') }, after: [t('If you didn’t ask, ignore this email. Your password stays the same.')] }) },
-  'magic-link': { subject: 'Your ourhunch login link', f: frame({ ...authFoot, subject: 'Your ourhunch login link', preheader: 'Log in with one click. The link works once.', heading: 'Log in to ourhunch',
-    intro: [t('Here’s the link you asked for. It logs you in once, on any device.')], button: { label: 'Log in', url: link('magiclink') } }) },
+  'magic-link': { subject: 'Your ourhunch code: {{ .Token }}', f: frame({ ...authFoot, subject: 'Your ourhunch code: {{ .Token }}', preheader: 'Enter this code to log in. It works once.', heading: 'Your login code',
+    intro: [t('Enter this code on the ourhunch login page:')], block: code, button: { label: 'Or log in with one click', url: link('magiclink') }, after: [t('The code and the link work once and expire after 10 minutes. Never share this code: ourhunch will never ask you for it.')] }) },
   'change-email': { subject: 'Confirm your new email for ourhunch', f: frame({ ...authFoot, subject: 'Confirm your new email for ourhunch', preheader: 'Confirm the change to {{ .NewEmail }}.', heading: 'Confirm your new email',
     intro: [t('You asked to change the email of your ourhunch account from {{ .Email }} to {{ .NewEmail }}. Until you confirm, you log in with the old one.')], button: { label: 'Confirm the change', url: link('email_change') } }) },
   'invite': { subject: 'You’re invited to ourhunch', f: frame({ ...authFoot, subject: 'You’re invited to ourhunch', preheader: 'Join the team and see the feedback on your site.', heading: 'You’re invited to ourhunch',

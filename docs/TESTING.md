@@ -42,8 +42,14 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
 |---|---|---|---|
-| 2.1 ⚡ | Browser A: `/app` → isi nama, email, password (2x) → **Create account** | Mode server: muncul pesan cek email (atau langsung masuk kalau konfirmasi email mati) | [ ] |
-| 2.2 | Buka email konfirmasi → klik link | Masuk ke aplikasi, lanjut ke onboarding | [ ] |
+| 2.1 ⚡ | Mode server, Browser A: `/app#/app/register` → isi nama + email → **Email me a code** | Layar "Check your email" dengan satu kolom kode 6 digit; tidak ada kolom password | [ ] |
+| 2.2 ⚡ | Buka email (subjek "Your ourhunch code: 123456") → ketik/tempel kode | Kode langsung dicek → onboarding (pilihan `?products=` tetap terbawa); nama tampil di Settings | [ ] |
+| 2.2a | Masukkan kode salah / kode lama (>10 menit) | "That code isn’t right…" / "That code has expired…" | [ ] |
+| 2.2b | Tombol **Send a new code** | Nonaktif 60 detik (hitung mundur), lalu mengirim kode baru | [ ] |
+| 2.2c | Log in → email yang **tidak** punya akun → **Email me a code** | Pesan sama "If … has an account, we sent it a code" + link **Create an account**; tidak ada email terkirim, tidak ada akun dibuat | [ ] |
+| 2.2d ⚡ | Log in → email terdaftar → kode | Masuk ke Overview | [ ] |
+| 2.2e | Log in → **Use a password instead** | Kolom password + **Forgot password?** muncul; login dengan password tetap bisa | [ ] |
+| 2.2f | Mode demo (tanpa Supabase): Register/Log in | Tetap pakai password lokal seperti sebelumnya | [ ] |
 | 2.3 | Password lemah (mis. `12345678`) | Ditolak dengan pesan yang jelas | [ ] |
 | 2.4 | Log out → **Log in** dengan password salah | Pesan error; tidak masuk | [ ] |
 | 2.5 ⚡ | Log in dengan password benar | Masuk ke Overview | [ ] |
@@ -53,6 +59,9 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 | 2.9 | Klik **Continue with Google**, lalu batalkan di layar Google | Kembali ke Log in dengan pesan "Google sign-in didn’t finish" | [ ] |
 | 2.10 | Akun Google → **Settings → Password** | Tertulis "You log in with Google"; bisa **Set password** tanpa password lama, lalu login dengan email + password | [ ] |
 | 2.11 | Google dimatikan di Supabase → buka Log in | Tombol Google tidak tampil | [ ] |
+| 2.12 ⚡ | Buka `/app#`, `/app#/xyz` | Tidak pernah tampil toko demo (Marketplace); diarahkan ke panel / log in | [ ] |
+| 2.13 | Buka `/app#/admin` | Halaman sign-in ops | [ ] |
+| 2.14 | Buka `/embed-demo.html` | Halaman demo widget tetap jalan seperti biasa | [ ] |
 
 ---
 
@@ -241,6 +250,14 @@ Pratinjau semua email (gambar): `docs/email-previews/`.
 
 Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.md` (query `cron.job_run_details`, `net._http_response`, log Edge Function).
 
+## 10b-2. Email selamat datang (sekali, dalam ±5 menit setelah login pertama)
+
+| # | Langkah | Hasil yang diharapkan | ✔ |
+|---|---|---|---|
+| 1 | Daftar dengan email, klik link konfirmasi | Email "welcome" datang dalam ±5 menit, hanya sekali | |
+| 2 | Daftar dengan Google (akun baru) | Email "welcome" dalam ±5 menit | |
+| 3 | Daftar dengan kode email (OTP), jangan masukkan kodenya | Tidak ada welcome; setelah kode dimasukkan → welcome dalam ±5 menit | |
+
 ## 10c. Panel ops internal (`/app#/admin`, hanya founder)
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
@@ -251,6 +268,11 @@ Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.
 | 4 | Cari user lewat email, ganti halaman (Next/Previous), klik email | Hasil sesuai; laci detail menampilkan workspace/proyek tanpa teks komentar | |
 | 5 | "Set plan" → Founding + catatan → Save | Badge berubah; baris baru di "Recent admin actions" | |
 | 6 | Build demo (tanpa Supabase), buka `/app#/admin` | "Ops needs the server" | |
+| 7 | Tabel user: kolom **Widget** | Not installed (script belum pernah lapor dari situs asli) / Installed (script terlihat, belum ada aktivitas) / In use (komentar, reviewer, studi dalam 14 hari) / Inactive (lebih dari 14 hari sepi); arahkan kursor ke badge untuk penjelasan | |
+| 8 | Filter "Widget" → In use, lalu Sort → Last activity | Hanya user In use (angka per status di menu); yang paling baru aktif di atas | |
+| 9 | Kolom Last script seen, Last activity, Last comment, Comments 7d / all, Reviewers, Studies / results, Rounds | Terisi sesuai data; "—" bila belum ada | |
+| 10 | Klik email → laci detail | Per proyek: origin, status widget, last seen, komentar, reviewer, studi, aktivitas terakhir | |
+| 11 | Kotak angka | Ada "Sites in use (14d)" | |
 
 ## 11. Keamanan & privasi (cek cepat)
 
@@ -271,8 +293,13 @@ Kalau email tidak datang: lihat bagian "Check it" di `apps/saas/supabase/README.
 | # | Langkah | Hasil yang diharapkan | ✔ |
 |---|---|---|---|
 | 12.1 | Buka `/` → PostHog **Activity** | `$pageview` muncul dalam ±30 detik | [ ] |
-| 12.2 | Klik Get started, daftar akun uji, selesaikan onboarding | Berurutan: `get_started_clicked`, `signup_completed`, `onboarding_completed` (+ `snippet_copied`) | [ ] |
+| 12.2 | Klik Get started, daftar akun uji, selesaikan onboarding | Berurutan: `cta_clicked` (location, target=signup), `signup_started`, `signup_completed` (method=email), `onboarding_completed` (products = id saja) (+ `snippet_copied`) | [ ] |
+| 12.2b | Gulir ke Pricing di `/` | `pricing_viewed` sekali | [ ] |
+| 12.2c | PostHog → Persons → akun uji | distinct id = id akun; properti `plan`, `signup_method`, `created_at`, `projects`, `products`; tanpa email/nama; `$initial_utm_source` terisi bila datang dari `/?utm_source=tes` | [ ] |
+| 12.2d | PostHog → Groups → workspace | Satu grup per workspace (id, `projects`, `plan`), tanpa nama | [ ] |
+| 12.2e | Daftar dengan Google | `signup_completed` method=google (login berikutnya: `login_completed` method=google) | [ ] |
 | 12.3 | Buka satu event → **Properties** | Tidak ada email, nama, isi komentar; alamat share berbentuk `#/share/:token` | [ ] |
+| 12.3b | Pasang script, dapat komentar pertama, selesaikan komentar, salin AI prompt, buat studi, buka hasil, ekspor CSV, ganti notifikasi | `install_detected`, `first_comment_received` (sekali per proyek), `comment_resolved`, `fix_prompt_copied`, `study_created`, `study_results_viewed`, `csv_exported`, `settings_notify_changed` | [ ] |
 | 12.4 | DevTools → Network → filter `posthog` di halaman situs pelanggan (bukan `/app`) | **Tidak ada** permintaan ke PostHog dari script widget | [ ] |
 
 ---

@@ -22,7 +22,7 @@ import { describe as describeEl, stateOf } from '../../core/embed/anchor'
 /** Open comments whose pin the widget last saw as moved or gone: they need re-pinning on the site. */
 const needsRepin = (t: Thread) => !t.resolved && (stateOf(t.anchor.st)?.s === 'moved' || stateOf(t.anchor.st)?.s === 'gone')
 import '../../saas/saas.css'
-import { resetAnalytics, track, trackOnce } from '../../lib/analytics'
+import { resetAnalytics, setPerson, track, trackOnce } from '../../lib/analytics'
 import { BrandMark } from '../../components/BrandMark'
 
 export interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
@@ -211,7 +211,7 @@ export function Products() {
     <div className="up-page">
       <div className="up-head"><div><h1>Products</h1><p>Turn tools on or off for “{project.name}”. Early-access tools are built and usable in the demo; they switch on in your script as they move into it.</p></div></div>
       {pending && <p className="up-warn"><TriangleAlert size={14} /> Your site still has the old set of tools. <button className="lp-btn sm primary" onClick={() => {
-        if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) { track('site_updated', { where: 'products' }); toast('Site updated: it follows on its next page load') }
+        if (setProject((x) => publishProducts(x, s.account?.name ?? 'You'))) { track('widget_published', { where: 'products' }); toast('Site updated: it follows on its next page load') }
         else toast('Not published: this browser’s storage is full or blocked.', 'error')
       }}>Update site</button> Only the tools change; other edits in <Link to="/app/widget">Widget</Link> wait until you update from there. The snippet stays the same.</p>}
       {CATEGORIES.map((cat) => <div key={cat}>
@@ -261,7 +261,7 @@ export function Install() {
   useEffect(() => {
     if (!project) return
     // On the server: what the script on any of the project's sites last reported.
-    const seenNow = (x: typeof seen) => { setSeen(x); if (x) trackOnce('script_detected', project.id, { shown: x.shown }) }
+    const seenNow = (x: typeof seen) => { setSeen(x); if (x) { trackOnce('install_detected', project.id, { shown: x.shown }); setPerson({ has_installed: true }) } }
     const read = () => (cloud ? void latestInstall(project.id).then(seenNow).catch(() => { /* retried */ }) : seenNow(lastSeen(project.id)))
     read()
     const t = window.setInterval(read, cloud ? 15000 : 3000)
@@ -382,7 +382,7 @@ export function Comments() {
     <div className="up-page">
       <div className="up-head"><div><h1>{kind === 'compare' ? 'Component reviews' : kind === 'voice' ? 'Voice notes' : 'Comments'}</h1><p>{kind === 'compare' ? 'A vs B comparisons your reviewers made' : kind === 'voice' ? 'Spoken notes your reviewers recorded' : 'Everything your reviewers left'} on “{project.name}”.{kind && <> <Link to="/app/comments">See all comments</Link></>}</p></div>
         <span className="up-row">
-          <button className="lp-btn" disabled={!threads.length} onClick={() => { track('comments_exported'); download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((t) => ({ ...toShared(t), round: roundName(t.round) ?? null })))) }}><Download size={14} /> CSV</button>
+          <button className="lp-btn" disabled={!threads.length} onClick={() => { track('csv_exported'); download(`${project.id}-comments.csv`, threadsCsv([...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((t) => ({ ...toShared(t), round: roundName(t.round) ?? null })))) }}><Download size={14} /> CSV</button>
           <button className="lp-btn primary" onClick={() => setSharing(true)}><Share2 size={14} /> Share list</button>
         </span></div>
       {cloud
@@ -418,7 +418,7 @@ export function Comments() {
                 <div className="up-row">
                   {t.resolved
                     ? <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: undefined }, 'Reopened')}><RotateCcw size={13} /> Reopen</button>
-                    : <button className="lp-btn sm" onClick={() => void save({ ...t, resolved: { by: 'panel', at: new Date().toISOString() } }, needsRepin(t) ? 'Closed' : 'Set as completed')}><Check size={13} /> {needsRepin(t) ? 'Close' : 'Set as completed'}</button>}
+                    : <button className="lp-btn sm" onClick={() => { track('comment_resolved'); void save({ ...t, resolved: { by: 'panel', at: new Date().toISOString() } }, needsRepin(t) ? 'Closed' : 'Set as completed') }}><Check size={13} /> {needsRepin(t) ? 'Close' : 'Set as completed'}</button>}
                   {url ? (cloud || t.page.startsWith('/embed-demo.html')
                     ? <button className="lp-btn sm ghost" onClick={() => void openAsReviewer(project.id, url).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })} title="Opens the page as a reviewer">Open on site <ExternalLink size={12} /></button>
                     // In the browser-only demo, review links work on the demo site only: this opens the page as it is.
@@ -595,7 +595,7 @@ function NotificationsCard() {
         <label className="lp-field">Email me about “{project.name}”
           <select className="up-select" value={project.notify ?? 'instant'} disabled={!cloud} onChange={(e) => {
             const v = e.target.value as Notify
-            if (setProject((p) => ({ ...p, notify: v }))) toast(v === 'off' ? 'Project emails off' : v === 'daily' ? 'You’ll get one summary a day' : 'You’ll get an email when something happens')
+            if (setProject((p) => ({ ...p, notify: v }))) track('settings_notify_changed', { notify: v }), toast(v === 'off' ? 'Project emails off' : v === 'daily' ? 'You’ll get one summary a day' : 'You’ll get an email when something happens')
           }}>
             <option value="instant">When something happens (grouped every few minutes)</option>
             <option value="daily">One summary a day</option>

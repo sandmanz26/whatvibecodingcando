@@ -156,7 +156,7 @@ export function WidgetBuilder() {
       {confirm === 'publish' && (
         <Modal title="Update your site?" description="Every page with your snippet follows these settings the next time it loads (within a few minutes). The previous settings stay in History, so you can restore them." onClose={() => setConfirm(null)}
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Cancel</button><button className="btn primary" onClick={() => {
-            if (setProject((p) => publish(p, by))) { toast('Site updated'); track('site_updated', { where: 'widget' }) }
+            if (setProject((p) => publish(p, by))) { toast('Site updated'); track('widget_published', { where: 'widget' }) }
             else toast('Not saved: this browser’s storage is full or blocked.', 'error')
             setConfirm(null)
           }}>Update site</button></>}>

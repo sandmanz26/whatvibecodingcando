@@ -45,14 +45,14 @@ export default function DemoApp() {
     <>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<Home />} />
+          <Route path="shop" element={<Home />} />
           <Route path="search" element={<Search />} />
           <Route path="product/:id" element={<Product />} />
           <Route path="cart" element={<Cart />} />
           <Route path="checkout" element={<Checkout />} />
           <Route path="orders" element={<Orders />} />
           <Route path="orders/:id" element={<OrderDetail />} />
-          <Route path="*" element={<Home />} />
+          <Route path="*" element={<Navigate to="/shop" replace />} />
         </Route>
         {/* Research tools: kept apart from the product they study. */}
         <Route path="console" element={<ResearchLayout />}>

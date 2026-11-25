@@ -62,7 +62,7 @@ export default function Narration() {
           <h1>Narration</h1>
           <p>Explain the screens out loud while you go through them. Press the microphone in the dock, walk through the app talking, and press Stop: each screen you visited becomes a chapter, so its explanation can be played on its own — here, or from the dock’s “Explain” button on that screen. The audio stays in this browser.</p>
         </div>
-        <div className="actions"><button className="btn primary" onClick={() => { window.location.hash = '#/'; window.setTimeout(() => window.dispatchEvent(new CustomEvent(NARRATE_EVENT, { detail: 'start' })), 150) }}><Mic size={14} /> Start narrating</button></div>
+        <div className="actions"><button className="btn primary" onClick={() => { window.location.hash = '#/shop'; window.setTimeout(() => window.dispatchEvent(new CustomEvent(NARRATE_EVENT, { detail: 'start' })), 150) }}><Mic size={14} /> Start narrating</button></div>
       </div>
 
       {list.length === 0 ? (

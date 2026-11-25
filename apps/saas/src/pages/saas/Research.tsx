@@ -284,6 +284,8 @@ export function StudyResults() {
     void studyResults(id).then(setData).catch((e: Error) => toast(`Couldn’t load results: ${e.message}`, 'error'))
   }
   useEffect(load, [project?.id, id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const got = !!data
+  useEffect(() => { if (got) track('study_results_viewed', { runs: data?.runs.length ?? 0 }) }, [got, id]) // eslint-disable-line react-hooks/exhaustive-deps
   const byRun = useMemo(() => { const m = new Map<string, EventRow[]>(); for (const e of data?.events ?? []) m.set(e.run_id, [...(m.get(e.run_id) ?? []), e]); return m }, [data])
   if (!project) return null
   if (!cloud) return <div className="up-page"><p className="up-warn">Studies need the server.</p></div>

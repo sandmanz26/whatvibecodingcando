@@ -13,7 +13,7 @@ export default function Checkout() {
   const nav = useNavigate()
   const [ship, setShip] = useState('Regular')
   const [pay, setPay] = useState('E-wallet')
-  if (!cart.length) return <div className="card" style={{ marginTop: 24 }}><Empty title="Nothing to check out"><Link className="btn sm" to="/">Back to the shop</Link></Empty></div>
+  if (!cart.length) return <div className="card" style={{ marginTop: 24 }}><Empty title="Nothing to check out"><Link className="btn sm" to="/shop">Back to the shop</Link></Empty></div>
   const fee = SHIPPING.find((s) => s.id === ship)!.price
 
   return (

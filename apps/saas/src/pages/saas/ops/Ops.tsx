@@ -6,13 +6,21 @@ import { cloud } from '../../../saas/supabase'
 import { Modal, Toasts } from '../../../components/ui'
 import { useStore } from '../../../store/store'
 import {
-  PLANS, PLAN_LABEL, amAdmin, opsEmail, opsSignIn, opsSignOut, opsAudit, opsDaily, opsFunnel, opsOverview, opsSetPlan, opsUserDetail, opsUsers,
-  type AuditRow, type Day, type Funnel, type OpsUser, type Overview, type Plan, type UserDetail,
+  PLANS, PLAN_LABEL, WIDGET_HELP, WIDGET_LABEL, WIDGET_STATES, amAdmin, opsEmail, opsSignIn, opsSignOut, opsAudit, opsDaily, opsFunnel, opsOverview, opsSetPlan, opsUserDetail, opsUsers,
+  type AuditRow, type Day, type Funnel, type OpsUser, type Overview, type Plan, type UserDetail, type UserSort, type WidgetState,
 } from '../../../saas/ops'
 
 const PAGE = 50
 const fmt = (n: number | undefined) => (n ?? 0).toLocaleString('en')
 const date = (s: string | null) => (s ? new Date(s).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' }) : '—')
+const ago = (s: string | null) => {
+  if (!s) return '—'
+  const d = Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000)
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 60 ? `${d} days ago` : date(s)
+}
+function WidgetBadge({ s }: { s: WidgetState }) {
+  return <span className={`up-badge ops-w-${s}`} title={WIDGET_HELP[s]}>{WIDGET_LABEL[s]}</span>
+}
 const when = (s: string) => new Date(s).toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 export default function Ops() {
@@ -124,6 +132,7 @@ function Kpis({ ov }: { ov: Overview }) {
     ['Signed in, 7 days', ov.active_7d],
     ['Sites (projects)', ov.projects_total],
     ['Script seen', ov.sites_seen, `${fmt(ov.sites_shown)} showing the widget`],
+    ['Sites in use (14d)', ov.sites_in_use, 'reviewer or study activity'],
     ['Comments', ov.comments_total, `+${fmt(ov.comments_7d)} in 7 days`],
     ['Studies / runs, 7 days', ov.studies_7d, `${fmt(ov.runs_7d)} runs`],
     ['Reviewers', ov.reviewers_total],
@@ -196,35 +205,44 @@ function Users({ onChanged }: { onChanged: () => void }) {
   const [q, setQ] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
-  const [data, setData] = useState<{ total: number; rows: OpsUser[] } | null>(null)
+  const [data, setData] = useState<Awaited<ReturnType<typeof opsUsers>> | null>(null)
   const [err, setErr] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const [planFor, setPlanFor] = useState<OpsUser | null>(null)
   const [n, setN] = useState(0)
+  const [wstate, setWstate] = useState<WidgetState | ''>('')
+  const [sort, setSort] = useState<UserSort>('created')
   useEffect(() => { const t = window.setTimeout(() => { setSearch(q.trim()); setOffset(0) }, 300); return () => window.clearTimeout(t) }, [q])
   useEffect(() => {
     let live = true
-    void opsUsers(search, PAGE, offset).then((d) => { if (live) { setData(d); setErr('') } }).catch((e) => { if (live) setErr((e as Error).message) })
+    void opsUsers(search, PAGE, offset, wstate, sort).then((d) => { if (live) { setData(d); setErr('') } }).catch((e) => { if (live) setErr((e as Error).message) })
     return () => { live = false }
-  }, [search, offset, n])
+  }, [search, offset, n, wstate, sort])
   return (
     <section className="up-card">
-      <div className="ops-row"><h2>Users{data ? ` (${fmt(data.total)})` : ''}</h2><input className="up-search grow" type="search" placeholder="Search by email or user id" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" /></div>
+      <div className="ops-row"><h2>Users{data ? ` (${fmt(data.total)})` : ''}</h2><input className="up-search grow" type="search" placeholder="Search by email or user id" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" />
+        <label className="up-muted">Widget <select className="up-select" value={wstate} onChange={(e) => { setWstate(e.target.value as WidgetState | ''); setOffset(0) }} aria-label="Filter by widget state">
+          <option value="">All</option>{WIDGET_STATES.map((w) => <option key={w} value={w}>{WIDGET_LABEL[w]}{data?.states?.[w] != null ? ` (${fmt(data.states[w])})` : ''}</option>)}</select></label>
+        <label className="up-muted">Sort <select className="up-select" value={sort} onChange={(e) => { setSort(e.target.value as UserSort); setOffset(0) }} aria-label="Sort users">
+          <option value="created">Newest signup</option><option value="activity">Last activity</option></select></label></div>
       {err && <div className="up-warn">{err}</div>}
       <div className="ops-tablewrap">
         <table className="ops-table">
-          <thead><tr><th>Email</th><th>Signed up</th><th>Last sign-in</th><th>Via</th><th className="num">Projects</th><th className="num">Comments</th><th>Plan</th><th /></tr></thead>
+          <thead><tr><th>Email</th><th>Widget</th><th>Last script seen</th><th>Last activity</th><th>Last comment</th><th className="num" title="Last 7 days / total">Comments 7d / all</th><th className="num">Reviewers</th><th className="num" title="Studies / finished results">Studies / results</th><th>Rounds</th><th>Signed up</th><th>Last sign-in</th><th>Via</th><th className="num">Projects</th><th>Plan</th><th /></tr></thead>
           <tbody>
             {data?.rows.map((u) => (
               <tr key={u.id}>
                 <td><button className="ops-link" onClick={() => setOpen(u.id)}>{u.email ?? u.id}</button></td>
+                <td><WidgetBadge s={u.widget} /></td><td>{ago(u.last_seen)}</td><td>{ago(u.last_activity)}</td><td>{ago(u.last_comment_at)}</td>
+                <td className="num">{fmt(u.comments_7d)} / {fmt(u.comments)}</td><td className="num">{fmt(u.reviewers)}</td><td className="num">{fmt(u.studies)} / {fmt(u.results)}</td>
+                <td>{u.rounds_on ? 'on' : '—'}</td>
                 <td>{date(u.created_at)}</td><td>{date(u.last_sign_in_at)}</td><td>{u.provider}</td>
-                <td className="num">{fmt(u.projects)}</td><td className="num">{fmt(u.comments)}</td>
+                <td className="num">{fmt(u.projects)}</td>
                 <td><span className={`up-badge plan-${u.plan}`}>{PLAN_LABEL[u.plan] ?? u.plan}</span></td>
                 <td><button className="lp-btn sm" onClick={() => setPlanFor(u)}>Set plan</button></td>
               </tr>
             ))}
-            {data && !data.rows.length && <tr><td colSpan={8} className="up-muted">No users match.</td></tr>}
+            {data && !data.rows.length && <tr><td colSpan={15} className="up-muted">No users match.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -295,10 +313,11 @@ function Drawer({ id, onClose }: { id: string; onClose: () => void }) {
                 <h3>{w.name} <span className="up-badge">{w.role}</span></h3>
                 {w.projects.length === 0 ? <p className="up-muted">No projects.</p> : (
                   <table className="ops-table">
-                    <thead><tr><th>Project</th><th>Site</th><th>Created</th><th>Script</th><th className="num">Comments</th></tr></thead>
+                    <thead><tr><th>Project</th><th>Origin</th><th>Widget</th><th>Last script seen</th><th className="num">Comments 7d / all</th><th className="num">Reviewers</th><th className="num">Studies / results</th><th>Last activity</th></tr></thead>
                     <tbody>{w.projects.map((p) => (
-                      <tr key={p.id}><td>{p.name}<br /><small className="up-muted">{p.public_id}</small></td><td>{p.origin || '—'}</td><td>{date(p.created_at)}</td>
-                        <td>{p.installed ? <span className="up-badge st-completed">seen</span> : <span className="up-badge">not yet</span>}</td><td className="num">{fmt(p.comments)}</td></tr>
+                      <tr key={p.id}><td>{p.name}<br /><small className="up-muted">{p.public_id} · {date(p.created_at)}{p.rounds_on ? ' · rounds on' : ''}</small></td><td>{p.origin || '—'}</td>
+                        <td><WidgetBadge s={p.widget} /></td><td>{p.installed ? ago(p.last_seen) : 'never'}</td>
+                        <td className="num">{fmt(p.comments_7d)} / {fmt(p.comments)}</td><td className="num">{fmt(p.reviewers)}</td><td className="num">{fmt(p.studies)} / {fmt(p.results)}</td><td>{ago(p.last_activity)}</td></tr>
                     ))}</tbody>
                   </table>
                 )}

@@ -62,7 +62,7 @@ const fid = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 
 const of = (n: number, d: number) => `${n} of ${d}`
 
 const FUNNEL: Omit<FunnelStep, 'n'>[] = [
-  { label: 'Home', match: (p) => p === '/' },
+  { label: 'Home', match: (p) => p === '/' || p === '/shop' },
   { label: 'Search or category', match: (p) => p === '/search' },
   { label: 'Product page', match: (p) => p.startsWith('/product/') },
   { label: 'Cart', match: (p) => p === '/cart' },

@@ -17,7 +17,7 @@ import type { Backend, RoundInfo, Thread } from '../core/embed/store'
 import type { Approval } from './rounds'
 import type { Stats, SharedList, ShareRow } from './stats'
 import type { Invite, Notify, Project, SaasState } from './account'
-import { identify } from '../lib/analytics'
+import { analyticsOn, group, identify } from '../lib/analytics'
 
 const BUCKET = 'widget-config'
 /** The project's database id, by its public id (the snippet's data-project). */
@@ -32,7 +32,7 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
   const { data: u } = await supabase.auth.getUser()
   const user = u.user
   if (!user) { dbIds.clear(); workspaceId = null; return null }
-  identify(user.id)
+  identify(user.id, { created_at: user.created_at, signup_method: user.app_metadata?.provider === 'google' ? 'google' : 'email' })
   const meta = (user.user_metadata ?? {}) as { name?: string; onboarded?: boolean }
   const account = { name: (meta.name || user.email?.split('@')[0] || 'You').slice(0, 40), email: user.email ?? '', createdAt: user.created_at }
 
@@ -75,7 +75,21 @@ export async function loadCloud(prevCurrent: string | null): Promise<SaasState |
   const byDb = new Map([...dbIds].map(([pub, id]) => [id, pub]))
   const invites: Invite[] = (inv ?? []).map((i) => ({ email: i.email, role: i.role === 'admin' ? 'admin' : 'member', projectId: byDb.get(i.project_id) ?? '', at: i.created_at }))
   const current = projects.some((p) => p.id === prevCurrent) ? prevCurrent : projects[0]?.id ?? null
+  void analyticsProfile(user.id, workspaceId, projects)
   return { account, projects, current, invites, signedIn: true, onboarded: !!meta.onboarded || projects.length > 0 }
+}
+
+/** Safe person and workspace properties for PostHog (ids and counts only), once per page load. */
+let profiled = ''
+async function analyticsProfile(userId: string, ws: string, projects: Project[]) {
+  const sig = `${userId}:${ws}:${projects.length}`
+  if (!analyticsOn || profiled === sig) return
+  profiled = sig
+  // The account's plan (row level security: only its own row); free when there is none or no table yet.
+  const { data } = await supabase!.from('account_plans').select('plan').eq('user_id', userId).maybeSingle()
+  const plan = (data as { plan?: string } | null)?.plan ?? 'free'
+  identify(userId, { plan, projects: projects.length, products: [...new Set(projects.flatMap((p) => p.products))].sort() })
+  group(ws, { projects: projects.length, plan })
 }
 
 /* "Copied the snippet" is a note for this browser only. */
