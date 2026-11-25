@@ -224,13 +224,14 @@ export const getDraft = async (project: string): Promise<WidgetConfig | null> =>
   try { return parseConfig(await rpc<unknown>('get_draft', { p_public_id: project })) } catch { return null }
 }
 
-/** The installation check: sampled, so plain page views barely reach the server. */
+/** The installation check: sampled (after each browser's first report), so plain page views barely reach the server. */
 export function reportSeen(project: string, version: string, shown: boolean, why: string) {
   const key = `${NS}seen-at:${project}`
   const last = Number(ls.get(key) ?? 0)
   const every = shown ? 3600_000 : 86_400_000
   if (Date.now() - last < every) return
-  if (!shown && Math.random() > 0.05) { ls.set(key, String(Date.now())); return }
+  // A browser's first report always goes (the panel's live install check waits for it); later hidden ones are sampled.
+  if (!shown && last > 0 && Math.random() > 0.05) { ls.set(key, String(Date.now())); return }
   ls.set(key, String(Date.now()))
   void rpc('report_seen', { p_public_id: project, p_version: version, p_shown: shown, p_why: why.slice(0, 200) }, { anon: true }).catch(() => { /* best effort */ })
 }

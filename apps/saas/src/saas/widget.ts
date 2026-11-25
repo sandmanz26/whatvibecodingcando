@@ -3,7 +3,7 @@
  * to the script through the configuration stand-in (core/embed/config.ts). Publishing is what sites
  * see; editing only changes the draft, which shows in previews.
  */
-import { DEFAULT_CONFIG, modulesOf, newHandoff, serve, unserve, type Env, type Release, type WidgetConfig } from '../core/embed/config'
+import { DEFAULT_CONFIG, MAX_ENVS, hostProblem, isLocalHost, modulesOf, newHandoff, serve, unserve, type Env, type Release, type WidgetConfig } from '../core/embed/config'
 import { cloud } from './supabase'
 import { productOf } from './products'
 import { createReviewLink } from './cloud'
@@ -60,17 +60,42 @@ export function setLiveOn(p: Project, on: boolean, by: string): Project {
   return { ...publish(p, by, { ...base, on }), config: { ...draft, on } }
 }
 
+/** The address to open for a host: http for a local dev address, https otherwise. */
+export const urlOfHost = (host: string) => `${isLocalHost(host) ? 'http' : 'https'}://${host}`
+
+/** The project's places that can be opened (no * patterns), switched on, in the project's order. */
+export function siteTargets(p: Project): { host: string; url: string }[] {
+  const envs = (liveOf(p)?.config ?? draftOf(p)).envs
+  return envs.filter((e) => e.on && !e.host.includes('*')).map((e) => ({ host: e.host, url: urlOfHost(e.host) }))
+}
+
+/**
+ * Adds an address (a new localhost port, a staging site) and publishes it at once, on top of what is
+ * live: other unpublished edits stay in the draft. null: not a valid host, or the list is full.
+ */
+export function addAddress(p: Project, host: string, by: string): Project | null {
+  const h = host.trim().toLowerCase()
+  if (hostProblem(h)) return null
+  const add = (c: WidgetConfig): WidgetConfig | null => (c.envs.some((e) => e.host === h) ? c
+    : c.envs.length >= MAX_ENVS ? null
+      : { ...c, envs: [...c.envs, { id: Math.random().toString(36).slice(2, 10), name: isLocalHost(h) ? 'Local dev' : h, host: h, on: true }] })
+  const draft = add(draftOf(p))
+  const base = add(liveOf(p)?.config ?? draftOf(p))
+  if (!draft || !base) return null
+  return { ...publish(p, by, base), config: draft, siteUrl: p.siteUrl || urlOfHost(h), domains: p.domains.includes(h) ? p.domains : [...p.domains, h] }
+}
+
 /** Hands a project's live settings and draft to the script (the stand-in for the configuration endpoint). */
 // On the server the script reads the published file on Storage instead; the stand-in is for the demo only.
 export const serveProject = (p: Project) => { if (!cloud) serve(p.id, { live: liveOf(p), draft: draftOf(p) }) }
 export const unserveProject = (id: string) => unserve(id)
 
 /** Puts a review token into a page address (#vibe_t=…), keeping the page's own hash route after it. */
-function withToken(url: string, token: string) {
+function withToken(url: string, token: string, fromPanel = false) {
   const u = new URL(url)
   if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('not_http')
   const rest = u.hash.replace(/^#/, '')
-  u.hash = `vibe_t=${token}${rest ? `&${rest}` : ''}`
+  u.hash = `vibe_t=${token}${fromPanel ? '&vibe_from=panel' : ''}${rest ? `&${rest}` : ''}`
   return u.href
 }
 /** A one-time review token: from the server (cloud), or this browser's stand-in (demo). */
@@ -84,14 +109,15 @@ async function reviewToken(projectId: string, preview: boolean): Promise<string 
  * it for a reviewer session and removes it). `preview` shows the draft instead of the published settings.
  * The tab opens at once (so pop-up blockers allow it) and goes to the site when the token is ready.
  */
-export async function openAsReviewer(projectId: string, url: string, preview = false): Promise<boolean> {
+export async function openAsReviewer(projectId: string, url: string, preview = false, fromPanel = false): Promise<boolean> {
   if (!/^https?:\/\//i.test(url)) return false
   const w = window.open('', '_blank')
   if (w) w.opener = null
   const token = await reviewToken(projectId, preview)
   if (!token) { w?.close(); return false }
-  if (w) w.location.href = withToken(url, token)
-  else window.open(withToken(url, token), '_blank', 'noopener')
+  const to = withToken(url, token, fromPanel)
+  if (w) w.location.href = to
+  else window.open(to, '_blank', 'noopener')
   return true
 }
 /** The same link, for an iframe inside the panel. */

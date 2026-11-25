@@ -55,12 +55,15 @@ export const MAX_ENVS = 10
 export const MAX_LABEL = 24
 const HOST_PART = /^(?:\*|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?|[a-z0-9-]*\*[a-z0-9-]*)$/
 
+/** A local dev address: localhost or 127.0.0.1, with or without a port. */
+export const isLocalHost = (host: string) => /^(?:localhost|127\.0\.0\.1)(?::\d{2,5})?$/.test(host.trim().toLowerCase())
+
 /** What's wrong with an environment's host pattern, or ''. A bare "*" or "*.vercel.app"-wide patterns are refused. */
 export function hostProblem(host: string): string {
   const h = host.trim().toLowerCase()
   if (!h) return 'Enter a host name.'
   if (/^https?:\/\//.test(h) || h.includes('/')) return 'Just the host name, without https:// or a path.'
-  if (h === 'localhost' || /^localhost:\d{2,5}$/.test(h)) return ''
+  if (isLocalHost(h)) return ''
   const parts = h.split('.')
   if (parts.length < 2 || !parts.every((p) => HOST_PART.test(p))) return 'That isn’t a host name like staging.example.com.'
   if (parts.filter((p) => p.includes('*')).length > 1) return 'Use at most one *.'
@@ -236,6 +239,27 @@ export function newHandoff(project: string, preview = false): string | null {
   const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('')
   return ls.set(handoffKey(token), JSON.stringify({ project, exp: Date.now() + HANDOFF_SECONDS * 1000, preview })) ? token : null
 }
+
+/**
+ * The browser-only demo, on a site that isn't the panel's own address (localhost:3000 beside the
+ * panel on localhost:5173): the panel's settings and its one-time token reach the site through the
+ * demo bridge (demo-bridge.ts), and are kept here as if the panel had served them on this origin.
+ */
+export function acceptHandoff(project: string, token: string, preview: boolean) {
+  if (!/^[0-9a-f]{32,64}$/.test(token)) return
+  ls.set(handoffKey(token), JSON.stringify({ project, exp: Date.now() + HANDOFF_SECONDS * 1000, preview }))
+}
+/** The demo bridge's side: what the panel serves for a project, as stored (or null), and whether a token is valid (taken once). */
+export function rawServed(project: string): unknown { try { return JSON.parse(ls.get(configKey(project)) ?? 'null') } catch { return null } }
+export function takeHandoff(project: string, token: string): { preview: boolean } | null {
+  if (!/^[0-9a-f]{32,64}$/.test(token)) return null
+  let h: unknown = null
+  try { h = JSON.parse(ls.get(handoffKey(token)) ?? 'null') } catch { /* ignore */ }
+  ls.del(handoffKey(token))
+  if (!isObj(h) || h.project !== project || typeof h.exp !== 'number' || h.exp < Date.now()) return null
+  return { preview: h.preview === true }
+}
+export function serveRaw(project: string, raw: unknown) { if (isObj(raw)) ls.set(configKey(project), JSON.stringify(raw)) }
 
 /* ---------- what the script reports about itself (the stand-in for the install check) ---------- */
 

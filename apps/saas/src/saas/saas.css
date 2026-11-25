@@ -637,3 +637,31 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 .lp-legal-short h2 { margin: 0 0 8px; }
 .lp-fill { background: #fff1b8; color: inherit; padding: 0 3px; border-radius: 4px; font-weight: 600; }
 @media (max-width: 600px) { .lp-legal-main h1 { font-size: 28px; } .lp-legal-short { padding: 14px; } }
+
+/* ---------- install journey (InstallFlow.tsx): snippet, three steps, live check ---------- */
+.ih { display: grid; gap: 16px; }
+.ih-snippet { display: grid; gap: 10px; justify-items: start; }
+.ih-snippet .up-code { width: 100%; box-sizing: border-box; }
+.ih-steps { list-style: none; counter-reset: ih; margin: 0; padding: 0; display: grid; gap: 14px; }
+.ih-steps > li { counter-increment: ih; position: relative; padding-left: 38px; display: grid; gap: 8px; justify-items: start; }
+.ih-steps > li::before { content: counter(ih); position: absolute; left: 0; top: -2px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--lp-ink); background: #fff0e4; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.ih-steps > li > p { margin: 0; line-height: 1.5; }
+.ih-steps .up-code { width: 100%; box-sizing: border-box; }
+.ih-open { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ih-check { display: grid; gap: 10px; justify-items: start; }
+.ih-check > p { margin: 0; }
+.ih-wait { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; font-size: 14px; }
+.ih-spin { animation: ih-spin 1s linear infinite; }
+@keyframes ih-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ih-spin { animation: none; } }
+.ih-next { gap: 14px; flex-wrap: wrap; align-items: center; }
+.ih-help { width: 100%; box-sizing: border-box; }
+.ih-help h3 { font-size: 15px; margin-bottom: 6px; }
+.ih-help ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.5; }
+.ih-add { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.ih-add input { height: 32px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--lp-line-2); font: inherit; min-width: 0; flex: 1 1 160px; max-width: 260px; }
+.ih-where { display: grid; gap: 14px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.ih-where legend { padding: 0; margin-bottom: 4px; }
+.ih-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.ih-chips button { height: 28px; padding: 0 10px; border-radius: 999px; border: 1.5px solid var(--lp-line-2); background: #fff; font: 600 12.5px inherit; font-family: inherit; cursor: pointer; color: var(--lp-ink); }
+.ih-chips button[aria-pressed='true'] { background: var(--lp-ink); color: #fff; border-color: var(--lp-ink); }

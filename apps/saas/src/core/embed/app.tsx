@@ -25,9 +25,10 @@ import { Widget, OPEN_EVENT, type Config, type OpenWhat } from './Widget'
 import { TOOL_IDS, type ToolId } from './Tools'
 import { LocalBackend, NS, type Backend } from './store'
 import { CSS } from './styles'
-import { LocalConfigSource, anyModule, envFor, modulesOf, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
+import { acceptHandoff, serveRaw, LocalConfigSource, anyModule, envFor, modulesOf, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
 import * as server from './server'
 import { frameMain } from './frame'
+import { bridgeMain, openBridge, type Bridge } from './demo-bridge'
 import { Participant } from './Research'
 import { loadRun, saveRun, studyInfo, takeStudyToken, type RunState } from './research'
 
@@ -141,7 +142,7 @@ interface Mode {
   reportSeen(shown: boolean, why: string): void
 }
 
-function localMode(project: string, legacy: WidgetConfig | null, trial = false): Mode {
+function localMode(project: string, legacy: WidgetConfig | null, trial = false, bridge: Bridge | null = null): Mode {
   const source: ConfigSource = new LocalConfigSource()
   let token: ReviewerSession | null = null
   const subs = new Set<() => void>()
@@ -166,7 +167,10 @@ function localMode(project: string, legacy: WidgetConfig | null, trial = false):
     async join() { /* the stand-in has no sessions: everyone may comment */ },
     exitPreview() { ss.del(previewKey(project)); subs.forEach((f) => f()) },
     backend: () => new LocalBackend(project),
-    reportSeen(shown, why) { reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown, why }) },
+    reportSeen(shown, why) {
+      reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown, why })
+      bridge?.seen(project, { page: window.location.pathname, version: VERSION, shown, why })
+    },
   }
 }
 
@@ -255,11 +259,25 @@ function LinkNotice({ why, onClose }: { why: string; onClose: () => void }) {
   )
 }
 
+const sameOrigin = (src: string) => { try { return new URL(src).origin === window.location.origin } catch { return true } }
+const tipKey = (p: string) => `${NS}tip-panel:${p}`
+const tipSeen = (p: string) => { try { return localStorage.getItem(tipKey(p)) === '1' } catch { return false } }
+const markTipSeen = (p: string) => { try { localStorage.setItem(tipKey(p), '1') } catch { /* shown again next time */ } }
+/** Once per project, for the team member who opened the site from the panel. */
+function PanelTip({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="vc-toast" role="status" data-vc-tip="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', bottom: 84, maxWidth: 'min(420px, calc(100vw - 32px))', lineHeight: 1.4 }}>
+      <span>You’re seeing ourhunch because you opened it from your panel. Visitors don’t see it.</span>
+      <button type="button" onClick={onClose} aria-label="Got it" style={{ border: 0, background: 'transparent', color: 'inherit', fontSize: 16, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
+    </div>
+  )
+}
+
 /** Starts the widget (or the session frame) for the script tag `given`: called by the loader (main.ts). */
 export async function boot(given?: HTMLScriptElement | null) {
   const me = given ?? (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
   // Loaded by our own session.html: this is the session frame, not a widget.
-  if (me?.dataset.frame !== undefined) { if (server.hasServer) frameMain(server.serverUrl, server.serverKey); return }
+  if (me?.dataset.frame !== undefined) { if (server.hasServer) frameMain(server.serverUrl, server.serverKey); else bridgeMain(); return }
   if (window.__vibeCollab) { console.warn('[ourhunch] the script is on this page twice; the second copy does nothing.'); return }
   const script = me
   const d = script?.dataset ?? {}
@@ -274,6 +292,8 @@ export async function boot(given?: HTMLScriptElement | null) {
   // The review link's token, taken off the address at once (so it isn't left in history or shared on).
   // Read from the address the browser first opened too, for sites that redirect on load (hints.ts).
   const token = takeHint('t', '[0-9a-f]{32,64}')
+  // Opened with the panel's "Open my site" (not a reviewer's invite): a one-time tip says why it shows.
+  const fromPanel = takeHint('from', 'panel') !== null
 
   // A study's participant (#vibe_r=… and "I agree"): the study runs instead of the widget, for this tab.
   const studyToken = takeStudyToken()
@@ -303,6 +323,13 @@ export async function boot(given?: HTMLScriptElement | null) {
     if (file.gone) { console.info('[ourhunch] this project was deleted; nothing to show.'); return }
     if (file.live) mode = serverMode(project, file)
   }
+  let bridge: Bridge | null = null
+  if (!mode && !server.hasServer && script?.src && !sameOrigin(script.src)) {
+    // The browser-only demo on the customer's own address: the panel's settings and token come through the bridge.
+    bridge = await openBridge(script.src)
+    const r = await bridge?.sync(project, token)
+    if (r) { serveRaw(project, r.served); if (r.handoff && token) acceptHandoff(project, token, r.handoff.preview) }
+  }
   if (!mode) {
     const first = new LocalConfigSource().get(project)
     if (first.gone) { console.info('[ourhunch] this project was deleted; nothing to show.'); reportSeen(project, { at: new Date().toISOString(), host: window.location.host, page: window.location.pathname, version: VERSION, shown: false, why: 'The project was deleted.' }); return }
@@ -319,7 +346,7 @@ export async function boot(given?: HTMLScriptElement | null) {
     }
     // Trying products on our own demo site before the project is published: the visitor is the
     // project's owner, so the reviewers' tools show too (they read only this page's styles).
-    mode = localMode(project, legacy, demo && !!legacy && picked !== null)
+    mode = localMode(project, legacy, demo && !!legacy && picked !== null, bridge)
   }
   const m = mode
   window.__vibeCollab.server = m.sessions
@@ -367,8 +394,10 @@ export async function boot(given?: HTMLScriptElement | null) {
       host.addEventListener(SESSION_EVENT, on)
       return () => host.removeEventListener(SESSION_EVENT, on)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const [tip, setTip] = useState(() => fromPanel && !tipSeen(project))
     const notice = problem ? <LinkNotice why={problem} onClose={() => setProblem(null)} /> : null
     if (!decision.show || needsJoin) return notice
+    const tipBox = tip && !problem && decision.config.audience === 'reviewers' ? <PanelTip onClose={() => { markTipSeen(project); setTip(false) }} /> : null
     const c = decision.config
     const config: Config = {
       project, position: c.launcher.position, shortcut: c.launcher.shortcut, launcher: c.launcher.kind, label: c.launcher.label,
@@ -377,7 +406,7 @@ export async function boot(given?: HTMLScriptElement | null) {
       compare: decision.comments && !!c.modules.compare, narration: decision.comments && !!c.modules.narration && m.sessions, version: c.version,
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
     }
-    return <>{notice}<Widget backend={backend} config={config} host={host} /></>
+    return <>{notice}{tipBox}<Widget backend={backend} config={config} host={host} /></>
   }
 
   const open = (what: OpenWhat = 'comment') => host.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: what === 'list' ? 'list' : 'comment' }))

@@ -26,7 +26,7 @@ export type FunnelEvent =
   | 'widget_published' | 'open_my_site' | 'install_detected' | 'review_link_created' | 'first_comment_received'
   | 'comment_resolved' | 'fix_prompt_copied' | 'csv_exported' | 'study_created' | 'study_results_viewed'
   | 'rounds_turned_on' | 'rounds_turned_off' | 'round_started' | 'round_approved_seen' | 'settings_notify_changed'
-  | 'checkout_started' | 'subscription_activated'
+  | 'checkout_started' | 'subscription_activated' | 'install_help_viewed' | 'address_added'
 export type Props = Record<string, string | number | boolean | string[]>
 /** How the account signed up or in. */
 export type Method = 'email' | 'google' | 'demo'

@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
-import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, ArrowLeft, LogOut, CheckCircle2, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown, Sparkles } from 'lucide-react'
+import { Plus, ExternalLink, Copy, Check, Trash2, RotateCcw, ArrowLeft, LogOut, X, TriangleAlert, Radar, Download, Share2, ChevronsUpDown, Sparkles } from 'lucide-react'
 import { useStore } from '../../store/store'
 import { Modal, Switch, Toasts } from '../../components/ui'
 import { BRAND, CATEGORIES, CAT_HELP, PRODUCTS, productOf, statusLabel, WEBSITE } from '../../saas/products'
 import { copyText, demoUrl, installSnippet, sameInstall } from '../../saas/snippet'
 import { WithPreview } from './ProductPreview'
-import { draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProject, unserveProject } from '../../saas/widget'
-import { lastSeen } from '../../core/embed/config'
+import { addAddress, draftOf, liveOf, openAsReviewer, publishProducts, releasable, serveProject, unserveProject } from '../../saas/widget'
+import { InstallCheck, InstallSteps, StrayBanner } from './InstallFlow'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState, type Notify } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
-import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, getMarketingCloud, setMarketingCloud, deleteAccountCloud, latestInstall, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
+import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, getMarketingCloud, setMarketingCloud, deleteAccountCloud, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
 import { PanelNav } from './Nav'
@@ -22,10 +22,10 @@ import { describe as describeEl, stateOf } from '../../core/embed/anchor'
 /** Open comments whose pin the widget last saw as moved or gone: they need re-pinning on the site. */
 const needsRepin = (t: Thread) => !t.resolved && (stateOf(t.anchor.st)?.s === 'moved' || stateOf(t.anchor.st)?.s === 'gone')
 import '../../saas/saas.css'
-import { resetAnalytics, setPerson, track, trackOnce } from '../../lib/analytics'
+import { resetAnalytics, track } from '../../lib/analytics'
 import { BrandMark } from '../../components/BrandMark'
 
-export interface Ctx { leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
+export interface Ctx { addHost: (host: string) => boolean; leave: (to: string, change: () => void) => void; logOut: () => void; s: SaasState; update: (fn: (s: SaasState) => SaasState) => boolean; project: Project | null; setProject: (fn: (p: Project) => Project) => boolean }
 export const usePanel = () => useOutletContext<Ctx>()
 const ago = (iso: string) => {
   const m = (Date.now() - new Date(iso).getTime()) / 60000
@@ -47,7 +47,7 @@ export const openMySite = (p: Project, toast: (t: string, k?: 'error') => void) 
   if (!p.siteUrl) { toast('Add your site’s address in Widget → Website first.', 'error'); return }
   if (!liveOf(p)) { toast('Press Update site in Widget first: your site has no settings yet.', 'error'); return }
   track('open_my_site')
-  void openAsReviewer(p.id, p.siteUrl).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })
+  void openAsReviewer(p.id, p.siteUrl, false, true).then((ok) => { if (!ok) toast('Couldn’t make a review link. Try again.', 'error') })
 }
 /** "x min ago" for the panel. */
 export { ago }
@@ -108,6 +108,15 @@ export function PanelLayout() {
     if (!ok) toast('Not saved: this browser’s storage is full or blocked.', 'error')
     return ok
   }
+  /** One click from a banner or the install check: the address is added and published. */
+  const addHost = (host: string) => {
+    if (!project) return false
+    const next = addAddress(project, host, s.account?.name ?? 'You')
+    if (!next) { toast(`Couldn’t add ${host}: check the address, or remove one in Widget → Website (10 at most).`, 'error'); return false }
+    if (!setProject(() => next)) return false
+    track('address_added', { where: pathname === '/app/install' ? 'install' : 'banner', local: /^(localhost|127\.0\.0\.1)/.test(host) })
+    return true
+  }
   return (
     <div className="up">
       <aside className="up-side">
@@ -122,7 +131,8 @@ export function PanelLayout() {
         <div className="up-beta"><TriangleAlert size={14} /> {cloud
           ? 'Beta: free while we build. Your account, projects, comments and reviewers are saved on the server; products marked early access work in the demo only.'
           : 'Beta without a server: this workspace is saved in this browser only.'}</div>
-        {project || pathname === '/app/settings' ? <Outlet context={{ s, update, project, setProject, leave, logOut } satisfies Ctx} /> : (
+        {project && pathname !== '/app/install' && <StrayBanner project={project} onAdd={(h) => { const ok = addHost(h); if (ok) toast(`Added ${h} and updated your site`); return ok }} />}
+        {project || pathname === '/app/settings' ? <Outlet context={{ s, update, project, setProject, leave, logOut, addHost } satisfies Ctx} /> : (
           <div className="up-empty"><h1>No project yet</h1><p>Create a project for a site or app to get its snippet.</p><button className="lp-btn primary" onClick={() => setCreating(true)}><Plus size={15} /> New project</button></div>
         )}
       </main>
@@ -245,87 +255,47 @@ export function Products() {
 
 /* ---------- install ---------- */
 
-const GUIDES: { id: string; label: string; where: string; code?: (s: string) => string }[] = [
-  { id: 'html', label: 'HTML', where: 'Paste it just before </body> on every page (or in your shared footer).' },
-  { id: 'vite', label: 'React / Vue / Svelte (Vite)', where: 'Paste it into index.html at the project root, before </body>. One place covers every route.' },
-  { id: 'next', label: 'Next.js', where: 'Add it to app/layout.tsx with next/script, inside <body>:', code: (s) => `import Script from 'next/script'\n\n<Script\n  src="${(s.match(/src="([^"]+)"/) ?? [])[1]}"\n${(s.match(/  data-[^\n]+/g) ?? []).map((x) => x.replace(/^\s+/, '  ')).join('\n')}\n  strategy="afterInteractive"\n/>` },
-  { id: 'cms', label: 'WordPress / Webflow / Framer', where: 'Use the site’s “custom code” setting for the footer (Webflow: Site settings → Custom code → Footer; Framer: Site settings → General → End of <body>; WordPress: a header-and-footer plugin).' },
-  { id: 'ai', label: 'Ask an AI assistant', where: 'Paste this into your AI coding assistant, opened in your project:', code: (s) => `Add this script tag to my site so it loads on every page, once (just before </body>, or the framework's equivalent such as next/script in the root layout). Don't change anything else.\n\n${s}` },
-]
-
 export function Install() {
-  const { project, setProject } = usePanel()
+  const { project, setProject, addHost } = usePanel()
   const { toast } = useStore()
-  const [guide, setGuide] = useState('html')
-  const [seen, setSeen] = useState(() => (project && !cloud ? lastSeen(project.id) : null))
-  useEffect(() => {
-    if (!project) return
-    // On the server: what the script on any of the project's sites last reported.
-    const seenNow = (x: typeof seen) => { setSeen(x); if (x) { trackOnce('install_detected', project.id, { shown: x.shown }); setPerson({ has_installed: true }) } }
-    const read = () => (cloud ? void latestInstall(project.id).then(seenNow).catch(() => { /* retried */ }) : seenNow(lastSeen(project.id)))
-    read()
-    const t = window.setInterval(read, cloud ? 15000 : 3000)
-    return () => window.clearInterval(t)
-  }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The live check waits from the copy (or from opening this page, when the snippet was copied before).
+  const [since, setSince] = useState<number | null>(() => (project?.copiedSnippet ? Date.now() : null))
   if (!project) return null
   const code = snippetOf(project)
   const stale = !!project.copiedSnippet && !sameInstall(project.copiedSnippet, project.id)
-  const g = GUIDES.find((x) => x.id === guide)!
-  const copy = async (text: string, what: string, mark: boolean) => {
-    if (!(await copyText(text))) { toast('Copy failed. Select the text and copy it by hand.', 'error'); return }
-    if (mark) setProject((p) => ({ ...p, copiedSnippet: code }))
-    if (what === 'Snippet' || mark) track('snippet_copied', { where: 'install' })
-    toast(`${what} copied`)
+  const copy = async () => {
+    if (!(await copyText(code))) { toast('Copy failed. Select the snippet and copy it by hand.', 'error'); return }
+    setProject((p) => ({ ...p, copiedSnippet: code }))
+    setSince((x) => x ?? Date.now())
+    track('snippet_copied', { where: 'install' })
+    toast('Snippet copied')
   }
   const live = liveOf(project)
-  const scriptHost = new URL(code.match(/src="([^"]+)"/)?.[1] ?? window.location.href).host
+  const scriptOrigin = new URL(code.match(/src="([^"]+)"/)?.[1] ?? window.location.href).origin
   return (
     <div className="up-page">
       <div className="up-head"><div><h1>Install</h1><p>One snippet per project. Paste it once; it works on every page and never has to change. What the widget shows, to whom and where is set in <Link to="/app/widget">Widget</Link>.</p></div>
         <button className="lp-btn" onClick={() => openDemo(project.id, toast)}>Try on the demo site <ExternalLink size={13} /></button></div>
       {stale && <p className="up-warn"><TriangleAlert size={14} /> The snippet on your site is from an older version or another project. It keeps working; copy this one when you next touch your site.</p>}
       {!live && <p className="up-warn"><TriangleAlert size={14} /> Your site has no settings yet. Open <Link to="/app/widget">Widget</Link> and press Update site to control it from here.</p>}
-      {project.siteUrl && live && (
-        <section className="up-card up-seeit">
-          <div className="lp-grow">
-            <h2>See it on your site</h2>
-            <p className="up-muted">{live.config.audience === 'everyone'
-              ? 'Comments are open to everyone visiting, so the widget shows on every page. Reviewers also get the design tools.'
-              : <>Only <b>reviewers</b> see the widget, so opening your site normally shows nothing, not even to you. Open it from here once: this browser becomes a reviewer and keeps seeing it. Change who sees it in <Link to="/app/widget">Widget → Who sees it</Link>.</>}</p>
-          </div>
-          <button className="lp-btn primary" onClick={() => openMySite(project, toast)}>Open my site <ExternalLink size={13} /></button>
-        </section>
-      )}
-      <div className="up-cols">
-        <section className="up-card">
-          <h2>Your snippet</h2>
-          <pre className="up-code">{code}</pre>
-          <button className="lp-btn primary" onClick={() => void copy(code, 'Snippet', true)}><Copy size={14} /> Copy snippet</button>
-          <p className="up-muted">Tip (optional): add <code>data-hunch="name"</code> to important elements, for example <code>&lt;button data-hunch="buy"&gt;</code>, to keep pins 100% stable when your site changes. Without it, pins still find their element again in most redeploys, or ask “Moved?”.</p>
-        </section>
-        <section className="up-card">
-          <h2><Radar size={16} /> Installation check</h2>
-          {seen ? (
-            <>
-              <p className={`up-check ${seen.shown ? 'ok' : 'warn'}`}>{seen.shown ? <CheckCircle2 size={14} /> : <TriangleAlert size={14} />} Script {seen.version} loaded on <code>{seen.host}{seen.page}</code> {ago(seen.at)}.</p>
-              <p className="up-muted">{seen.shown ? 'The widget was shown.' : `The widget stayed hidden: ${seen.why}`}</p>
-              {!seen.shown && /reviewers/i.test(seen.why) && project.siteUrl && <button className="lp-btn sm" onClick={() => openMySite(project, toast)}>Open my site as a reviewer <ExternalLink size={12} /></button>}
-            </>
-          ) : <p className="up-muted">Not seen yet. After installing, press Open my site above (or try the demo site).</p>}
-          <p className="up-note">{cloud ? 'Every site with your snippet reports here: right away when the widget shows, and now and then (a sample) when it stays hidden, so plain page views barely reach the server.' : 'Beta without a server: this check only sees the demo site opened in this browser.'}</p>
-        </section>
-      </div>
+      {live?.config.audience === 'everyone' && <p className="up-note">Comments are open to everyone visiting, so the widget shows on every page of your listed addresses. Reviewers also get the design tools.</p>}
       <section className="up-card">
-        <h2>Where to paste it</h2>
-        <div className="up-tabs" role="tablist">{GUIDES.map((x) => <button key={x.id} role="tab" aria-selected={guide === x.id} onClick={() => setGuide(x.id)}>{x.label}</button>)}</div>
-        <p>{g.where}</p>
-        {g.code && <><pre className="up-code">{g.code(code)}</pre><button className="lp-btn sm" onClick={() => void copy(g.code!(code), g.id === 'ai' ? 'Prompt' : 'Code', g.id !== 'ai')}><Copy size={13} /> Copy</button></>}
+        <h2>Your snippet</h2>
+        <InstallSteps project={project} code={code} copied={project.copiedSnippet === code} onCopy={() => void copy()} toast={toast} />
+      </section>
+      <section className="up-card">
+        <h2><Radar size={16} /> Installation check</h2>
+        <InstallCheck project={project} since={since} onAdd={addHost} toast={toast} next={<Link className="lp-btn" to="/app/reviewers">Next: invite a reviewer</Link>} />
+        <p className="up-note">{cloud ? 'Every site with your snippet reports here: the first time in each browser, right away when the widget shows, and now and then after that.' : 'Beta without a server: this check sees your site through this browser only (the panel and your site must be open in the same browser).'}</p>
+      </section>
+      <section className="up-card">
+        <p className="up-muted">Tip (optional): add <code>data-hunch="name"</code> to important elements, for example <code>&lt;button data-hunch="buy"&gt;</code>, to keep pins 100% stable when your site changes. Without it, pins still find their element again in most redeploys, or ask “Moved?”.</p>
       </section>
       <section className="up-card">
         <h2>For developers</h2>
         <dl className="up-dl">
           <dt>Content-Security-Policy</dt>
-          <dd>If your site sends one, allow the script: <code>script-src {scriptHost}</code>. When the server is live, also <code>connect-src</code> for its API.</dd>
+          <dd>If your site sends one, allow us: <code>script-src {scriptOrigin}</code> and <code>frame-src {scriptOrigin}</code>{cloud && import.meta.env.VITE_SUPABASE_URL ? <>, plus <code>connect-src {String(import.meta.env.VITE_SUPABASE_URL)}</code></> : null}.</dd>
           <dt>Your own button</dt>
           <dd><code>{'<button data-vibe="comment">Give feedback</button>'}</code> starts a comment; <code>data-vibe="comments"</code> opens the list. From code: <code>window.OurHunch.open('comment')</code>.</dd>
           <dt>Private parts of a page</dt>

@@ -324,6 +324,22 @@ export async function removeReviewer(id: string) {
   if (error) throw error
 }
 
+/** Every site's latest report (at most 20 per project), newest first. */
+export async function installsOf(publicId: string): Promise<Seen[]> {
+  const id = dbIds.get(publicId)
+  if (!id) return []
+  const { data, error } = await supabase!.from('installs').select('host, last_seen, version, shown, why').eq('project_id', id).order('last_seen', { ascending: false }).limit(20)
+  if (error) throw error
+  return ((data ?? []) as { host: string; last_seen: string; version: string; shown: boolean; why: string }[]).map((r) => ({ at: r.last_seen, host: r.host, page: '', version: r.version, shown: r.shown, why: r.why }))
+}
+/** Local dev addresses where the script ran but which aren't in the project (install_strays; none on a server without it). */
+export async function straysOf(publicId: string): Promise<string[]> {
+  const id = dbIds.get(publicId)
+  if (!id) return []
+  const { data, error } = await supabase!.from('install_strays').select('host').eq('project_id', id).order('last_seen', { ascending: false }).limit(5)
+  if (error) return []
+  return ((data ?? []) as { host: string }[]).map((r) => r.host)
+}
 /** The most recent report from the script, on any site of the project. */
 export async function latestInstall(publicId: string): Promise<Seen | null> {
   const id = dbIds.get(publicId)

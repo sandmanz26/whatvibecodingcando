@@ -17,6 +17,8 @@ Analytics hanya ada di website (`/`, `apps/landing/src/analytics.ts`) dan aplika
 | `install_detected` | app | `shown` | **Aktivasi 1:** script benar-benar terpasang (sekali per proyek) |
 | `widget_published` | app | `where` (widget/products) | Seberapa sering setelan widget diubah |
 | `open_my_site` | app | — | Pemilik mencoba sendiri |
+| `install_help_viewed` | app | `late` (true: otomatis setelah 2 menit tanpa laporan) | Kartu pemecahan masalah instalasi terlihat |
+| `address_added` | app | `where` (onboarding/install/banner), `local` | Alamat ditambahkan dengan satu klik (mis. port localhost baru) |
 | `review_link_created` | app | — | **Aktivasi 2:** mengundang reviewer |
 | `first_comment_received` | app | — | **Aktivasi 3 (aha):** komentar pertama (sekali per proyek) |
 | `comment_resolved` | app | — | Apakah feedback ditindaklanjuti? |

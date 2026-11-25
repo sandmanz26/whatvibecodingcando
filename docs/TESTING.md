@@ -71,9 +71,12 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 |---|---|---|---|
 | 3.1 | Langkah 1: pilih tool (dikelompokkan Feedback / Research / Design QA) | **Fake doors** tertulis "Coming soon" dan tidak bisa dipilih; **Eye tracking** berlabel "Labs" | [ ] |
 | 3.2 | Langkah 2: isi nama proyek | Di bawahnya muncul id proyek (mis. `gagero`) | [ ] |
-| 3.3 | Isi "Where is the site online?" dengan `trms-zeta.vercel.app` | Muncul "The widget will show on trms-zeta.vercel.app" | [ ] |
-| 3.4 | Isi alamat salah (mis. `abc`) | Pesan contoh format yang benar | [ ] |
-| 3.5 | Langkah 3: **Copy snippet** | Snippet berisi `src=".../embed/vibe.js"` dan `data-project="..."` saja | [ ] |
+| 3.3 | "Where will you add it?": klik saran **localhost:3000** (atau ketik `localhost:4173` / `127.0.0.1:5173`), dan/atau isi **Live website** `trms-zeta.vercel.app` → **Create project** | Proyek dibuat dan pengaturan widget langsung dipublikasikan (Widget → History berisi versi 1 dengan alamat-alamat itu) | [ ] |
+| 3.4 | Isi alamat salah (mis. `abc` di Live website, atau `example.com` di kolom lokal) | Pesan contoh format yang benar; tidak bisa lanjut | [ ] |
+| 3.5 | Langkah 3: **Copy snippet** | Snippet berisi `src=".../embed/vibe.js"` dan `data-project="..."` saja; di sebelahnya 3 langkah (① tempel sebelum `</body>` + tab framework ② **Open my site** ③ "Visitors won't see anything…") dan "Waiting for your site…" | [ ] |
+| 3.5a ⚡ | Tempel snippet di app lokal (mis. `localhost:3000`), jalankan, buka langsung | Tidak ada widget (benar). Di onboarding: "Installed on localhost:3000" dalam beberapa detik, tombol **Open my site** dan **Next: invite a reviewer** | [ ] |
+| 3.5aa ⚡ | Klik **Open my site** | Tab baru ke app Anda; widget muncul dengan catatan sekali "You're seeing ourhunch because you opened it from your panel. Visitors don't see it." (× menutupnya; tidak muncul lagi untuk proyek ini) | [ ] |
+| 3.5ab | Jangan pasang snippet, tunggu 2 menit setelah Copy (atau klik **Not showing up?**) | Kartu pemecahan masalah: snippet di halaman, id proyek, daftar alamat + kolom Add, host CSP persis (`script-src`, `frame-src`, `connect-src` Supabase), ad-blocker | [ ] |
 | 3.5b | Langkah 1: pilih 4 tool (mis. Comments, Inspect, Design tokens, Heatmaps), lanjut ke langkah 3, klik **Try it on the demo site** | Dock widget di situs demo berisi **keempat** tool itu (Comment, Inspect, Design tokens, Heatmap), bukan hanya Comments | [ ] |
 | 3.5c | Sama, tapi pilih juga **Usability tests** / **Reports** | Catatan "You picked" di kiri bawah situs demo menjelaskan tool itu dijalankan dari panel (Research / Reports), bukan dari dock | [ ] |
 | 3.5d | Desktop: arahkan mouse (atau Tab) ke kartu tool, tunggu sebentar | Muncul popover berisi video pendek (tanpa suara, berulang), nama dan deskripsi; Esc menutupnya; halaman tidak bergeser | [ ] |
@@ -93,6 +96,8 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 | 4.4 | Tutup tab, buka situs uji lagi di browser yang sama | Widget tetap muncul (browser ini sekarang reviewer) | [ ] |
 | 4.5 | Kembali ke **Install** → **Installation check** | Menampilkan "Script ... loaded on ..." dan "The widget was shown" (bisa butuh beberapa detik) | [ ] |
 | 4.6 | Situs yang `redirect` ke `/login` saat dibuka: pakai **Open my site** | Widget tetap muncul setelah redirect | [ ] |
+| 4.7 ⚡ | Jalankan app yang sama di port lain (mis. `localhost:3001`) dan buka | Di panel (halaman mana pun) muncul "ourhunch saw your script on localhost:3001, which isn't in this project — Add it"; klik → alamat ditambahkan dan dipublikasikan, banner hilang (server: setelah `catch-up/2026-11-27-install-flow.sql`) | [ ] |
+| 4.8 | SQL: jalankan `apps/saas/supabase/catch-up/2026-11-27-install-flow.sql` di SQL editor, lalu `tests/run.sh` lokal | Tanpa error; `install_flow_test.sql` ALL PASS (hanya alamat lokal, maks 5, bukan install, RLS member) | [ ] |
 
 ---
 
