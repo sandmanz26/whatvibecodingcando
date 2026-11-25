@@ -378,3 +378,13 @@ Console (F12 → Console, salin error merah):
 ```
 
 Prioritas: **P0** (tidak bisa daftar/login, data hilang, data bocor) → perbaiki hari itu; **P1** (fitur utama rusak) → minggu itu; **P2** (tampilan/teks) → kumpulkan.
+
+## Halaman legal (Privacy & Terms)
+
+- [ ] Buka `/app#/privacy` dan `/app#/terms`: ada judul, tanggal "Last updated", kotak "The short version", bagian bernomor.
+- [ ] Placeholder `[...]` tampil kuning; daftarnya sama dengan `docs/LEGAL-TODO.md`.
+- [ ] Harga di Terms sama dengan `PRICING` di `products.ts` ($4.80, $2, 200 pelanggan pertama).
+- [ ] Link footer website (Privacy, Terms) membuka halaman yang benar; link silang Privacy ↔ Terms berfungsi.
+- [ ] Lebar ponsel (390px): tidak ada scroll horizontal, teks terbaca.
+- [ ] Dengan/ tanpa `VITE_POSTHOG_KEY`: bagian Analytics berubah sesuai.
+- [ ] Semua teks widget, panel dan email berbahasa Inggris.

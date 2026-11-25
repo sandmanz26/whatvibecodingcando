@@ -632,3 +632,8 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 .up .db-table td.rs-ci { white-space: nowrap; }
 .up .db-table th { white-space: nowrap; }
 @media (max-width: 720px) { .up .rs-heatgrid { grid-template-columns: 1fr; } }
+.lp-legal-main p { margin: 0; line-height: 1.6; }
+.lp-legal-short { background: #f4f7ff; border: 1px solid #dbe3f5; border-radius: 14px; padding: 16px 18px; }
+.lp-legal-short h2 { margin: 0 0 8px; }
+.lp-fill { background: #fff1b8; color: inherit; padding: 0 3px; border-radius: 4px; font-weight: 600; }
+@media (max-width: 600px) { .lp-legal-main h1 { font-size: 28px; } .lp-legal-short { padding: 14px; } }
