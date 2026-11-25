@@ -91,7 +91,7 @@ export function safeQuery(q: URLSearchParams = currentQuery()): string {
 }
 
 /** The app's main page, where a recorded session starts counting. */
-export const isMainPage = (path: string) => path === '/'
+export const isMainPage = (path: string) => path === '/' || path === '/shop'
 
 export const CONSOLE_PREFIX = '/console'
 export const isConsole = (path: string) => path === CONSOLE_PREFIX || path.startsWith(CONSOLE_PREFIX + '/')

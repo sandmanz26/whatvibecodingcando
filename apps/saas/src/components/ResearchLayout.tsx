@@ -48,7 +48,7 @@ export function ResearchLayout() {
       </header>
       <aside className="rs-side no-print" aria-label="Research tools">
         <span className="research-mark rs-brand"><FlaskConical size={15} /> Research console</span>
-        <Link to="/" className="btn sm rs-back"><ArrowLeft size={14} /> Back to the shop</Link>
+        <Link to="/shop" className="btn sm rs-back"><ArrowLeft size={14} /> Back to the shop</Link>
         <nav className="rs-nav">
           {GROUPS.map((g) => (
             <div key={g.title} className="rs-group">

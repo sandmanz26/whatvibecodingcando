@@ -37,10 +37,11 @@ cd apps/saas && npx esbuild supabase/functions/send-emails/test.ts --bundle --pl
 2. **Database changes** = a new file in `apps/saas/supabase/migrations/` (timestamped, never edit an applied one) + a test in `supabase/tests/`. The owner runs migrations by hand in the Supabase SQL Editor: give them the SQL and say so.
 3. **Scale:** Supabase returns at most 1,000 rows per request — read longer lists with `paged()` (`apps/saas/src/saas/cloud.ts`); bound lists in SQL; index every query filtered by project; poll only while the tab is visible.
 4. **The embed script** runs on customers' sites: keep the loader (`src/core/embed/main.ts`) tiny with no React; keep the widget in its shadow root; never read form values; never add analytics to it; the snippet carries only `data-project`.
-5. **Two modes:** the app works with a Supabase project in the build (server) and without one (browser-only demo). Keep both working; text that mentions "no server" must depend on the mode.
-6. **Honesty:** no invented customers, numbers, testimonials or ratings; never claim a feature that isn't built (product list: `apps/saas/src/saas/products.ts`).
-7. **Analytics (PostHog):** website and `/app` only, named funnel events only, no autocapture or recordings, no names, emails or comment text.
-8. **Git:** push finished work to `main` (and the working branch if any). No pull requests unless the owner asks.
+5. **Two areas in `/app`:** the demo shop and research console load only on their explicit paths (`isDemo` in `apps/saas/src/App.tsx`); the empty hash and unknown addresses open the hosted product (`#/app`). Never link the demo from the product.
+6. **Two modes:** the app works with a Supabase project in the build (server) and without one (browser-only demo). Keep both working; text that mentions "no server" must depend on the mode.
+7. **Honesty:** no invented customers, numbers, testimonials or ratings; never claim a feature that isn't built (product list: `apps/saas/src/saas/products.ts`).
+8. **Analytics (PostHog):** website and `/app` only, named funnel events only, no autocapture or recordings, no names, emails or comment text.
+9. **Git:** push finished work to `main` (and the working branch if any). No pull requests unless the owner asks.
 
 ## Systems at a glance
 
