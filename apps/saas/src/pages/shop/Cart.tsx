@@ -15,7 +15,7 @@ export default function Cart() {
   if (!cart.length) return (
     <div style={{ marginTop: 24 }}>
       <h1>Cart</h1>
-      <div className="card" style={{ marginTop: 16 }}><Empty title="Your cart is empty"><Link className="btn sm primary" to="/">Start shopping</Link></Empty></div>
+      <div className="card" style={{ marginTop: 16 }}><Empty title="Your cart is empty"><Link className="btn sm primary" to="/shop">Start shopping</Link></Empty></div>
     </div>
   )
 

@@ -36,7 +36,7 @@ export default function Product() {
     return PRODUCTS.filter((x) => x.id !== p.id && x.category === p.category).sort((a, b) => score(b, u) - score(a, u)).slice(0, 5)
   }, [p])
 
-  if (!p) return <div className="card" style={{ marginTop: 24 }}><Empty title="This product isn’t available"><Link className="btn sm" to="/">Back to the shop</Link></Empty></div>
+  if (!p) return <div className="card" style={{ marginTop: 24 }}><Empty title="This product isn’t available"><Link className="btn sm" to="/shop">Back to the shop</Link></Empty></div>
 
   const s = seller(p.sellerId)!
   const missing = Object.keys(p.options ?? {}).filter((k) => !opts[k])
@@ -55,7 +55,7 @@ export default function Product() {
   return (
     <>
       <nav className="crumbs" aria-label="Breadcrumb" style={{ margin: '16px 0' }}>
-        <Link to="/">Home</Link> / <Link to={`/search?cat=${p.category}`}>{category(p.category)?.name}</Link> / <span className="here">{p.title}</span>
+        <Link to="/shop">Home</Link> / <Link to={`/search?cat=${p.category}`}>{category(p.category)?.name}</Link> / <span className="here">{p.title}</span>
       </nav>
 
       <div className="pdp">

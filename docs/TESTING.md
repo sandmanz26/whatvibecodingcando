@@ -42,8 +42,14 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
 |---|---|---|---|
-| 2.1 ⚡ | Browser A: `/app` → isi nama, email, password (2x) → **Create account** | Mode server: muncul pesan cek email (atau langsung masuk kalau konfirmasi email mati) | [ ] |
-| 2.2 | Buka email konfirmasi → klik link | Masuk ke aplikasi, lanjut ke onboarding | [ ] |
+| 2.1 ⚡ | Mode server, Browser A: `/app#/app/register` → isi nama + email → **Email me a code** | Layar "Check your email" dengan satu kolom kode 6 digit; tidak ada kolom password | [ ] |
+| 2.2 ⚡ | Buka email (subjek "Your ourhunch code: 123456") → ketik/tempel kode | Kode langsung dicek → onboarding (pilihan `?products=` tetap terbawa); nama tampil di Settings | [ ] |
+| 2.2a | Masukkan kode salah / kode lama (>10 menit) | "That code isn’t right…" / "That code has expired…" | [ ] |
+| 2.2b | Tombol **Send a new code** | Nonaktif 60 detik (hitung mundur), lalu mengirim kode baru | [ ] |
+| 2.2c | Log in → email yang **tidak** punya akun → **Email me a code** | Pesan sama "If … has an account, we sent it a code" + link **Create an account**; tidak ada email terkirim, tidak ada akun dibuat | [ ] |
+| 2.2d ⚡ | Log in → email terdaftar → kode | Masuk ke Overview | [ ] |
+| 2.2e | Log in → **Use a password instead** | Kolom password + **Forgot password?** muncul; login dengan password tetap bisa | [ ] |
+| 2.2f | Mode demo (tanpa Supabase): Register/Log in | Tetap pakai password lokal seperti sebelumnya | [ ] |
 | 2.3 | Password lemah (mis. `12345678`) | Ditolak dengan pesan yang jelas | [ ] |
 | 2.4 | Log out → **Log in** dengan password salah | Pesan error; tidak masuk | [ ] |
 | 2.5 ⚡ | Log in dengan password benar | Masuk ke Overview | [ ] |
@@ -53,6 +59,9 @@ Untuk dijalankan sendiri, tanpa bantuan AI. Setiap tes punya **langkah** dan **h
 | 2.9 | Klik **Continue with Google**, lalu batalkan di layar Google | Kembali ke Log in dengan pesan "Google sign-in didn’t finish" | [ ] |
 | 2.10 | Akun Google → **Settings → Password** | Tertulis "You log in with Google"; bisa **Set password** tanpa password lama, lalu login dengan email + password | [ ] |
 | 2.11 | Google dimatikan di Supabase → buka Log in | Tombol Google tidak tampil | [ ] |
+| 2.12 ⚡ | Buka `/app#`, `/app#/xyz` | Tidak pernah tampil toko demo (Marketplace); diarahkan ke panel / log in | [ ] |
+| 2.13 | Buka `/app#/admin` | Halaman sign-in ops | [ ] |
+| 2.14 | Buka `/embed-demo.html` | Halaman demo widget tetap jalan seperti biasa | [ ] |
 
 ---
 

@@ -20,7 +20,7 @@ export function Layout() {
     <div className="shop">
       <header className="sh-head">
         <div className="sh-bar container">
-          <Link to="/" className="sh-logo" aria-label="Marketplace home"><span className="sh-logo-box">LOGO</span><b>Marketplace</b></Link>
+          <Link to="/shop" className="sh-logo" aria-label="Marketplace home"><span className="sh-logo-box">LOGO</span><b>Marketplace</b></Link>
           <form className="sh-search" role="search" onSubmit={(e) => { e.preventDefault(); if (q.trim()) nav(`/search?q=${encodeURIComponent(q.trim())}`) }}>
             <Sparkles size={16} className="sh-search-ai" aria-hidden />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search, or describe what you need — “running shoes under 500k”" aria-label="Search or describe what you need" />
