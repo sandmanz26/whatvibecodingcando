@@ -23,6 +23,8 @@ Each app's documentation is in its own README (`apps/content/README.md`, `apps/s
 
 ## Vercel: one deployment, three apps
 
+Only `main` is built: `ignoreCommand` in `vercel.json` skips every other branch, so working branches never use the Hobby plan's daily deployment quota. If a push to `main` doesn't show up in Vercel, create the deployment by hand (Deployments → ⋯ → Create Deployment → `main`).
+
 One Vercel project serves all three apps. `vercel.json` at the root sets the install (`npm run install:all`: each app installs its own dependencies), the build (`npm run build`, which builds both apps) and the output (`dist`), so nothing needs configuring in Vercel.
 
 | URL | App | Built into |
