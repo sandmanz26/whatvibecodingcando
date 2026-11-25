@@ -126,6 +126,8 @@ export function labelOf(el: Element) {
   return `${tag}${text ? ` “${text.slice(0, 40)}”` : ''}`
 }
 
+const isDeadClick = (interactive: boolean, changed: boolean) => !interactive && !changed
+
 export class Recorder {
   private queue: Ev[] = []
   private recent: { t: number; x: number; y: number }[] = []
@@ -147,20 +149,33 @@ export class Recorder {
     const now = () => Math.max(0, Math.round(Date.now() - this.t0))
     const ours = (e: Event) => e.composedPath().some((n) => n instanceof Element && /^vibe-collab/i.test(n.tagName))
     const down = (e: PointerEvent) => {
-      if (ours(e) || !(e.target instanceof Element)) return
+      // Only real people: programmatic clicks (isTrusted false) and our own widget are left out.
+      if (!e.isTrusted || ours(e) || !(e.target instanceof Element)) return
       const page = window.location.pathname
-      const el = e.target.closest(INTERACTIVE) ?? e.target
+      const hitEl = e.target.closest(INTERACTIVE)
+      const el = hitEl ?? e.target
       const r = el.getBoundingClientRect()
       const t = now()
-      this.recent = this.recent.filter((c) => t - c.t < 700 && Math.hypot(c.x - e.clientX, c.y - e.clientY) < 30)
+      // Rage: 3+ clicks within 1 s and 30 px.
+      this.recent = this.recent.filter((c) => t - c.t < 1000 && Math.hypot(c.x - e.clientX, c.y - e.clientY) < 30)
       this.recent.push({ t, x: e.clientX, y: e.clientY })
-      this.push({
+      const ev: Ev = {
         t, task: task?.(), kind: 'click', page,
         x: Math.round(e.pageX), y: Math.round(e.pageY), vw: window.innerWidth, doc_h: document.documentElement.scrollHeight,
         sel: redact(selectorFor(el)).slice(0, 400), label: labelOf(el).slice(0, 80),
         ex: r.width ? Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) : 0.5, ey: r.height ? Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) : 0.5,
-        hit: hit?.(el), rage: this.recent.length >= 3, dead: !e.target.closest(INTERACTIVE),
-      })
+        hit: hit?.(el), rage: this.recent.length >= 3, dead: false,
+      }
+      if (hitEl) this.push(ev)
+      else {
+        // Dead click: nothing clickable, and nothing on the page (DOM or address) changes within 1 s.
+        // Only whether something changed is noted, never what.
+        let changed = false
+        const before = window.location.href
+        const mo = new MutationObserver(() => { changed = true; mo.disconnect() })
+        try { mo.observe(document.body, { childList: true, subtree: true, attributes: true, characterData: true }) } catch { changed = true }
+        window.setTimeout(() => { mo.disconnect(); ev.dead = isDeadClick(false, changed || window.location.href !== before); this.push(ev) }, 1000)
+      }
       this.onClick({ el, page })
     }
     const look = () => {

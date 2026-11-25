@@ -78,6 +78,13 @@ set role authenticated; select pg_temp.as_user('00000000-0000-0000-0000-00000000
 select pg_temp.check(json_array_length(public.heatmap_points('kopi-shop-r001', '/') -> 'points') = 1, 'a reviewer reads the clicks of a page');
 select pg_temp.check((public.heatmap_points('kopi-shop-r001', '/') -> 'points' -> 0 ->> 'p') = '1' and (public.heatmap_points('kopi-shop-r001', '/') -> 'points' -> 0 ->> 'dev') = 'desktop' and (public.heatmap_points('kopi-shop-r001', '/') -> 'points' -> 0 ->> 't') = '100', 'heatmap points carry participant number, device and time (no ids)');
 select pg_temp.check((public.heatmap_points('kopi-shop-r001', '/') -> 'points')::text !~ '[0-9a-f]{8}-[0-9a-f]{4}-', 'no participant or run ids in the heatmap points');
+-- one person can't dominate: at most 60 clicks per run and page, with their labels
+reset role;
+insert into run_events (run_id, project_id, t, kind, page, x, y, label) select r.id, r.project_id, 1000 + g, 'click', '/', g, g, 'button “Buy”' from runs r, generate_series(1, 70) g;
+set role authenticated; select pg_temp.as_user('00000000-0000-0000-0000-00000000b0c1', true);
+select pg_temp.check(json_array_length(public.heatmap_points('kopi-shop-r001', '/') -> 'points') = 60, 'heatmap keeps at most 60 clicks per participant run');
+select pg_temp.check((public.heatmap_points('kopi-shop-r001', '/') -> 'points')::text like '%button “Buy”%', 'heatmap points carry the element label');
+reset role; delete from run_events where t > 1000; set role authenticated; select pg_temp.as_user('00000000-0000-0000-0000-00000000b0c1', true);
 -- closing the study stops new runs
 select pg_temp.as_user('00000000-0000-0000-0000-00000000b0a1');
 update studies set status = 'closed' where name = 'Checkout';

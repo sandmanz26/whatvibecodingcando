@@ -1,82 +1,52 @@
 /**
- * Drawing a real heatmap: every tap is a soft blob of heat, blobs add up where taps cluster,
- * and the summed heat is coloured from blue (a few taps) to red (the most). The densest spot
- * always reaches red, so the colours read the same for 20 taps or 20,000.
+ * Drawing a real heatmap: a kernel density estimate of the taps (core/density.ts), coloured on a
+ * perceptually uniform scale (inferno) whose top is the 99th-percentile density, so the colours read
+ * the same for 20 taps or 20,000 and one extreme spot doesn't wash out the rest.
  */
 
 /** w: how much the point counts (1 by default), e.g. a fixation's duration or one person's share. */
+import { bandwidth, colourise, kde, type Scaling } from './density'
+
 export interface HeatPoint { x: number; y: number; w?: number }
 
-const STOPS: [number, [number, number, number]][] = [
-  [0, [0, 0, 255]], [0.3, [0, 160, 255]], [0.5, [0, 220, 120]], [0.7, [190, 235, 0]], [0.85, [255, 170, 0]], [1, [240, 30, 20]],
-]
-/** 256 colours along the scale, as [r, g, b] per heat level. */
-const PALETTE = (() => {
-  const out = new Uint8ClampedArray(256 * 3)
-  for (let i = 0; i < 256; i++) {
-    const t = i / 255
-    let k = 0
-    while (k < STOPS.length - 2 && t > STOPS[k + 1][0]) k++
-    const [t0, c0] = STOPS[k], [t1, c1] = STOPS[k + 1]
-    const f = Math.min(1, Math.max(0, (t - t0) / (t1 - t0)))
-    for (let j = 0; j < 3; j++) out[i * 3 + j] = c0[j] + (c1[j] - c0[j]) * f
-  }
-  return out
-})()
-export const LEGEND = `linear-gradient(90deg, ${STOPS.map(([t, c]) => `rgb(${c.join(',')}) ${t * 100}%`).join(', ')})`
+export { LEGEND } from './density'
+
+export interface HeatStats { /** points drawn */ n: number; /** bandwidth in page px */ h: number; /** weight per 50×50 page px at the top of the scale */ top: number; ms: number }
+
+/** One offscreen canvas and pixel buffer per heatmap canvas, reused between draws (bounded memory). */
+const buffers = new WeakMap<HTMLCanvasElement, { off: HTMLCanvasElement; px?: Uint8ClampedArray }>()
 
 /**
- * The density that should read as red: the weight within one blob's reach, at the 95th percentile of
- * the busy cells rather than the very busiest, so one extreme spot doesn't wash out the rest.
+ * Draws points (in page px) onto a canvas covering the page at `scale`. The density is an adaptive
+ * Gaussian KDE (core/density.ts) on a coarse grid, coloured once into a small offscreen image and
+ * stretched with smoothing onto the canvas, so the cost hardly depends on the canvas size.
+ * radius: the finest detail the data supports, in page px (e.g. webcam eye-tracking accuracy):
+ * the bandwidth (Gaussian sigma) stays between 0.4× and 0.6× of it. opacity: 0–1 for the coloured layer.
  */
-function peak(points: HeatPoint[], r: number) {
-  const cells = new Map<string, number>()
-  for (const p of points) {
-    const k = `${Math.floor(p.x / r)},${Math.floor(p.y / r)}`
-    cells.set(k, (cells.get(k) ?? 0) + (p.w ?? 1))
-  }
-  const v = [...cells.values()].sort((a, b) => a - b)
-  if (!v.length) return 1
-  return Math.max(1e-6, v.length >= 20 ? v[Math.floor(v.length * 0.95)] : v[v.length - 1])
-}
-
-/**
- * Draws points (in page px) onto a canvas covering the page at `scale`.
- * radius: blob size in page px. opacity: 0–1 for the coloured layer.
- */
-export function drawHeat(canvas: HTMLCanvasElement, points: HeatPoint[], scale: number, radius: number, opacity: number) {
+export function drawHeat(canvas: HTMLCanvasElement, points: HeatPoint[], scale: number, radius: number, opacity: number, scaling: Scaling = 'sqrt'): HeatStats {
+  const t0 = performance.now()
   const dpr = Math.min(2, window.devicePixelRatio || 1)
   const w = Math.max(1, Math.round(canvas.clientWidth * dpr)), h = Math.max(1, Math.round(canvas.clientHeight * dpr))
-  canvas.width = w; canvas.height = h
+  if (canvas.width !== w) canvas.width = w
+  if (canvas.height !== h) canvas.height = h
   const ctx = canvas.getContext('2d')
-  if (!ctx || !points.length) { ctx?.clearRect(0, 0, w, h); return }
-  const r = Math.max(4, radius * scale * dpr)
-  // One soft blob, drawn once and stamped for every tap.
-  const blob = document.createElement('canvas')
-  blob.width = blob.height = Math.ceil(r * 2)
-  const b = blob.getContext('2d')!
-  const g = b.createRadialGradient(r, r, 0, r, r, r)
-  g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)')
-  b.fillStyle = g; b.fillRect(0, 0, r * 2, r * 2)
-  // Each stamp's strength is set so that the densest cluster just saturates.
-  const n = peak(points, radius)
-  const base = Math.min(1, Math.max(0.02, 1 - Math.pow(0.04, 1 / Math.max(1, n))))
-  const unit = n < 1 ? 1 / n : 1
-  for (const p of points) {
-    ctx.globalAlpha = Math.min(1, base * (p.w ?? 1) * unit)
-    ctx.drawImage(blob, p.x * scale * dpr - r, p.y * scale * dpr - r)
-  }
-  ctx.globalAlpha = 1
-  // Colour the summed heat.
-  const img = ctx.getImageData(0, 0, w, h)
-  const d = img.data
-  for (let i = 0; i < d.length; i += 4) {
-    const a = d[i + 3]
-    if (a < 6) { d[i + 3] = 0; continue }
-    d[i] = PALETTE[a * 3]; d[i + 1] = PALETTE[a * 3 + 1]; d[i + 2] = PALETTE[a * 3 + 2]
-    d[i + 3] = Math.min(255, (60 + a * 0.85) * opacity)
-  }
-  ctx.putImageData(img, 0, 0)
+  ctx?.clearRect(0, 0, w, h)
+  if (!ctx || !points.length) return { n: 0, h: 0, top: 0, ms: 0 }
+  const k = scale * dpr
+  const pts = points.map((p) => ({ x: p.x * k, y: p.y * k, w: p.w ?? 1 }))
+  const hPage = bandwidth(points, Math.max(5, radius * 0.4), Math.max(8, radius * 0.6))
+  const d = kde(pts, { width: w, height: h, h: hPage * k, adaptive: true })
+  let buf = buffers.get(canvas)
+  if (!buf) { buf = { off: document.createElement('canvas') }; buffers.set(canvas, buf) }
+  if (buf.off.width !== d.gw) buf.off.width = d.gw
+  if (buf.off.height !== d.gh) buf.off.height = d.gh
+  buf.px = colourise(d, opacity, scaling, 0.12, buf.px)
+  buf.off.getContext('2d')!.putImageData(new ImageData(buf.px as Uint8ClampedArray<ArrayBuffer>, d.gw, d.gh), 0, 0)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(buf.off, 0, 0, d.gw * d.cell, d.gh * d.cell)
+  const cellPage = d.cell / k
+  return { n: points.length, h: Math.round(hPage), top: d.vmax * (2500 / (cellPage * cellPage)), ms: performance.now() - t0 }
 }
 
 /* ---------- sample data ---------- */

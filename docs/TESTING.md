@@ -204,6 +204,10 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 9.9 | (Labs) Usability test dengan eye tracking: peserta izinkan kamera, kalibrasi | Kalibrasi selesai; video **tidak** disimpan; heatmap gaze tersedia (akurasi tergantung cahaya) | [ ] |
 | 9.10 | **Results → Participant paths** | Daftar peserta + langkah mereka; tombol CSV | [ ] |
 | 9.11 | **Clear results** pada studi | Peserta & heatmap kosong; studi & link tetap ada | [ ] |
+| 9.11a | Heatmap (dock) dengan < 10 peserta | Muncul **Early signal: N people so far**; legenda berwarna ungu → kuning dengan satuan "per 50 px square" | [ ] |
+| 9.11b | Satu peserta klik 100× di halaman yang sama | Heatmap menghitung maksimal 60 klik orang itu; daftar **Most clicked elements** menampilkan % orang dan first click | [ ] |
+| 9.11c | Klik 3× cepat di gambar yang tidak bisa diklik | Dihitung sebagai rage dan dead click; klik dari script (`el.click()`) tidak tercatat | [ ] |
+| 9.11d | `node apps/saas/tests/heatmap.test.ts` | Semua tes lulus (0/1 titik, titik sama, 100k titik, perangkat campur) | [ ] |
 | 9.12 | Hapus studi | Hilang beserta datanya | [ ] |
 
 ---

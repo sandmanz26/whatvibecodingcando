@@ -281,8 +281,8 @@ export default function Heatmap() {
   }, [ready, sample, mode, who, source, test?.id, task?.id, page, device, taps]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const scale = Math.min(1, avail / d.w)
-  // Eyes: each fixation weighs by how long it lasted (one stamp per 60 ms), so long looks burn hotter.
-  const eyeHeat = useMemo(() => allFix.flatMap((f) => Array.from({ length: Math.max(1, Math.round(f.dur / 60)) }, () => ({ x: f.x, y: f.y }))), [allFix])
+  // Eyes: each fixation weighs by how long it lasted, so long looks burn hotter.
+  const eyeHeat = useMemo(() => allFix.map((f) => ({ x: f.x, y: f.y, w: f.dur })), [allFix])
   useEffect(() => {
     if (!canvas.current) return
     drawHeat(canvas.current, layer === 'eyes' ? (showHeat ? eyeHeat : []) : placed, scale, layer === 'eyes' ? Math.max(radius, accuracy ?? 60) : radius, opacity)
@@ -302,7 +302,7 @@ export default function Heatmap() {
       <div className="page-head">
         <div>
           <h1>Heatmap</h1>
-          <p>Where participants clicked while doing a usability task, added up and drawn as heat over the screen: blue where a few clicked, red where most did. Start with <b>first clicks</b>: people whose first click is on the right path usually finish the task. For one person’s path step by step, see <Link to="/console/sessions">Sessions</Link>.</p>
+          <p>Where participants clicked while doing a usability task, added up and drawn as heat over the screen: purple where a few clicked, bright yellow where most did (a smoothed density; faint noise is left unpainted). Start with <b>first clicks</b>: people whose first click is on the right path usually finish the task. For one person’s path step by step, see <Link to="/console/sessions">Sessions</Link>.</p>
         </div>
         <div className="actions">
           <Link className="btn" to="/console/heatmap"><ArrowLeft size={14} /> All results</Link>

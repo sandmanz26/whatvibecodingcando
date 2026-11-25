@@ -287,6 +287,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
   const [equal, setEqual] = useState(true)
   const [goodOnly, setGoodOnly] = useState(true)
   const canvas = useRef<HTMLCanvasElement>(null)
+  const [top, setTop] = useState(0)
   const prep = useMemo(() => (data ? prepare(data.points, { kind, device, equal, maxAcc: goodOnly ? 220 : null }) : null), [data, kind, device, equal, goodOnly])
   useEffect(() => {
     let live = true
@@ -314,16 +315,19 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
         else { x = p.x * (W / (p.vw || W)) - window.scrollX; y = p.y - window.scrollY }
         if (x > -100 && x < W + 100 && y > -100 && y < H + 100) pts.push({ x, y, w: p.w })
       }
-      drawHeat(c, pts, 1, prep.radius, opacity)
+      setTop(drawHeat(c, pts, 1, prep.radius, opacity).top)
     }
+    let tm = 0
     const redraw = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw) }
+    // Resizing re-lays out the page: wait until it settles.
+    const resized = () => { window.clearTimeout(tm); tm = window.setTimeout(redraw, 150) }
     draw()
     window.addEventListener('scroll', redraw, true)
-    window.addEventListener('resize', redraw)
+    window.addEventListener('resize', resized)
     const iv = window.setInterval(() => { if (pageOf(window.location.pathname) !== page) setPage(pageOf(window.location.pathname)) }, 500)
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', key)
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', redraw, true); window.removeEventListener('resize', redraw); window.clearInterval(iv); window.removeEventListener('keydown', key) }
+    return () => { cancelAnimationFrame(raf); window.clearTimeout(tm); window.removeEventListener('scroll', redraw, true); window.removeEventListener('resize', resized); window.clearInterval(iv); window.removeEventListener('keydown', key) }
   }, [prep, opacity, page, onClose])
   const n = data?.points.length ?? 0
   const rage = data?.points.filter((p) => p.rage).length ?? 0
@@ -351,10 +355,17 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
               </label>
             )}
             <label className="vc-q">Opacity <input type="range" min={0.2} max={1} step={0.05} value={opacity} onChange={(e) => setOpacity(Number(e.target.value))} /></label>
-            <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>less</span><span className="vc-grow" /><span>{kind === 'gaze' ? 'longer looked at' : 'more clicks'}</span></div>
+            {prep?.note && <p className="vc-bad">{prep.note}</p>}
+            {!!prep?.capped && kind === 'click' && <p className="vc-muted">{prep.capped} repeated or excess clicks left out (at most 60 per person on a page).</p>}
+            <div className="vc-legend" style={{ background: LEGEND }} aria-hidden /><div className="vc-row vc-muted"><span>few</span><span className="vc-grow" /><span>{kind === 'gaze' ? 'longest looked at' : top > 0 ? `≈ ${top < 10 ? top.toFixed(1) : Math.round(top)} ${equal ? 'people' : 'clicks'} per 50 px square` : 'most clicks'}</span></div>
+            {kind === 'click' && !!prep?.ranking.length && (
+              <details className="vc-q"><summary>Most clicked elements</summary>
+                <ol className="vc-muted">{prep.ranking.map((r) => <li key={r.sel}>{r.label} · {Math.round(r.share * 100)}% of people · first click {Math.round(r.firstShare * 100)}%{r.dead ? ` · ${r.dead} dead` : ''}</li>)}</ol>
+              </details>
+            )}
           </>
         )}
-        <p className="vc-where">{kind === 'gaze' ? 'Where people’s eyes rested (fixations), weighted by how long; webcam eye tracking is estimated, so read areas, not exact spots.' : 'Where people clicked.'} Only study participants who agreed; never other visitors. Pages with ids share a map (/product/:id).</p>
+        <p className="vc-where">{kind === 'gaze' ? 'Labs: where people’s eyes rested (fixations), weighted by how long. Webcam eye tracking is approximate (often 100–200 px), and the map is never sharper than that: read areas, not exact spots.' : 'Where people clicked.'} Only study participants who agreed; never other visitors. Pages with ids share a map (/product/:id).</p>
       </div>
     </>
   )
