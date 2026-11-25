@@ -277,6 +277,14 @@ const HEAT_ERRORS: Record<string, string> = {
 }
 /** Above this many clicks in one view, the map is drawn from the server's bins of all clicks (full data). */
 const RAW_MAX = 20000
+/** A page of the ourhunch panel, on the host that served this script (e.g. https://ourhunch.com/app#/app/research). */
+function panelUrl(path: string) {
+  const el = document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
+  let origin = 'https://ourhunch.com'
+  try { if (el?.src) origin = new URL(el.src, window.location.href).origin } catch { /* keep default */ }
+  return `${origin}/app#${path}`
+}
+
 /** Our own demo page: the trial has no study yet, so the heatmap shows labelled sample data instead of an error. */
 const onDemoPage = () => /\/embed-demo\.html$/.test(window.location.pathname)
 
@@ -429,6 +437,17 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
               <label className="vc-q">Site version (never mixed)
                 <select value={version} onChange={(e) => setVer(e.target.value)}>{versions.map((v) => <option key={v.ver} value={v.ver}>{verName(v.ver)} · {v.people} {v.people === 1 ? 'person' : 'people'}</option>)}</select>
               </label>
+            )}
+            {!sample && !n && (
+              <div className="vc-sample">
+                <b>{kind === 'gaze' ? 'No eye tracking here yet.' : 'No heatmap data here yet.'}</b> Heatmaps never record your normal visitors: they fill with people who join a study and agree.
+                <ol className="vc-steps">
+                  <li>In your panel: Research → New study → {kind === 'gaze' ? 'Usability test, with eye tracking on (Labs)' : 'Heatmap visit'}.</li>
+                  <li>Share the study link with a few people (5–10 is a good start), or open it yourself to try.</li>
+                  <li>Come back here: the map fills as they finish.</li>
+                </ol>
+                <a className="vc-btn primary" href={panelUrl('/app/research')} target="_blank" rel="noopener noreferrer">Start a study</a>
+              </div>
             )}
             <p className={`vc-sum ${units ? '' : 'bad'}`}>{units
               ? `${kind === 'click' && view && view.people > people ? `${people} of ${view.people} people clicked` : `${people} ${people === 1 ? 'person' : 'people'}`} · ${kind === 'gaze' ? `${units} fixation${units === 1 ? '' : 's'}` : `${units} click${units === 1 ? '' : 's'}`}${prep?.hidden ? ` · ${prep.hidden} with poor eye tracking left out` : ''}${binned ? ' · all clicks (server bins)' : n >= RAW_MAX ? ' (the latest 20,000 points)' : ''}`

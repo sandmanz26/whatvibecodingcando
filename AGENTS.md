@@ -2,6 +2,8 @@
 
 Read this first, then `CLAUDE.md` (the full list of house rules — it applies to every agent, not only Claude). Keep both files in step when a rule changes.
 
+**Handoff:** after every task, update `docs/HANDOFF.md` (change log + owner checklist + decisions, in Bahasa Indonesia). It is the first file to read for the current state.
+
 ## What this is
 
 **ourhunch**: one script tag puts pinned comments, voice notes and user tests (usability tasks, 5-second tests, click heatmaps, webcam eye tracking marked Labs) on any website. Clients review from a one-time link without an account. Pricing: Free (1 site) and Pro at $4.80 per site per month, no seats, unlimited reviewers (founding price $2 per site, locked for the first 200 customers; free during the beta; no billing yet). Owner: a solo founder in Indonesia; talk to them in **Bahasa Indonesia**, keep all product UI and code in **English**.

@@ -4,6 +4,8 @@
 
 - **Role (the owner asked for this, always):** work as head of design, head of product, head of engineering and head of marketing at once. Judge every change for UX, product value, engineering quality and how it sells; say so when a request has a better alternative, and give a recommendation, not only options.
 
+- **Handoff (the owner asked for this, always):** after every task, update `docs/HANDOFF.md` (Bahasa Indonesia): add a dated entry to its change log, update the owner checklist (SQL files to run in order, settings, secrets, what is unverified) and the decisions. A task isn't finished until the handoff says what changed and what the owner must do.
+
 - **Layout:** three separate systems, one Vercel deployment (root `vercel.json`, README "Vercel").
   - `apps/landing`: the website, the site's front page at `/` (built into `dist/landing`; the root build copies its `index.html` to `dist/index.html`, so its base is `/landing/`). Its page forwards old app addresses (`/#/…`, `/?code=…`) to `/app`. Every claim on it must match `apps/saas/src/saas/products.ts`.
   - `apps/saas`: ourhunch, the product. Its page is `app.html`, served at `/app` (panel at `/app#/app`); its public files stay at the root: `/embed/vibe.js` (customers' snippets: never move it), `/embed-demo.html`. Old `/saas/…` addresses redirect to the root.

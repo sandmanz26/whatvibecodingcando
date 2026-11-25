@@ -117,6 +117,9 @@ export const CSS = `
 .vc-val i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,.18); flex: none; }
 .vc-ok { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; color: #237032; }
 .vc-bad { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; color: #c92a2a; }
+.vc-steps { margin: 6px 0 8px; padding-left: 18px; }
+.vc-steps li { margin: 2px 0; }
+.vc-sample .vc-btn { display: inline-block; text-decoration: none; }
 .vc-sample { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: #fff8db; color: #5c4400; font-size: 12px; line-height: 1.45; }
 .vc-sum { font-size: 12px; font-weight: 600; padding: 6px 8px; border-radius: 8px; background: #e6f6e9; color: #237032; }
 .vc-sum.bad { background: #fff5f5; color: #a61e1e; }
