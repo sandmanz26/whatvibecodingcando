@@ -219,6 +219,15 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 9.11h | **Compare with** versi lain | Tiap elemen ada kalimat: "likely a real difference (p = …)" atau "it could be chance" | [ ] |
 | 9.11i | (Labs) Peserta eye tracking yang klik ≥ 5 kali; buka heatmap **Where people looked** | Muncul "Drift-corrected with their own clicks … error after ≈ N px"; tanpa 5 klik: "Not drift-corrected" | [ ] |
 | 9.11j | SQL v4: jalankan `apps/saas/supabase/catch-up/2026-11-26-heatmap-v4.sql` di SQL editor, lalu `PGHOST=… bash apps/saas/supabase/tests/run.sh` lokal | Tanpa error; `heatmap_v4_test.sql` ALL PASS (hitungan benar, maksimal 20.000 bin, hanya member/reviewer) | [ ] |
+| 9.11k | Onboarding pilih **Heatmaps** → panel **Research** | Studi **Site heatmap** (default) sudah ada, tanpa membuat studi apa pun | [ ] |
+| 9.11l | **Open my site** → klik beberapa tombol → buka **Heatmap** di widget | Sekali muncul catatan "Your clicks on this site help build its heatmap…"; dalam ±10 detik klik Anda tampil di heatmap | [ ] |
+| 9.11m | Di panel Heatmap: hapus centang **Record my clicks for this heatmap**, klik lagi | Klik baru tidak tercatat | [ ] |
+| 9.11n | **Copy invite link** → buka di Browser B (bukan reviewer) | Layar persetujuan "Site heatmap"; setelah **I agree** klik tercatat; angka "N people so far" naik | [ ] |
+| 9.11o | **Share on WhatsApp** | WhatsApp terbuka dengan teks + link undangan | [ ] |
+| 9.11p | Buka situs biasa (tanpa link review/undangan) di Browser C, klik-klik | Tidak ada yang tercatat (pengunjung biasa tidak pernah direkam) | [ ] |
+| 9.11q | Tab **Clicks** / **Where people looked** → **What's the difference?** | Satu kalimat penjelasan per tab; tabel perbandingan 4 baris | [ ] |
+| 9.11r | Research → studi **Site heatmap** → Close | Reviewer tidak lagi merekam; tombol undangan berkata "paused" | [ ] |
+| 9.11s | Demo (tanpa server): `apps/saas/tests/e2e/` (`node serve.mjs &` lalu `node default-heatmap.mjs`) | Klik tampil di heatmap, link undangan membuka layar persetujuan | [ ] |
 | 9.12 | Hapus studi | Hilang beserta datanya | [ ] |
 
 ---

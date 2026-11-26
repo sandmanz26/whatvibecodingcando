@@ -418,16 +418,20 @@ export async function getShareCloud(token: string): Promise<SharedList | null> {
 /* ---------- research: studies, participant links, results ---------- */
 
 export type StudyKind = 'usability' | 'fivesec' | 'browse'
-export interface StudyRow { id: string; kind: StudyKind; name: string; config: Record<string, unknown>; status: 'open' | 'closed'; eye_tracking: boolean; max_runs: number; link_expires: string | null; has_link: boolean; created_at: string; runs: number }
+export interface StudyRow { id: string; kind: StudyKind; name: string; config: Record<string, unknown>; status: 'open' | 'closed'; eye_tracking: boolean; max_runs: number; link_expires: string | null; has_link: boolean; created_at: string; runs: number; is_default?: boolean }
 export interface RunRow { id: string; started_at: string; finished_at: string | null; device: string | null; vw: number | null; gaze_accuracy: number | null; result: { tasks?: { id: string; outcome: string; ms: number; pages?: string[]; clicks?: number; firstClickHit?: boolean | null }[]; answers?: string[] }; events: number }
 export interface EventRow { run_id: string; t: number; task: string | null; kind: 'click' | 'page' | 'gaze' | 'door'; page: string; label: string | null; sel: string | null; rage: boolean | null; dead: boolean | null; hit: boolean | null }
 
 export async function listStudies(publicId: string): Promise<StudyRow[]> {
   const id = dbIds.get(publicId)
   if (!id) return []
-  const { data, error } = await supabase!.from('studies').select('id, kind, name, config, status, eye_tracking, max_runs, link_expires, link_hash, created_at, runs(count)').eq('project_id', id).order('created_at', { ascending: false })
+  const cols = 'id, kind, name, config, status, eye_tracking, max_runs, link_expires, link_hash, created_at, runs(count)'
+  // is_default comes with 2026-11-28-default-heatmap.sql; before that SQL is run, read without it.
+  const read = (c: string) => supabase!.from('studies').select(c).eq('project_id', id).order('created_at', { ascending: false })
+  let { data, error } = await read(`${cols}, is_default`)
+  if (error) ({ data, error } = await read(cols))
   if (error) throw error
-  return (data as (Omit<StudyRow, 'has_link' | 'runs'> & { link_hash: string | null; runs: { count: number }[] })[]).map(({ link_hash, runs, ...s }) => ({ ...s, has_link: !!link_hash, runs: runs?.[0]?.count ?? 0 }))
+  return (data as unknown as (Omit<StudyRow, 'has_link' | 'runs'> & { link_hash: string | null; runs: { count: number }[] })[]).map(({ link_hash, runs, ...s }) => ({ ...s, has_link: !!link_hash, runs: runs?.[0]?.count ?? 0 }))
 }
 export async function saveStudy(publicId: string, s: { id?: string; kind: StudyKind; name: string; config: Record<string, unknown>; status?: 'open' | 'closed'; eye_tracking?: boolean; max_runs?: number }): Promise<string> {
   const pid = dbIds.get(publicId)

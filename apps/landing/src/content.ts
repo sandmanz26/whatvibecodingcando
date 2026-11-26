@@ -99,7 +99,7 @@ export const FEATURES: { id: FeatureId; name: string; title: string; body: strin
     id: 'heatmap',
     name: 'Heatmaps',
     title: 'See where they really clicked.',
-    body: 'Give people a task on your real product and get a heatmap of every click, per screen and per device. The argument ends where the map starts.',
+    body: 'See where people click on your real product, per page and per device. It fills automatically as your team and reviewers use the site; invite more people with a link. The argument ends where the map starts.',
     answers: 'I just feel the button should be bigger.',
   },
   {
@@ -154,9 +154,9 @@ export const LAYERS: {
     tools: [
       { id: 'usability', name: 'Usability tests', what: 'A task, a timer, and where each person got lost.' },
       { id: 'fivesec', name: '5-second tests', what: 'Show a screen for five seconds and learn what sticks.' },
-      { id: 'heatmap', name: 'Heatmaps', what: 'Where people click during a task, per screen and per device.' },
+      { id: 'heatmap', name: 'Heatmaps', what: 'Where people click — fills automatically from your team and reviewers.' },
       { id: 'insights', name: 'Participant paths', what: 'Each participant’s pages and clicks, with rage and dead clicks marked.' },
-      { id: 'gaze', name: 'Eye tracking', what: 'Webcam gaze heatmaps. The video never leaves the device.', tag: 'Labs' },
+      { id: 'gaze', name: 'Eye tracking', what: 'Where people look — needs their webcam and consent. Approximate; the video never leaves the device.', tag: 'Labs' },
       { id: 'report', name: 'Reports', what: 'The research as ranked findings, each linked to its evidence.' },
     ],
   },

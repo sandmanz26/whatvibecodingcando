@@ -236,6 +236,7 @@ export function Products() {
               <span className="lp-icon" style={{ background: p.hue }}><Icon size={17} /></span>
               <div className="lp-grow">
                 <h3>{p.name}{p.labs && <span className="lp-labs">Labs</span>} {p.soon ? <span className="lp-status soon">Coming soon</span> : <span className={`lp-status ${p.status}`}>{statusLabel(p.status, 'panel')}</span>}</h3>
+                {p.sub && <p className="up-muted"><b>{p.sub}</b></p>}
                 <p>{p.tagline}</p>
                 {p.demo.startsWith('#') ? <a href={p.demo} target="_blank" rel="noopener" className="up-link">Try it <ExternalLink size={11} /></a> : <button className="up-link up-linkbtn" onClick={() => openDemo(project.id, toast)}>Try it <ExternalLink size={11} /></button>}
               </div>

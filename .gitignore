@@ -19,3 +19,4 @@ pitch/*.mp4
 .vercel
 **/supabase/.temp/
 **/supabase/.branches/
+apps/saas/tests/e2e/pid

@@ -44,7 +44,7 @@ export function Privacy() {
     <Page title="Privacy policy" short={
       <ul>
         <li>We keep what it takes to run {BRAND}: your account, your projects and the feedback on them.</li>
-        <li>On your site, the script records nobody unless they opened a review link or agreed to a study.</li>
+        <li>On your site, the script records nobody unless they opened a review link (or your panel’s “Open my site”) or agreed to a study. Reviewers’ and your team’s clicks build your heatmap by default; each of them can turn that off in the widget.</li>
         <li>We never record typed text or field values. Webcam video never leaves the participant’s browser.</li>
         <li>No ads, no selling data, no session recordings of you.</li>
         <li>For your reviewers’ and participants’ data, you are in charge; we handle it for you.</li>
@@ -67,6 +67,7 @@ export function Privacy() {
       <ul>
         <li>Opening a review link gives your browser an anonymous session. We keep the name you type and when you were last active. No email or password is needed.</li>
         <li>We keep the comments, replies, approvals and voice notes you choose to post. Deleting a comment deletes its voice note too.</li>
+        <li><b>Your clicks build the site’s heatmap</b> when the site has Heatmaps on: where you click (page address without its query, position, which element and a short label of it), the pages you open, which parts of a page you saw and how far you scrolled. The widget tells you the first time, and you can turn it off at any time in the widget’s Heatmap panel (“Record my clicks”). Never what you type, field values or video. The same applies to the site owner’s team when they open their own site from the panel.</li>
       </ul>
 
       <h2>4. If you take part in a study</h2>
@@ -79,7 +80,7 @@ export function Privacy() {
       </ul>
 
       <h2>5. If you visit a site that uses {BRAND}</h2>
-      <p>The script loads on the page, but it records nothing about you unless you open a review link or agree to a study. It never reads what you type into the site, and it stays in its own sealed box on the page.</p>
+      <p>The script loads on the page, but it records nothing about you unless you open a review link or agree to a study. (Reviewers’ clicks build the site’s heatmap, see section 3.) It never reads what you type into the site, and it stays in its own sealed box on the page.</p>
 
       <h2>6. Analytics on our own site</h2>
       {analyticsOn

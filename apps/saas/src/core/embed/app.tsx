@@ -30,7 +30,7 @@ import * as server from './server'
 import { frameMain } from './frame'
 import { bridgeMain, openBridge, type Bridge } from './demo-bridge'
 import { Participant } from './Research'
-import { loadRun, saveRun, studyInfo, takeStudyToken, type RunState } from './research'
+import { heatNoteSeen, loadRun, markHeatNoteSeen, reviewerClicksOff, saveRun, setReviewerClicksOff, startReviewerClicks, studyInfo, takeStudyToken, type RunState } from './research'
 
 /** The public API: window.OurHunch.open('comment' | 'list') (also window.VibeCollab, the original name). Calls made before the script loaded are queued in q. */
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
@@ -263,6 +263,29 @@ const sameOrigin = (src: string) => { try { return new URL(src).origin === windo
 const tipKey = (p: string) => `${NS}tip-panel:${p}`
 const tipSeen = (p: string) => { try { return localStorage.getItem(tipKey(p)) === '1' } catch { return false } }
 const markTipSeen = (p: string) => { try { localStorage.setItem(tipKey(p), '1') } catch { /* shown again next time */ } }
+/**
+ * Records the reviewer's clicks into the default "Site heatmap" study, and says so once, with a way to
+ * turn it off (also in the Heatmap panel).
+ */
+function ReviewerClicks({ project, version }: { project: string; version: string }) {
+  const [off, setOff] = useState(() => reviewerClicksOff(project))
+  const [note, setNote] = useState(() => !heatNoteSeen(project))
+  useEffect(() => {
+    const on = () => setOff(reviewerClicksOff(project))
+    window.addEventListener('vibe-collab:heat-pref', on)
+    return () => window.removeEventListener('vibe-collab:heat-pref', on)
+  }, [project])
+  useEffect(() => (off ? undefined : startReviewerClicks(project, version)), [off, project, version])
+  if (!note || off) return null
+  const close = () => { markHeatNoteSeen(project); setNote(false) }
+  return (
+    <div className="vc-toast" role="status" data-vc-heatnote="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', bottom: 140, maxWidth: 'min(420px, calc(100vw - 32px))', lineHeight: 1.4 }}>
+      <span>Your clicks on this site help build its heatmap. Turn off in the widget menu (Heatmap), or <button type="button" onClick={() => { setReviewerClicksOff(project, true); close() }} style={{ border: 0, background: 'transparent', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}>turn off now</button>.</span>
+      <button type="button" onClick={close} aria-label="Got it" style={{ border: 0, background: 'transparent', color: 'inherit', fontSize: 16, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
+    </div>
+  )
+}
+
 /** Once per project, for the team member who opened the site from the panel. */
 function PanelTip({ onClose }: { onClose: () => void }) {
   return (
@@ -297,7 +320,8 @@ export async function boot(given?: HTMLScriptElement | null) {
 
   // A study's participant (#vibe_r=… and "I agree"): the study runs instead of the widget, for this tab.
   const studyToken = takeStudyToken()
-  if (server.hasServer && (studyToken || loadRun(project))) {
+  // (In the browser-only demo the default study's link works too, from this browser's stand-in: localheat.ts.)
+  if (studyToken || loadRun(project)) {
     let study = loadRun(project)
     if (studyToken) {
       try {
@@ -406,7 +430,9 @@ export async function boot(given?: HTMLScriptElement | null) {
       compare: decision.comments && !!c.modules.compare, narration: decision.comments && !!c.modules.narration && m.sessions, version: c.version,
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
     }
-    return <>{notice}{tipBox}<Widget backend={backend} config={config} host={host} /></>
+    // Reviewers and the team (let in by the owner) build the heatmap as they click, unless they turned it off.
+    const heat = decision.tools.includes('heatmap')
+    return <>{notice}{tipBox}{heat && <ReviewerClicks project={project} version={c.version ?? ''} />}<Widget backend={backend} config={config} host={host} /></>
   }
 
   const open = (what: OpenWhat = 'comment') => host.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: what === 'list' ? 'list' : 'comment' }))

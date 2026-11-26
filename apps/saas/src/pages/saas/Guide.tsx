@@ -146,6 +146,12 @@ export function Guide() {
 
           <section id="heatmaps">
             <h2>Heatmaps and eye tracking</h2>
+            <h3>Click heatmap vs eye-tracking heatmap</h3>
+            <ul>
+              <li><b>Click heatmap (Heatmaps):</b> where people clicked or tapped. It fills automatically: when Heatmaps is on, every project gets a <i>Site heatmap</i> study, and the clicks of your team (<i>Open my site</i>) and your reviewers (review links) go into it. The widget tells each of them once and they can turn it off (<i>Record my clicks</i> in the Heatmap panel). To get more people, press <i>Copy invite link</i> (or <i>Share on WhatsApp</i>) in the widget’s Heatmap panel: people who open it see a consent screen first, then browse. Your normal visitors are never recorded.</li>
+              <li><b>Eye-tracking heatmap (Labs):</b> where people’s eyes rested, from their webcam. Only people who join a study with eye tracking on, agree and calibrate (about 20 seconds). It is approximate (often 100–200 px), so read areas, not exact spots. Video never leaves their browser.</li>
+            </ul>
+            <p>The <i>Site heatmap</i> study shows in <i>Research</i>: you can rename it, close it (pause) or delete it. You don’t need it for other studies.</p>
             <p>Open a heatmap from a study’s results, or with the <i>Heatmap</i> button on your site (reviewers). The heatmap is drawn over the real page, and is built to read true:</p>
             <ul>
               <li><b>One device at a time</b> (desktop, tablet, phone), because the same button sits in a different place on each.</li>
@@ -187,6 +193,7 @@ export function Guide() {
             <h2>Privacy and your data</h2>
             <ul>
               <li>The widget never reads what people type into your site’s fields.</li>
+              <li>Your team’s and reviewers’ clicks build your heatmap by default (each can turn it off in the widget). Other visitors are never recorded.</li>
               <li>Email addresses, phone numbers and long numbers in element labels are replaced before anything is saved.</li>
               <li>Mark anything sensitive on your site with <code>data-private</code> (for example <code>&lt;div data-private&gt;</code>); it’s recorded only as “(private)”.</li>
               <li>Delete single comments, a study’s results, or everything of one kind (<i>Settings → Data</i>, after typing the project id). Deleting your account deletes everything.</li>

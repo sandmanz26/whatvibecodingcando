@@ -12,7 +12,7 @@ import * as server from './server'
 import { deviceOf, prepare, type Anchor, type Device, type RawPt } from './heatmath'
 import { binsToPoints, exposureWeight, fmtShare, place, rowOf, tagOfLabel, type Resolve } from '../heatstats'
 import { cleanSummary, compareViews, MIN_EXPOSURES, verName, versionsOf, viewOf, type Summary } from './heatsummary'
-import { labelOf, pageOf } from './research'
+import { defaultInvite, inviteUrl, labelOf, pageOf, reviewerClicksOff, setReviewerClicksOff, type Invite } from './research'
 import { takeHint } from './hints'
 
 export type ToolId = 'inspect' | 'dscheck' | 'tokens' | 'heatmap'
@@ -335,20 +335,41 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
   const canvas = useRef<HTMLCanvasElement>(null)
   const [top, setTop] = useState(0)
   const [unplaced, setUnplaced] = useState(0)
+  // Refreshes while the panel is open and the tab visible, so reviewers' clicks show as they happen.
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const iv = window.setInterval(() => { if (document.visibilityState === 'visible') setTick((t) => t + 1) }, 10_000)
+    return () => window.clearInterval(iv)
+  }, [])
+  const [invite, setInvite] = useState<Invite | null>(null)
+  useEffect(() => { void defaultInvite(project).then(setInvite).catch(() => setInvite(null)) }, [project, tick])
+  const [mine, setMine] = useState(() => !reviewerClicksOff(project))
+  const [diff, setDiff] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const key0 = useRef('')
   useEffect(() => {
     let live = true
-    setData(null); setError('')
+    const k = `${project}|${page}|${study}|${kind}`
+    if (key0.current !== k) { key0.current = k; setData(null) }
+    setError('')
     const pts = server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[]; anchors?: Anchor[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null, p_kind: kind })
     const sum = kind === 'click' ? server.rpc<unknown>('heatmap_summary', { p_public_id: project, p_page: page, p_study: study || null }).then(cleanSummary).catch(() => null) : Promise.resolve(null)
     Promise.all([pts, sum])
-      .then(([d, summary]) => { if (live) setData({ studies: d.studies ?? [], points: d.points ?? [], anchors: d.anchors ?? [], summary }) })
+      .then(([d, summary]) => {
+        if (!live) return
+        // Our demo page keeps its labelled sample until real clicks exist.
+        const real = (d.points ?? []).length > 0
+        if (!real && onDemoPage() && kind === 'click') { setSample(true); setData({ studies: d.studies ?? [], points: samplePoints(), anchors: [], summary: null }); return }
+        setSample(false)
+        setData({ studies: d.studies ?? [], points: d.points ?? [], anchors: d.anchors ?? [], summary })
+      })
       .catch((e: Error) => {
         if (!live) return
         if (onDemoPage() && kind === 'click') { setSample(true); setData({ studies: [], points: samplePoints(), anchors: [], summary: null }); return }
         setError(HEAT_ERRORS[e.message] ?? `The heatmap couldn’t load (${e.message}).`)
       })
     return () => { live = false }
-  }, [project, page, study, kind])
+  }, [project, page, study, kind, tick])
   // Versions: never mixed. The busiest version on this device is shown first; the reviewer can pick another.
   const versions = useMemo(() => {
     if (!data) return []
@@ -430,8 +451,27 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
         <div className="vc-card-head"><b>Heatmap · {page}</b><span className="vc-grow" /><button className="vc-icon" onClick={onClose} aria-label="Close"><X size={14} /></button></div>
         {error ? <p className="vc-bad">{error}</p> : !data ? <p className="vc-empty">Loading…</p> : (
           <>
-            {sample && <p className="vc-sample"><b>Sample data.</b> This is what a click heatmap looks like. Yours fills with real clicks from people who join a heatmap study: in your panel, open Research → All studies → New study → Heatmap visit, then share its link.</p>}
+            {sample && <p className="vc-sample"><b>Sample data.</b> This is what a click heatmap looks like. Click around this page: your own clicks replace it within a few seconds.</p>}
             <div className="vc-seg"><button aria-pressed={kind === 'click'} onClick={() => setKind('click')}>Clicks</button><button aria-pressed={kind === 'gaze'} onClick={() => setKind('gaze')}>Where people looked</button></div>
+            <p className="vc-muted" data-vc-heatkind="">{kind === 'click' ? 'Where people clicked or tapped. Fills automatically from your team and reviewers.' : 'Where people’s eyes rested, using their webcam (Labs). Only people who turn on eye tracking and calibrate (about 20 s). Video never leaves their browser.'}</p>
+            <button type="button" className="vc-linkbtn" aria-expanded={diff} onClick={() => setDiff(!diff)}>What’s the difference?</button>
+            {diff && (
+              <table className="vc-table"><thead><tr><th /><th>Clicks</th><th>Where people looked</th></tr></thead><tbody>
+                <tr><td>Data from</td><td>Your team, reviewers and invited people, automatically</td><td>Only people who turn on eye tracking in a study</td></tr>
+                <tr><td>You learn</td><td>What people try to use</td><td>What people notice or read</td></tr>
+                <tr><td>Needs</td><td>Nothing: just use the site</td><td>Their webcam, consent and a 20 s calibration</td></tr>
+                <tr><td>Accuracy</td><td>Exact spot</td><td>Approximate (often 100–200 px): read areas</td></tr>
+              </tbody></table>
+            )}
+            {kind === 'click' && (
+              <div className="vc-invite">
+                <div className="vc-row">
+                  <button type="button" className="vc-btn primary" disabled={!invite?.token} onClick={() => { if (invite?.token && navigator.clipboard) void navigator.clipboard.writeText(inviteUrl(invite.token)).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 2000) }) }}>{copied ? 'Copied' : 'Copy invite link'}</button>
+                  {invite?.token && <a className="vc-btn" href={`https://wa.me/?text=${encodeURIComponent(`Could you look around this site for a few minutes? It helps us improve it: ${inviteUrl(invite.token)}`)}`} target="_blank" rel="noopener noreferrer">Share on WhatsApp</a>}
+                </div>
+                <p className="vc-muted">{invite ? (invite.token ? `${invite.people} ${invite.people === 1 ? 'person' : 'people'} so far · people you invite agree first, then browse.` : invite.open ? 'The invite link is off (Research in your panel).' : 'The site heatmap is paused (Research in your panel).') : 'Invite link not available here.'} <a href={panelUrl('/app/research')} target="_blank" rel="noopener noreferrer">More options in your panel</a></p>
+              </div>
+            )}
             <div className="vc-seg" role="group" aria-label="Device">{(['all', 'desktop', 'tablet', 'mobile'] as Device[]).map((d) => <button key={d} aria-pressed={device === d} onClick={() => setDevice(d)}>{d === 'all' ? 'All' : d[0].toUpperCase() + d.slice(1)}</button>)}</div>
             {versions.length > 1 && (
               <label className="vc-q">Site version (never mixed)
@@ -440,13 +480,9 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
             )}
             {!sample && !n && (
               <div className="vc-sample">
-                <b>{kind === 'gaze' ? 'No eye tracking here yet.' : 'No heatmap data here yet.'}</b> Heatmaps never record your normal visitors: they fill with people who join a study and agree.
-                <ol className="vc-steps">
-                  <li>In your panel: Research → New study → {kind === 'gaze' ? 'Usability test, with eye tracking on (Labs)' : 'Heatmap visit'}.</li>
-                  <li>Share the study link with a few people (5–10 is a good start), or open it yourself to try.</li>
-                  <li>Come back here: the map fills as they finish.</li>
-                </ol>
-                <a className="vc-btn primary" href={panelUrl('/app/research')} target="_blank" rel="noopener noreferrer">Start a study</a>
+                <b>{kind === 'gaze' ? 'No eye tracking here yet.' : 'No clicks on this page yet.'}</b> {kind === 'gaze'
+                  ? 'Eye tracking needs a study with eye tracking on (Labs): set it up in your panel.'
+                  : 'Click around: your clicks and your reviewers’ show here within a few seconds. To get more, copy the invite link above and send it to a few people (5–10 is a good start).'}
               </div>
             )}
             <p className={`vc-sum ${units ? '' : 'bad'}`}>{units
@@ -454,6 +490,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
               : n ? `Nothing on ${device === 'all' ? 'any device' : device} for this page${prep?.hidden ? ` (${prep.hidden} left out for poor eye tracking)` : ''}` : kind === 'gaze' ? 'No eye tracking on this page yet' : 'No clicks on this page yet'}{units && kind === 'click' ? ` · ${rage} rage · ${dead} on nothing clickable` : ''}</p>
             {unplaced > 0 && <p className="vc-muted"><TriangleAlert size={12} /> {unplaced} {kind === 'gaze' ? 'fixation' : 'click'}{unplaced === 1 ? '' : 's'} couldn’t be placed on this version of the page (their element isn’t here now), so {unplaced === 1 ? 'it is' : 'they are'} left off the map.</p>}
             {kind === 'gaze' && !!prep?.drift.length && <p className={corrected.length ? 'vc-sum' : 'vc-muted'}>{corrected.length ? `Drift-corrected with their own clicks: ${corrected.length} of ${prep.drift.length} ${prep.drift.length === 1 ? 'person' : 'people'} · error after ≈ ${resid} px` : 'Not drift-corrected (needs 5 clicks with gaze just before them)'} · each person drawn at their own accuracy</p>}
+            <label className="vc-check"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setReviewerClicksOff(project, !e.target.checked) }} /> Record my clicks for this heatmap</label>
             <label className="vc-check"><input type="checkbox" checked={equal} onChange={(e) => setEqual(e.target.checked)} /> Each person counts the same</label>
             {kind === 'click' && view && view.depthPeople > 0 && <label className="vc-check"><input type="checkbox" checked={exposed} onChange={(e) => setExposed(e.target.checked)} /> Adjust for how many people saw it (scrolled that far)</label>}
             {kind === 'gaze' && <label className="vc-check"><input type="checkbox" checked={goodOnly} onChange={(e) => setGoodOnly(e.target.checked)} /> Leave out eye tracking calibrated worse than 220 px</label>}
@@ -495,7 +532,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
             )}
           </>
         )}
-        <p className="vc-where">{kind === 'gaze' ? 'Labs: where people’s eyes rested (fixations), weighted by how long. Webcam eye tracking is approximate (often 100–200 px), and the map is never sharper than that: read areas, not exact spots.' : 'Where people clicked.'} Only study participants who agreed; never other visitors. Pages with ids share a map (/product/:id).</p>
+        <p className="vc-where">{kind === 'gaze' ? 'Labs: where people’s eyes rested (fixations), weighted by how long. Webcam eye tracking is approximate (often 100–200 px), and the map is never sharper than that: read areas, not exact spots.' : 'Where people clicked.'} From your team, invited reviewers and people who agreed through a link; never other visitors. Pages with ids share a map (/product/:id).</p>
       </div>
     </>
   )

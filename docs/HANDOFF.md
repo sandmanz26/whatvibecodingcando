@@ -2,7 +2,7 @@
 
 *Dokumen serah-terima utama. Setiap pekerjaan baru **wajib** menambah catatan di "Log perubahan" dan memperbarui bagian "Yang harus dilakukan pemilik". Ditulis untuk pemilik (Bahasa Indonesia) dan bisa dibaca AI/developer lain.*
 
-Terakhir diperbarui: 27 November 2026
+Terakhir diperbarui: 28 November 2026
 
 ---
 
@@ -41,6 +41,7 @@ Centang di sini setiap kali selesai. ✅ = sudah dikonfirmasi pemilik/tes, ⬜ =
 | `2026-11-26-billing.sql` | pembayaran (mati) | ❓ |
 | `2026-11-26-security.sql` | pengerasan keamanan (setelah billing) | ❓ |
 | `2026-11-27-install-flow.sql` | alur instalasi: banner alamat localhost baru (jalankan setelah security) | ⬜ |
+| `2026-11-28-default-heatmap.sql` | heatmap otomatis: studi "Site heatmap", klik reviewer/tim, link undangan (jalankan setelah install-flow) | ⬜ |
 
 Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into public.platform_admins (user_id) select id from auth.users where email = '<email>';` ✅
 
@@ -75,12 +76,25 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - Harga: Free 1 situs; Pro **$4.80/situs/bulan**; founding **$2** untuk 200 pelanggan pertama; Pro gratis selama beta.
 - Login email = **kode 6 digit** (password opsional); Google sekali klik. Admin login terpisah, email + password.
 - Widget **tersembunyi untuk pengunjung biasa**; hanya tim (lewat "Open my site") dan reviewer (link review) yang melihatnya.
-- Heatmap hanya dari peserta studi yang setuju; tidak pernah merekam pengunjung biasa. Eye tracking = Labs (perkiraan).
+- Heatmap **otomatis**: tiap proyek dengan Heatmaps punya satu studi "Site heatmap" yang selalu terbuka. **Klik reviewer dan tim (Open my site) ikut tercatat secara default**, dengan pemberitahuan sekali dan tombol mati per orang. Orang lain hanya lewat link undangan + layar persetujuan. Pengunjung biasa tetap **tidak pernah** direkam. Eye tracking = Labs (perkiraan).
+- **"Collect clicks from all visitors" TIDAK dibuat** (mati, belum diputuskan): butuh notifikasi cookie/persetujuan situs pelanggan, perubahan di loader dan sesi untuk pengunjung anonim — terlalu besar/berisiko untuk sekarang. Kalau mau: pengaturan proyek, teks jujur di panel, dan loader hanya merekam bila situs memberi sinyal persetujuan.
+- Eye tracking satu klik (opt-in di widget) **belum dibuat**, menunggu keputusan pemilik.
 - Ditahan: "Fixed, please check", error konsol di komentar, MCP.
 
 ---
 
 ## 4. Log perubahan (terbaru di atas)
+
+### 28 Nov 2026
+- **Heatmap langsung jalan tanpa membuat studi.** Saat Heatmaps dinyalakan (onboarding atau Products → Update site), server otomatis membuat satu studi **Site heatmap** (Heatmap visit, tanpa tanggal akhir, semua halaman) — tidak pernah dobel; proyek lama yang Heatmaps-nya aktif ikut dibuatkan oleh SQL. Tampil di Research dengan label "default"; bisa diganti nama, ditutup (pause), atau dihapus.
+- **Klik reviewer & tim tercatat otomatis** (lewat link review atau Open my site) ke studi itu, satu "run" per sesi reviewer, dengan aturan rekaman yang sama (hanya klik asli, batas jumlah, tanpa isi field/ketikan). Widget menampilkan sekali: "Your clicks on this site help build its heatmap…" + tombol mati; di panel Heatmap ada centang **Record my clicks for this heatmap**. Server memeriksa origin, status reviewer dan rate limit.
+- **Panel Heatmap di widget**: tombol utama **Copy invite link** (link peserta → layar persetujuan → jelajah), **Share on WhatsApp**, "N people so far", link kecil "More options in your panel". Tulisan lama "Start a study" diganti. Heatmap menyegarkan diri tiap 10 detik selama tab terlihat. Halaman demo tetap menampilkan "Sample data" sampai ada klik asli.
+- **Perbedaan dua heatmap dijelaskan**: di bawah tab Clicks / Where people looked ada satu kalimat + tombol "What's the difference?" (tabel: sumber data, yang dipelajari, kebutuhan, akurasi). Kartu produk onboarding & Products: Heatmaps "Where people click — fills automatically"; Eye tracking (Labs) "Where people look — needs their webcam and consent". Pratinjau dan teks website disesuaikan. Guide: bagian "Click heatmap vs eye-tracking heatmap".
+- **Privacy** diperbarui: klik reviewer/tim kini direkam secara default (bagian 3 & ringkasan), bisa dimatikan.
+- Demo tanpa server: data heatmap & link undangan disimpan di browser situs (`localheat.ts`), jadi alur yang sama bisa dicoba.
+- Tes: `supabase/tests/default_heatmap_test.sql` (28 cek: otomatis & tidak dobel, reviewer run, origin, rate limit, anon ditolak, pause, link baru/ dicabut); SQL catch-up dites di DB dari semua migrasi lama, dua kali; Playwright demo `apps/saas/tests/e2e/`.
+- **Perlu SQL** `2026-11-28-default-heatmap.sql`. Sebelum SQL dijalankan, widget tidak merekam klik reviewer dan tombol undangan nonaktif (panel tetap jalan).
+- **Belum diverifikasi**: di Supabase live; tampilan HP; email "studi" di lifecycle/ops kini menganggap proyek dengan Heatmaps sudah punya studi (angka "studies" di admin ikut naik); token link default disimpan (tabel `study_invites`, hanya service role) agar bisa disalin dari widget.
 
 ### 27 Nov 2026
 - **Heatmap kosong di situs asli**: panel heatmap sekarang menjelaskan kenapa kosong dan langkah membuat studi, dengan tombol **Start a study** ke panel (sebelumnya hanya "No eye tracking on this page yet").

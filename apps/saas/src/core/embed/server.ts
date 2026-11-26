@@ -11,6 +11,7 @@
  */
 import { NS, type Backend, type RoundState, type Thread } from './store'
 import { parseConfig, type Release, type WidgetConfig } from './config'
+import { localRpc } from './localheat'
 
 const URL_ = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? ''
 const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? ''
@@ -163,6 +164,8 @@ async function ensureSession(create: boolean): Promise<Session | null> {
 export class ServerError extends Error {}
 /** Calls a database function as this browser's reviewer (or anonymously, for the installation check). */
 export async function rpc<T>(fn: string, args: Record<string, unknown>, opts: { signIn?: boolean; anon?: boolean } = {}): Promise<T> {
+  // The browser-only demo: the heatmap's calls are answered from this browser (localheat.ts).
+  if (!hasServer) { try { return localRpc(fn, args) as T } catch (e) { throw new ServerError((e as Error).message) } }
   const s = opts.anon ? null : await ensureSession(!!opts.signIn)
   if (!opts.anon && !s) throw new ServerError('not_invited')
   const r = await fetch(`${URL_}/rest/v1/rpc/${fn}`, {
@@ -181,6 +184,7 @@ export async function rpc<T>(fn: string, args: Record<string, unknown>, opts: { 
  * the navigation, with the session this page already has (nothing can be awaited any more).
  */
 export function rpcOnLeave(fn: string, args: Record<string, unknown>) {
+  if (!hasServer) { try { localRpc(fn, args) } catch { /* lost */ } return }
   if (!session) return
   try {
     void fetch(`${URL_}/rest/v1/rpc/${fn}`, {

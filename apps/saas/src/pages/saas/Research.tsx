@@ -99,6 +99,12 @@ export function Research() {
       {cloud && <div className="seg rs-tabs" role="tablist"><button role="tab" aria-selected={tab === 'studies'} aria-pressed={tab === 'studies'} onClick={() => setTab('studies')}>Studies</button><button role="tab" aria-selected={tab === 'sessions'} aria-pressed={tab === 'sessions'} onClick={() => setTab('sessions')}>Participant paths</button></div>}
       {tab === 'sessions' ? <Sessions studies={rows ?? []} /> : <>
       {!cloud && <p className="up-warn"><TriangleAlert size={13} /> Studies on your site need the server: this demo panel has none. Try the research tools in the demo console instead.</p>}
+      {!cloud && moduleOn('browse') && (
+        <section className="up-card" data-default-study="">
+          <div className="up-row"><span className="lp-grow"><b>Site heatmap</b><small className="up-muted"> · Heatmap visit · default</small></span><span className="up-badge">Open</span></div>
+          <p className="up-muted">Made automatically because Heatmaps is on. Your clicks and your reviewers’ build it as you use the site (<i>Open my site</i>); invite more people from the widget’s Heatmap panel (<i>Copy invite link</i>). In this demo it is kept in the site’s own browser storage.</p>
+        </section>
+      )}
       {cloud && rows && !rows.length && (
         <section className="up-card rs-empty">
           <FlaskConical size={22} />
@@ -112,7 +118,7 @@ export function Research() {
         {(rows ?? []).filter((s) => !filter || filter.has(s)).map((s) => (
           <li key={s.id} className="up-card">
             <div className="up-row">
-              <span className="lp-grow"><b>{s.name}</b><small className="up-muted"> · {KIND[s.kind].label} · {s.runs} participant{s.runs === 1 ? '' : 's'} · {ago(s.created_at)}</small></span>
+              <span className="lp-grow"><b>{s.name}</b><small className="up-muted"> · {KIND[s.kind].label}{s.is_default ? ' · default: fills from your team, reviewers and the widget’s invite link' : ''} · {s.runs} participant{s.runs === 1 ? '' : 's'} · {ago(s.created_at)}</small></span>
               <span className={`up-badge ${s.status === 'open' ? '' : 'pending'}`}>{s.status === 'open' ? 'Open' : 'Closed'}</span>
             </div>
             {!moduleOn(s.kind) && <p className="up-warn"><TriangleAlert size={13} /> Participants’ links won’t open yet: turn on {productOf(KIND[s.kind].product)?.name ?? KIND[s.kind].label} in <Link to="/app/products">Products</Link>, then update your site from Widget.</p>}

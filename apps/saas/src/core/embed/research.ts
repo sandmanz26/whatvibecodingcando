@@ -302,3 +302,43 @@ export const studyInfo = (project: string, token: string) =>
 export const startRun = (project: string, token: string) =>
   server.rpc<{ run: string; kind: StudyKind; name: string; config: unknown; eye: boolean }>('start_run', { p_public_id: project, p_token: token, p_vw: window.innerWidth, p_vh: window.innerHeight }, { signIn: true })
 export const finishRun = (run: string, result: Record<string, unknown>, gaze?: number) => server.rpc('finish_run', { p_run: run, p_result: result, p_gaze: gaze ?? null })
+
+/* ---------- reviewers' and the team's clicks (the default "Site heatmap" study) ---------- */
+
+/**
+ * People the owner already let in (a review link, or "Open my site") record their clicks into the
+ * project's default study, with the same recorder and rules as participants (real clicks only, no
+ * field values, no typed text, the same caps). Each reviewer can turn it off for themselves.
+ */
+const offKey = (p: string) => `${NS}heat-off:${p}`
+const noteKey = (p: string) => `${NS}heat-note:${p}`
+const lsGet = (k: string) => { try { return localStorage.getItem(k) } catch { return null } }
+const lsSet = (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v) } catch { /* this page only */ } }
+export const reviewerClicksOff = (p: string) => lsGet(offKey(p)) === '1'
+export const setReviewerClicksOff = (p: string, off: boolean) => { lsSet(offKey(p), off ? '1' : null); window.dispatchEvent(new Event('vibe-collab:heat-pref')) }
+export const heatNoteSeen = (p: string) => lsGet(noteKey(p)) === '1'
+export const markHeatNoteSeen = (p: string) => lsSet(noteKey(p), '1')
+
+/** Starts recording this reviewer's clicks; returns a stop function. Fails quietly (nothing recorded). */
+export function startReviewerClicks(project: string, version: string): () => void {
+  let rec: Recorder | null = null
+  let stopped = false
+  const k = `${NS}rrun:${project}`
+  void (async () => {
+    let kept: { run: string; started: number } | null = null
+    try { kept = JSON.parse(sessionStorage.getItem(k) ?? 'null') } catch { kept = null }
+    if (!kept || Date.now() - kept.started > 11 * 3600_000) {
+      try { kept = await server.rpc<{ run: string; started: number }>('start_reviewer_run', { p_public_id: project, p_vw: window.innerWidth, p_vh: window.innerHeight }) } catch { return }
+      try { sessionStorage.setItem(k, JSON.stringify(kept)) } catch { /* new run next page */ }
+    }
+    if (stopped || !kept) return
+    rec = new Recorder(kept.run, kept.started, () => {}, () => {}, version)
+    rec.start()
+  })()
+  return () => { stopped = true; void rec?.end() }
+}
+
+export interface Invite { token: string | null; open: boolean; people: number; name?: string }
+export const defaultInvite = (project: string) => server.rpc<Invite>('default_study_invite', { p_public_id: project })
+/** The participant link: this page's address with the study token in the hash. */
+export const inviteUrl = (token: string) => `${window.location.origin}${window.location.pathname}#vibe_r=${token}`

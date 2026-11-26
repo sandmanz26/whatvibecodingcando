@@ -176,7 +176,7 @@ export default function Onboarding() {
                     <WithPreview key={p.id} p={p} selected={on} onSelect={p.soon ? undefined : () => toggle(p.id)}>
                     <button type="button" className={`lp-check ${on ? 'on' : ''} ${p.soon ? 'soon' : ''}`} onClick={() => !p.soon && toggle(p.id)} aria-pressed={on} disabled={p.soon}>
                       <span className="lp-icon sm" style={{ background: p.hue }}><Icon size={15} /></span>
-                      <span className="lp-grow"><b>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</b><small>{p.soon ? 'Coming soon' : statusLabel(p.status)}</small></span>
+                      <span className="lp-grow"><b>{p.name}{p.labs && <span className="lp-labs">Labs</span>}</b><small>{p.soon ? 'Coming soon' : p.sub ?? statusLabel(p.status)}</small></span>
                       <span className="lp-tick">{on && <Check size={13} />}</span>
                     </button>
                     </WithPreview>

@@ -32,6 +32,8 @@ export interface Product {
   id: string
   name: string
   tagline: string
+  /** a short line under the name on product cards (onboarding, Products) */
+  sub?: string
   points: string[]
   category: Category
   /** script: runs on the customer's site; panel: in the user panel; console: early access, in the demo console */
@@ -48,11 +50,11 @@ export interface Product {
 export const PRODUCTS: Product[] = [
   { id: 'comments', name: 'Comments', tagline: 'Pin feedback on the live product, reply, and close the loop.', points: ['Pins stick to elements', 'Draft, post, reply, complete', 'Works on any site'], category: 'Feedback', status: 'script', demo: 'embed-demo.html', icon: MessageSquarePlus, hue: '#e8590c' },
   { id: 'insights', name: 'Participant paths', tagline: 'Follow each study participant through your site: pages, clicks, and where they got stuck.', points: ['One path per participant', 'Rage and dead clicks', 'Only people who agreed'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: MousePointerClick, hue: '#1971c2' },
-  { id: 'heatmap', name: 'Heatmaps', tagline: 'See where people click (and look) while doing a task, as a heatmap per screen.', points: ['Click and gaze heatmaps', 'Per task, per device', 'Every run listed'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: Flame, hue: '#e03131' },
+  { id: 'heatmap', name: 'Heatmaps', sub: 'Where people click — fills automatically', tagline: 'Where people click or tap, per page and device. Fills automatically from your team and reviewers; invite more people with a link.', points: ['Fills as your team clicks', 'Invite link, with consent', 'Per page, per device'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: Flame, hue: '#e03131' },
   { id: 'usability', name: 'Usability tests', tagline: 'Give people a task, time it, and see where they get lost.', points: ['Task success and time', 'Participant link', 'Replays per task'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: ListChecks, hue: '#2f9e44' },
   { id: 'fivesec', name: '5-second tests', tagline: 'Show a screen for five seconds and learn what sticks.', points: ['First clicks', 'Recall questions', 'Shareable link'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: Timer, hue: '#f08c00' },
   { id: 'doors', name: 'Fake doors', soon: true, tagline: 'Show your real visitors a button for a feature you haven’t built yet, and count who clicks it.', points: ['On your live site', 'Clicks vs views', 'No code changes'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: DoorOpen, hue: '#9c36b5' },
-  { id: 'gaze', name: 'Eye tracking', labs: true, tagline: 'Webcam eye tracking in usability tests: calibration, accuracy check and a gaze heatmap. Accuracy depends on the webcam and light.', points: ['Runs in the browser', 'Accuracy check', 'Video never leaves the device'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: Eye, hue: '#0c8599' },
+  { id: 'gaze', name: 'Eye tracking', labs: true, sub: 'Where people look — needs their webcam and consent', tagline: 'Where people look, from their webcam, in studies: only people who agree and calibrate (about 20 s). Approximate: accuracy depends on the webcam and light.', points: ['Runs in the browser', 'Accuracy check', 'Video never leaves the device'], category: 'Research', status: 'script', demo: 'embed-demo.html', icon: Eye, hue: '#0c8599' },
   { id: 'compare', name: 'Component review', tagline: 'Put two components side by side and agree on what changes.', points: ['Pick from real screens', 'Rendered style diff', 'Notes about A, B or both'], category: 'Feedback', status: 'script', demo: 'embed-demo.html', icon: Columns2, hue: '#c2255c' },
   { id: 'tokens', name: 'Design tokens', tagline: 'Upload token files, simulate them, and compare two sets.', points: ['W3C, Tokens Studio, CSS', 'Live preview', 'Contrast check'], category: 'Design QA', status: 'script', demo: 'embed-demo.html', icon: Palette, hue: '#5f3dc4' },
   { id: 'inspect', name: 'Inspect', tagline: 'Hover anything to see its colours, font and spacing, and whether they are design tokens.', points: ['On the live product', 'Token or hard-coded', 'Pin to compare'], category: 'Design QA', status: 'script', demo: 'embed-demo.html', icon: SquareDashedMousePointer, hue: '#1864ab' },

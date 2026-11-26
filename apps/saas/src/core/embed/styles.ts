@@ -120,6 +120,10 @@ export const CSS = `
 .vc-steps { margin: 6px 0 8px; padding-left: 18px; }
 .vc-steps li { margin: 2px 0; }
 .vc-sample .vc-btn { display: inline-block; text-decoration: none; }
+.vc-invite { display: grid; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--vc-line); }
+.vc-invite a.vc-btn { text-decoration: none; color: inherit; }
+.vc-invite .vc-row { gap: 6px; flex-wrap: wrap; }
+.vc-linkbtn { border: 0; background: transparent; padding: 0; color: var(--vc-accent); text-decoration: underline; cursor: pointer; font: inherit; font-size: 12px; justify-self: start; text-align: left; }
 .vc-sample { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: #fff8db; color: #5c4400; font-size: 12px; line-height: 1.45; }
 .vc-sum { font-size: 12px; font-weight: 600; padding: 6px 8px; border-radius: 8px; background: #e6f6e9; color: #237032; }
 .vc-sum.bad { background: #fff5f5; color: #a61e1e; }
