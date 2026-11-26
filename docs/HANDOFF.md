@@ -2,7 +2,7 @@
 
 *Dokumen serah-terima utama. Setiap pekerjaan baru **wajib** menambah catatan di "Log perubahan" dan memperbarui bagian "Yang harus dilakukan pemilik". Ditulis untuk pemilik (Bahasa Indonesia) dan bisa dibaca AI/developer lain.*
 
-Terakhir diperbarui: 29 November 2026
+Terakhir diperbarui: 30 November 2026
 
 ---
 
@@ -102,6 +102,15 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 
 **Yang belum terverifikasi:** laporan eye tracking dengan data server asli (hanya diuji dengan data contoh di demo); overlay gaze di server (demo tidak punya data gaze, jadi menampilkan "No eye tracking here yet"); "Take part in eye tracking" di situs asli (butuh studi ★ Eye tracking terbuka). **Cache:** `vibe-app.js` disajikan dengan max-age 300 — setelah deploy, tunggu ±5 menit atau hard-reload sebelum menilai perilaku baru.
 
+
+### 30 Nov 2026 — Eye tracking webcam v2 (akurasi)
+- **Audit pipeline lama**: fitur hanya posisi iris terhadap sudut mata + arah kepala kasar (tanpa kelopak, tanpa roll/jarak); model ridge linear dengan λ tetap 0,5; kalibrasi mengambil frame mulai 150 ms (mata masih mendarat), tanpa buang kedip/lirikan, urutan titik tetap; validasi hanya rata-rata px (tanpa derajat/presisi); kedip dari satu ambang keterbukaan; tidak ada deteksi kepala bergeser; klik dipakai 3× bobot tanpa cek (bisa menyeret model); fiksasi I-DT dengan ambang hanya dari akurasi.
+- **Sekarang** (`src/core/gaze-model.ts`, `gaze-analysis.ts`): fitur iris kedua mata dinormalisasi ke sudut + kelopak, eye aspect ratio, yaw/pitch/roll, posisi & jarak kepala; model ridge polinomial derajat 2 + kompensasi pose kepala, λ dipilih cross-validation per sumbu x/y; kalibrasi 13 titik urutan acak, 300 ms pertama dibuang, kedip/lirikan dibuang; validasi 5 titik baru → akurasi px **dan derajat** (jarak layar diperkirakan dari ukuran iris) + presisi RMS-S2S; jika buruk (> ~5,5°) ditawarkan **Five more dots** sekali; saat merekam: kedip dibuang (EAR), sampel saat kepala jauh dari pose kalibrasi dibuang + ajakan "Move back…" setelah 2 dtk; klik hanya mengajari model jika dekat estimasi (bobot 0,5); `requestVideoFrameCallback`; fiksasi hybrid I-VT/I-DT dengan ambang dari presisi terukur.
+- **Angka (data sintetis, `node apps/saas/tests/gaze.test.ts`)**: error rata-rata kepala diam **137 → 58 px**, kepala bergerak **268 → 120 px**; kedip 300/300 tertangkap, 0/300 salah buang; fiksasi precision/recall 0,97/0,92 → 1,00/0,95; ~1–2 µs per frame untuk prediksi (deteksi wajah MediaPipe sendiri tidak diukur di Node); fit kalibrasi + CV ~30–60 ms.
+- **Kualitas per run disimpan tanpa SQL baru**: konsol di `GazeSession` (accuracyDeg, precision, distance, loss, head, msPerFrame — field opsional); widget di `runs.result.gaze` (jsonb yang sudah ada). Aturan "leave out" heatmap tetap 220 px tapi kini jelas berdasarkan cek akurasi. Model lama yang tersimpan tetap bisa dipakai.
+- Loader `vibe.js` tidak berubah; semua kode gaze tetap di `embed/gaze.js` yang dimuat hanya saat eye tracking dimulai. `apps/content` tidak diubah. Halaman hasil eye tracking (Nav/Research) tidak disentuh — dikerjakan agen lain.
+- **Tidak perlu SQL.**
+- **Belum diverifikasi**: webcam asli (berbagai kamera, kacamata, cahaya redup/dari belakang), akurasi nyata dalam derajat, perkiraan jarak dari iris (bergantung FOV kamera), ms/frame MediaPipe di laptop lemah, Safari (tanpa `requestVideoFrameCallback` di versi lama → fallback rAF). Tes manual: `docs/TESTING.md` 9.11e–f.
 
 ### 29 Nov 2026
 - **Satu studi default ★ per modul riset.** Heatmap, Eye tracking, 5-second test dan Usability test masing-masing otomatis punya satu studi default (badge **★ Default · Auto**) saat modul dinyalakan (onboarding atau Update site); proyek lama mendapatkannya lewat SQL untuk modul yang sudah aktif. Indeks unik per (proyek, modul), pembuatan idempoten.

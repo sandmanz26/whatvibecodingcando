@@ -10,7 +10,7 @@ import { setFlag, useFlag } from '../tools/shared'
 import { nameOf } from '../tools/compare/store'
 import { loadSessions, loadTests, summarize, type UsabilityTest } from '../tools/tests/store'
 import { loadGaze, loadGazeSessions, timeOf } from '../tools/gaze/store'
-import { aoiStats, fixationsOf, idtFor, saccadesOf, type Aoi, type Fixation } from '../core/gaze-analysis'
+import { adaptiveIdt, aoiStats, fixationsOf, idtFor, saccadesOf, type Aoi, type Fixation } from '../core/gaze-analysis'
 import { sampleGaze } from '../tools/gaze/sample'
 
 /** Screens for everyday browsing, with or without recorded taps. */
@@ -133,6 +133,8 @@ export default function Heatmap() {
 
   /* ---------- eyes: gaze samples → fixations, per person ---------- */
   const gazeAcc = useMemo(() => new Map((ver >= 0 ? loadGazeSessions() : []).map((g) => [g.sid, g.accuracy])), [ver])
+  /** Precision (RMS-S2S px) per eye-tracking session, measured at validation (v2 sessions only). */
+  const gazePrec = useMemo(() => new Map((ver >= 0 ? loadGazeSessions() : []).filter((g) => g.precision != null).map((g) => [g.sid, g.precision!])), [ver])
   const testOutcome = useMemo(() => {
     const m = new Map<string, { ok: boolean; firstRight: boolean | null; acc?: number }>()
     if (source !== 'test' || !test || !task) return m
@@ -143,32 +145,36 @@ export default function Heatmap() {
     return m
   }, [source, test, task, sessions])
   const realEyes = useMemo(() => {
-    const groups = new Map<string, { start: number; acc: number | null; samples: { t: number; x: number; y: number }[] }>()
+    const groups = new Map<string, { start: number; acc: number | null; prec: number | null; samples: { t: number; x: number; y: number }[] }>()
     for (const p of gaze) {
       if (p.page !== page || layoutOf(p.vw) !== device) continue
       if (source === 'test' ? !(p.task === task?.id && p.test && testOutcome.has(p.test)) : !!p.test) continue
       const key = p.test ?? p.sid
       const t = timeOf(p)
-      const g = groups.get(key) ?? { start: p.tt !== undefined ? t - p.tt : t, acc: (p.test ? testOutcome.get(p.test)?.acc : undefined) ?? gazeAcc.get(p.sid) ?? null, samples: [] }
+      const g = groups.get(key) ?? { start: p.tt !== undefined ? t - p.tt : t, acc: (p.test ? testOutcome.get(p.test)?.acc : undefined) ?? gazeAcc.get(p.sid) ?? null, prec: gazePrec.get(p.sid) ?? null, samples: [] }
       if (p.tt === undefined) g.start = Math.min(g.start, t)
       g.samples.push({ t, x: (p.x / 100) * d.w, y: p.y })
       groups.set(key, g)
     }
-    return [...groups.entries()].map(([id, g]) => ({ id, start: g.start, acc: g.acc, samples: g.samples }))
-  }, [gaze, gazeAcc, page, device, source, task?.id, testOutcome, d.w])
+    return [...groups.entries()].map(([id, g]) => ({ id, start: g.start, acc: g.acc, prec: g.prec, samples: g.samples }))
+  }, [gaze, gazeAcc, gazePrec, page, device, source, task?.id, testOutcome, d.w])
   const eyeSample = realEyes.length === 0
   const accs = realEyes.map((e) => e.acc).filter((a): a is number => a !== null).sort((a, b) => a - b)
   const accuracy = accs.length ? accs[Math.floor(accs.length / 2)] : null
+  const precs = realEyes.map((e) => e.prec).filter((a): a is number => a !== null).sort((a, b) => a - b)
+  const precision = precs.length ? precs[Math.floor(precs.length / 2)] : null
+  // v2: thresholds adapt to the measured precision (hybrid I-VT/I-DT); older sessions keep plain I-DT.
+  const idt = useMemo(() => (eyeSample || precision === null ? idtFor(eyeSample ? 110 : accuracy) : adaptiveIdt(accuracy, precision)), [eyeSample, accuracy, precision])
   const eyePeople = useMemo(() => {
     const base = eyeSample
       ? sampleGaze(aois.map((a) => ({ rect: a.rect, weight: a.target ? 3 : 1, target: a.target })), `${source}|${test?.id}|${task?.id}|${page}|${device}`).map((p) => ({ ...p, acc: null as number | null }))
       : realEyes
-    const opts = idtFor(eyeSample ? 110 : accuracy)
+    const opts = idt
     return base
       .filter((p) => source !== 'test' || who === 'all' || eyeSample || (who === 'ok') === !!testOutcome.get(p.id)?.ok)
       .map((p) => ({ id: p.id, start: p.start, fixations: fixationsOf(p.samples, opts) }))
       .filter((p) => p.fixations.length > 0)
-  }, [eyeSample, realEyes, aois, source, test?.id, task?.id, page, device, accuracy, who, testOutcome])
+  }, [eyeSample, realEyes, aois, source, test?.id, task?.id, page, device, idt, who, testOutcome])
   const person = eyePeople[Math.min(pidx, Math.max(0, eyePeople.length - 1))]
   // Playback runs from the first fixation (no blank lead-in); the clock still shows time since the task began.
   const pathBase = person ? person.fixations[0].start : 0
@@ -481,7 +487,7 @@ export default function Heatmap() {
               ))}
             </tbody>
           </table>
-          <p className="muted" style={{ fontSize: 12 }}>Fixations: I-DT, dispersion {idtFor(eyeSample ? 110 : accuracy).dispersion} px, at least 100 ms. TTFF counts from the start of the task. Hover an area to see it.</p>
+          <p className="muted" style={{ fontSize: 12 }}>Fixations: {idt.vel ? 'I-VT/I-DT hybrid' : 'I-DT'}, dispersion {idt.dispersion} px, at least 100 ms. TTFF counts from the start of the task. Hover an area to see it.</p>
         </aside>
         ) : (
         <aside className="card card-body hm-side">

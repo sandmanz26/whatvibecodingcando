@@ -527,7 +527,7 @@ function HeatmapTool({ project, onClose, report }: { project: string; onClose: (
             <label className="vc-check"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setReviewerClicksOff(project, !e.target.checked) }} /> Record my clicks for this heatmap</label>
             <label className="vc-check"><input type="checkbox" checked={equal} onChange={(e) => setEqual(e.target.checked)} /> Each person counts the same</label>
             {kind === 'click' && view && view.depthPeople > 0 && <label className="vc-check"><input type="checkbox" checked={exposed} onChange={(e) => setExposed(e.target.checked)} /> Adjust for how many people saw it (scrolled that far)</label>}
-            {kind === 'gaze' && <label className="vc-check"><input type="checkbox" checked={goodOnly} onChange={(e) => setGoodOnly(e.target.checked)} /> Leave out eye tracking calibrated worse than 220 px</label>}
+            {kind === 'gaze' && <label className="vc-check"><input type="checkbox" checked={goodOnly} onChange={(e) => setGoodOnly(e.target.checked)} /> Leave out eye tracking whose accuracy check was worse than 220 px (about 5.5°)</label>}
             {data.studies.length > 0 && (
               <label className="vc-q">Study
                 <select value={study} onChange={(e) => setStudy(e.target.value)}>

@@ -5,8 +5,8 @@
  * Video never leaves the browser: each frame becomes face landmarks and is dropped.
  */
 import type { FaceLandmarker } from '@mediapipe/tasks-vision'
-export { startCamera, stopCamera, features, fit, predict, CALIBRATION, VALIDATION, isBlink } from '../gaze-model'
-export type { Features, Model } from '../gaze-model'
+export { startCamera, stopCamera, features, fit, predict, CALIBRATION, VALIDATION, QUICK, isBlink, headDrift, headWeight, stableFrames, calibrationOrder, validate, qualityOf, clickTeaches, CLICK_WEIGHT, SETTLE_MS, COLLECT_MS, RunMeter } from '../gaze-model'
+export type { Features, Model, Quality, CalSample } from '../gaze-model'
 
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
 let landmarker: Promise<FaceLandmarker> | null = null

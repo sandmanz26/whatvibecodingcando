@@ -35,7 +35,11 @@ export interface RunState {
   module?: ResearchModule
   phase: 'consent' | 'eyes' | 'intro' | 'task' | 'showing' | 'questions' | 'done' | 'declined'
   /** eye tracking, when the study asks for it and the participant agreed and calibrated */
-  eye?: { on: boolean; model?: import('../gaze-model').Model; accuracy?: number; calib?: { f: number[]; x: number; y: number }[] }
+  eye?: {
+    on: boolean; model?: import('../gaze-model').Model; accuracy?: number; calib?: { f: number[]; x: number; y: number; w?: number }[]
+    /** v2 validation quality: degrees, precision (RMS-S2S px), estimated distance (cm) */
+    accuracyDeg?: number; precision?: number; distance?: number
+  }
   info?: { name: string; kind: StudyKind; eye: boolean; tasks: number }
   run?: string
   kind?: StudyKind
