@@ -255,7 +255,7 @@ function ReviewerClicks({ project, version }: { project: string; version: string
   const close = () => { markHeatNoteSeen(project); setNote(false) }
   return (
     <div className="vc-toast" role="status" data-vc-heatnote="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', bottom: 140, maxWidth: 'min(420px, calc(100vw - 32px))', lineHeight: 1.4 }}>
-      <span>Your clicks on this site help build its heatmap. Turn off in the widget menu (Heatmap), or <button type="button" onClick={() => { setReviewerClicksOff(project, true); close() }} style={{ border: 0, background: 'transparent', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}>turn off now</button>.</span>
+      <span>Your clicks on this site help build its heatmap (and a masked picture of each page layout may be saved, form fields emptied). Turn off in the widget menu (Heatmap), or <button type="button" onClick={() => { setReviewerClicksOff(project, true); close() }} style={{ border: 0, background: 'transparent', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, font: 'inherit' }}>turn off now</button>.</span>
       <button type="button" onClick={close} aria-label="Got it" style={{ border: 0, background: 'transparent', color: 'inherit', fontSize: 16, lineHeight: 1, cursor: 'pointer', padding: 0 }}>×</button>
     </div>
   )

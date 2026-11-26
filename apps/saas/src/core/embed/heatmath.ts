@@ -21,7 +21,7 @@ import { fixationsOf, type Sample } from '../gaze-analysis'
 import { capPerPerson, dedupe, rankElements, sampleNote, type Ranked } from '../density'
 import { cleanGaze, driftOf, pairsOf, smoothGaze } from '../heatstats'
 
-export interface RawPt { x: number; y: number; label?: string | null; vw: number | null; sel: string | null; ex: number | null; ey: number | null; rage: boolean | null; dead: boolean | null; p?: number; t?: number; dev?: string | null; acc?: number | null; ver?: string | null }
+export interface RawPt { x: number; y: number; label?: string | null; vw: number | null; sel: string | null; ex: number | null; ey: number | null; rage: boolean | null; dead: boolean | null; p?: number; t?: number; dev?: string | null; acc?: number | null; ver?: string | null; /** layout number on its page (0 = unknown, older data) */ lay?: number }
 export interface Anchor { p: number; t: number; x: number; y: number }
 export type Device = 'all' | 'desktop' | 'tablet' | 'mobile'
 export interface HeatOpts { kind: 'click' | 'gaze'; device: Device; equal: boolean; maxAcc: number | null; /** the version shown ('' = points without a version); null = all (only when there is one) */ version?: string | null; anchors?: Anchor[] }
@@ -89,4 +89,17 @@ export function prepare(points: RawPt[], o: HeatOpts): Prepared {
   const acc = median(accs)
   const people = byPerson.size - hidden
   return { groups, drift, capped, ranking, note: out.length ? sampleNote(people) : null, pts: out, people, hidden, radius: o.kind === 'gaze' ? Math.round(Math.min(90, Math.max(28, (acc ?? 120) * 0.45))) : 26, units: out.length }
+}
+
+/**
+ * Layouts are never mixed on the live page: when a page has had more than one layout, only the
+ * points of the newest one (what the page looks like now) are drawn. Returns the points kept and,
+ * when it split, the date the current layout started.
+ */
+export function currentLayout<T extends { lay?: number }>(points: T[], layouts: { n: number; since: string }[] = []): { points: T[]; since: string | null; left: number } {
+  const ns = new Set(points.map((p) => p.lay ?? 0))
+  if (ns.size <= 1 && layouts.length <= 1) return { points, since: null, left: 0 }
+  const top = Math.max(0, ...layouts.map((l) => l.n), ...ns)
+  const kept = points.filter((p) => (p.lay ?? 0) === top)
+  return { points: kept, since: layouts.find((l) => l.n === top)?.since ?? null, left: points.length - kept.length }
 }

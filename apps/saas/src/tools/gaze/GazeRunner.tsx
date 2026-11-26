@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Square, Video } from 'lucide-react'
 import { APP, currentPath, isConsole, isEmbedded } from '../shared'
-import { CLICK_WEIGHT, COLLECT_MS, QUICK, RunMeter, SETTLE_MS, VALIDATION, calibrationOrder, clickTeaches, features, fit, headDrift, headWeight, isBlink, loadLandmarker, predict, qualityOf, stableFrames, startCamera, stopCamera, validate, type CalSample, type Features, type Model, type Quality } from './engine'
+import { CLICK_WEIGHT, COLLECT_MS, QUICK, RunMeter, SETTLE_MS, VALIDATION, calibrationOrder, clickTeaches, features, fit, headDrift, headWeight, isBlink, loadLandmarker, resetLandmarker, cameraError, predict, qualityOf, stableFrames, startCamera, stopCamera, validate, type CalSample, type Features, type Model, type Quality } from './engine'
 import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP, appendGaze, gazeFrame, loadGazeSessions, saveGazeSession, setGazeClickHook, type GazePoint } from './store'
 import { OneEuro } from '../../core/gaze-analysis'
 import { runningTask } from '../tests/store'
@@ -90,22 +90,29 @@ export function GazeRunner() {
   useEffect(() => {
     const start = () => { setForTest(true); setPhase((p) => (p === 'off' ? 'consent' : p)) }
     const stop = () => shutdown(false)
+    // Leaving the page or unmounting always lets the camera go (it never stays on for a later run).
+    const leave = () => { stopCamera(stream.current); stream.current = null }
     window.addEventListener(GAZE_START, start)
     window.addEventListener(GAZE_STOP, stop)
-    return () => { window.removeEventListener(GAZE_START, start); window.removeEventListener(GAZE_STOP, stop) }
+    window.addEventListener('pagehide', leave)
+    return () => { window.removeEventListener(GAZE_START, start); window.removeEventListener(GAZE_STOP, stop); window.removeEventListener('pagehide', leave); leave() }
   }, [shutdown])
 
   const camera = useCallback(async (next: Phase) => {
     setPhase('loading')
     try {
       if (!video.current) video.current = document.createElement('video')
+      // A stream is reused only while its track is live; otherwise the camera is asked for afresh.
+      const live = stream.current?.getVideoTracks()[0]?.readyState === 'live'
+      if (!live) { stopCamera(stream.current); stream.current = null }
       const [lm, s] = await Promise.all([loadLandmarker(), stream.current ? Promise.resolve(stream.current) : startCamera(video.current)])
       stream.current = s
       if (preview.current) preview.current.srcObject = s
       void lm
       setPhase(next)
     } catch (e) {
-      setError(e instanceof DOMException && e.name === 'NotAllowedError' ? 'The camera wasn’t allowed. Eye tracking needs it; nothing else does.' : 'Couldn’t start eye tracking: the camera or the face model didn’t load.')
+      resetLandmarker()
+      setError(e instanceof DOMException && e.name === 'NotAllowedError' ? 'The camera wasn’t allowed. Eye tracking needs it; nothing else does.' : `Couldn’t start eye tracking: ${cameraError(e)}`)
       setPhase('error')
       stopCamera(stream.current)
       stream.current = null
@@ -132,7 +139,9 @@ export function GazeRunner() {
         if ((rvfc || now - last >= 33) && video.current && video.current.readyState >= 2) {
           last = now
           const a = performance.now()
-          const f = features(lm, video.current, now)
+          let f: Features | null
+          // A detect that throws leaves the landmarker unusable: close it, make a new one next start.
+          try { f = features(lm, video.current, performance.now()) } catch { live = false; resetLandmarker(); setError('Eye tracking stopped: the face model failed. Try again.'); setPhase('error'); stopCamera(stream.current); stream.current = null; return }
           const ms = performance.now() - a
           setFace(!!f)
           if (f) { lastF.current = { f, at: now }; collector.current?.(f, ms) }

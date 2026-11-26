@@ -10,14 +10,26 @@
  */
 import { NS } from './store'
 import { LocalConfigSource } from './config'
+import { matchLayout, type Fingerprint } from './layout'
 
 export type LModule = 'heatmap' | 'gaze' | 'fivesec' | 'usability'
 export const LMODULES: LModule[] = ['heatmap', 'gaze', 'fivesec', 'usability']
-export interface LStudy { id: string; name: string; token: string; open: boolean; module?: LModule }
-interface LRun { id: string; source: 'reviewer' | 'participant' | 'visitor'; started: number; vw: number; study?: string }
-interface LEv { r: string; kind: string; page: string; x?: number; y?: number; vw?: number; sel?: string; label?: string; ex?: number; ey?: number; rage?: boolean; dead?: boolean; t: number; version?: string }
+export interface LStudy { id: string; name: string; token: string; open: boolean; module?: LModule; /** eye tracking added to a usability or 5-second study (optional there) */ eye?: boolean }
+interface LRun { id: string; source: 'reviewer' | 'participant' | 'visitor'; started: number; vw: number; study?: string; excluded?: boolean }
+interface LEv { r: string; lh?: string; kind: string; page: string; x?: number; y?: number; vw?: number; sel?: string; label?: string; ex?: number; ey?: number; rage?: boolean; dead?: boolean; t: number; version?: string }
 /** `study` is the heatmap's ★ study (the only one before per-module defaults); `more` the other modules'. */
-export interface LStore { study: LStudy; more?: Partial<Record<Exclude<LModule, 'heatmap'>, LStudy>>; runs: LRun[]; events: LEv[] }
+export interface LLayout { page: string; n: number; fp: Fingerprint; since: number; hashes: string[] }
+export interface LSnap { path: string; page: string; n: number; device: string; vw: number; width: number; height: number; scrollH: number; boxes: Record<string, [number, number, number, number]>; taken?: number }
+export interface LStore { study: LStudy; more?: Partial<Record<Exclude<LModule, 'heatmap'>, LStudy>>; runs: LRun[]; events: LEv[]; layouts?: LLayout[]; snaps?: LSnap[] }
+/** The demo's snapshot pictures (data URLs), by path, kept apart from the events. */
+export const lsnapKey = (p: string) => `${NS}lsnap:${p}`
+export function localSnapshot(path: string, dataUrl: string) {
+  const p = project()
+  try { const m = JSON.parse(localStorage.getItem(lsnapKey(p)) ?? '{}') as Record<string, string>; m[path] = dataUrl; localStorage.setItem(lsnapKey(p), JSON.stringify(m)) } catch { /* full: no picture */ }
+}
+export const localSnapshotUrl = (p: string, path: string): string | null => { try { return (JSON.parse(localStorage.getItem(lsnapKey(p)) ?? '{}') as Record<string, string>)[path] ?? null } catch { return null } }
+/** The layout number of an event's hash on its page (0 = unknown). */
+export const layoutNo = (s: LStore, page: string, lh?: string) => (lh ? s.layouts?.find((l) => l.page === page && l.hashes.includes(lh))?.n ?? 0 : 0)
 
 const SEED: Record<LModule, { name: string; kind: 'browse' | 'fivesec' | 'usability'; eye: boolean; config: Record<string, unknown> }> = {
   heatmap: { name: 'Site heatmap', kind: 'browse', eye: false, config: { minutes: 30, prompt: 'Look around the site as you normally would.' } },
@@ -99,7 +111,7 @@ export function localRpc(fn: string, a: Record<string, unknown>): unknown {
       if (!st) throw err('link_expired')
       if (!st.open) throw err('study_closed')
       const m = moduleOf(s, st)
-      return { name: st.name, kind: SEED[m].kind, eye: SEED[m].eye, tasks: 1 }
+      return { name: st.name, kind: SEED[m].kind, eye: st.eye ?? SEED[m].eye, tasks: 1 }
     }
     case 'start_run': {
       const st = byToken()
@@ -107,7 +119,7 @@ export function localRpc(fn: string, a: Record<string, unknown>): unknown {
       const m = moduleOf(s, st)
       const run: LRun = { id: hex(16), source: 'participant', started: Date.now(), vw: Number(a.p_vw) || 0, study: st.id }
       s.runs.push(run); saveLocal(p, s)
-      return { run: run.id, kind: SEED[m].kind, name: st.name, config: m === 'heatmap' ? { minutes: 3, prompt: 'Look around the site as you normally would.' } : SEED[m].config, eye: SEED[m].eye }
+      return { run: run.id, kind: SEED[m].kind, name: st.name, config: m === 'heatmap' ? { minutes: 3, prompt: 'Look around the site as you normally would.' } : SEED[m].config, eye: st.eye ?? SEED[m].eye }
     }
     case 'log_events': {
       const all = loadLocal(project())
@@ -118,15 +130,63 @@ export function localRpc(fn: string, a: Record<string, unknown>): unknown {
       saveLocal(project(), all)
       return evs.length
     }
-    case 'finish_run': return null
+    case 'finish_run': {
+      // An eye-tracking study's run without gaze doesn't count (as on the server).
+      const all = loadLocal(project())
+      const run = all.runs.find((r) => r.id === a.p_run)
+      if (run) { const st = studies(all).find((x) => x.id === run.study); if (st && moduleOf(all, st) === 'gaze' && !all.events.some((e) => e.r === run.id && e.kind === 'gaze')) { run.excluded = true; saveLocal(project(), all) } }
+      return null
+    }
+    case 'discard_run': {
+      const all = loadLocal(project())
+      all.runs = all.runs.filter((r) => r.id !== a.p_run); all.events = all.events.filter((e) => e.r !== a.p_run)
+      saveLocal(project(), all)
+      return null
+    }
+    case 'layout_seen': {
+      const all = loadLocal(project())
+      const page = String(a.p_page), lh = String(a.p_hash)
+      all.layouts ??= []
+      const mine = all.layouts.filter((l) => l.page === page)
+      let l = mine.find((x) => x.hashes.includes(lh))
+      if (!l) {
+        const i = matchLayout(a.p_fp as Fingerprint, mine.map((x) => x.fp))
+        l = i >= 0 ? mine[i] : undefined
+        if (!l) { l = { page, n: mine.length + 1, fp: a.p_fp as Fingerprint, since: Date.now(), hashes: [] }; all.layouts.push(l) }
+        l.hashes.push(lh)
+        saveLocal(project(), all)
+      }
+      return { n: l.n }
+    }
+    case 'snapshot_claim': {
+      const all = loadLocal(project())
+      const run = all.runs.find((r) => r.id === a.p_run)
+      if (!run || run.source === 'visitor') return null
+      const page = String(a.p_page)
+      const n = layoutNo(all, page, String(a.p_hash))
+      if (!n) return null
+      all.snaps ??= []
+      if (all.snaps.some((x) => x.page === page && x.n === n && x.device === a.p_device)) return null
+      const path = `${hex(4)}/${n}/${a.p_device}.${a.p_ext}`
+      all.snaps.push({ path, page, n, device: String(a.p_device), vw: Number(a.p_vw), width: Number(a.p_width), height: Number(a.p_height), scrollH: Number(a.p_scroll_h), boxes: (a.p_boxes ?? {}) as LSnap['boxes'] })
+      saveLocal(project(), all)
+      return path
+    }
+    case 'snapshot_done': {
+      const all = loadLocal(project())
+      const x = all.snaps?.find((y) => y.path === a.p_path)
+      if (x && localSnapshotUrl(project(), x.path)) { x.taken = Date.now(); saveLocal(project(), all); return true }
+      return false
+    }
     case 'heatmap_points': {
       const kind = a.p_kind === 'gaze' ? 'gaze' : 'click'
       const ids = new Map(s.runs.map((r, i) => [r.id, { n: i + 1, dev: device(r.vw), study: r.study ?? s.study.id }]))
-      const points = s.events.filter((e) => e.kind === kind && e.page === a.p_page && (!a.p_study || ids.get(e.r)?.study === a.p_study)).map((e) => ({
+      const out = new Set(s.runs.filter((r) => r.excluded).map((r) => r.id))
+      const points = s.events.filter((e) => e.kind === kind && e.page === a.p_page && !out.has(e.r) && (!a.p_study || ids.get(e.r)?.study === a.p_study)).map((e) => ({
         x: e.x, y: e.y, vw: e.vw, sel: e.sel ?? null, label: e.label ?? null, ex: e.ex ?? null, ey: e.ey ?? null, rage: !!e.rage, dead: !!e.dead,
-        p: ids.get(e.r)?.n ?? 0, t: e.t, dev: ids.get(e.r)?.dev ?? null, acc: null, ver: e.version ?? '',
+        p: ids.get(e.r)?.n ?? 0, t: e.t, dev: ids.get(e.r)?.dev ?? null, acc: null, ver: e.version ?? '', lay: layoutNo(s, String(a.p_page), e.lh),
       }))
-      return { studies: studies(s).map((x) => ({ id: x.id, name: x.name })), points, anchors: [] }
+      return { studies: studies(s).map((x) => ({ id: x.id, name: x.name })), points, anchors: [], layouts: (s.layouts ?? []).filter((l) => l.page === a.p_page).map((l) => ({ n: l.n, since: new Date(l.since).toISOString() })) }
     }
     default: throw err('no_server')
   }

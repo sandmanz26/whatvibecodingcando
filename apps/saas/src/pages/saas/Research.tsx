@@ -8,9 +8,10 @@ import { liveOf, openAsReviewer } from '../../saas/widget'
 import { reportHash } from '../../core/embed/hints'
 import { sampleGaze } from '../../saas/gaze-report'
 import { GazeReport } from './GazeReport'
+import { LayoutSplit, LocalPageHeat, groupByLayout, type Snap } from './SnapshotHeat'
 import { productOf } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
-import { clearStudyResults, deleteRun, deleteStudy, listStudies, makeDefaultStudy, projectSessions, revokeStudyLink, saveStudy, studyLink, studyModule, studyResults, type EventRow, type RunRow, type StudyKind, type StudyModule, type StudyRow } from '../../saas/cloud'
+import { pageLayouts, pageSnapshots, type LayoutRow, type SnapshotRow, clearStudyResults, deleteRun, deleteStudy, listStudies, makeDefaultStudy, projectSessions, revokeStudyLink, saveStudy, studyLink, studyModule, studyResults, type EventRow, type RunRow, type StudyKind, type StudyModule, type StudyRow } from '../../saas/cloud'
 import { localStudies, setLocalStudyOpen } from '../../core/embed/localheat'
 import { ago, usePanel } from './Panel'
 import { download, toCsv } from '../../saas/stats'
@@ -157,6 +158,7 @@ export function Research() {
                 <div className="up-row"><span className="lp-grow"><b>{demoRow.study.name}</b><small className="up-muted"> · {demoRow.runs} {demoRow.runs === 1 ? 'person' : 'people'}{demoRow.visitors ? ` (${demoRow.visitors} visitor${demoRow.visitors === 1 ? '' : 's'})` : ''}</small></span>{STAR}<span className={`up-badge ${demoRow.study.open ? '' : 'pending'}`}>{demoRow.study.open ? 'Open' : 'Paused'}</span></div>
                 <p className="up-muted">{DEFAULT_HELP}{demoRow.study.open ? '' : ' Paused: nothing is recorded, and visitors don’t see this module.'}</p>
                 <div className="up-row wrap"><button className="lp-btn sm ghost" onClick={() => { setLocalStudyOpen(project.id, m.id, !demoRow.study.open); redraw((n) => n + 1) }}>{demoRow.study.open ? 'Pause' : 'Resume'}</button>{(m.id === 'heatmap' || m.id === 'gaze') && <button className="lp-btn sm" data-view-heat={m.id === 'gaze' ? 'gaze' : 'click'} onClick={() => viewDemoHeat(m.id === 'gaze' ? 'gaze' : 'click')}>View heatmap <ExternalLink size={12} /></button>}{m.id === 'gaze' && <Link className="lp-btn sm ghost" to="/app/research/sample-gaze" data-sample-gaze="">See a sample report</Link>}</div>
+                {(m.id === 'heatmap' || m.id === 'gaze') && <LocalPageHeat project={project.id} kind={m.id === 'gaze' ? 'gaze' : 'click'} />}
               </li></ul>
             )}
             {cloud && rows && on(m.id) && !mine.some((s) => s.is_default) && <p className="up-muted">The default study appears after you update your site from Widget (or run the 2026-11-29 SQL). {mine.length ? 'Or make one of the studies below the default.' : ''}</p>}
@@ -307,6 +309,15 @@ export function StudyResults() {
   const [data, setData] = useState<{ runs: RunRow[]; events: EventRow[] } | null>(null)
   const [open, setOpen] = useState<string | null>(null)
   const [clearing, setClearing] = useState(false)
+  const [lays, setLays] = useState<{ layouts: LayoutRow[]; snaps: SnapshotRow[] }>({ layouts: [], snaps: [] })
+  useEffect(() => { if (project && cloud) void Promise.all([pageLayouts(project.id), pageSnapshots(project.id)]).then(([layouts, snaps]) => setLays({ layouts, snaps })).catch(() => {}) }, [project?.id])
+  const layoutOf = (e: { page: string; layout_hash?: string | null }) => { const l = e.layout_hash ? lays.layouts.find((x) => x.page === e.page && x.hashes.includes(e.layout_hash!)) : undefined; return { n: l?.n ?? 0, since: l?.created_at ?? null } }
+  const snapOf = (page: string, n: number, dev = 'desktop'): Snap | null => {
+    const l = lays.layouts.find((x) => x.page === page && x.n === n)
+    const all = l ? lays.snaps.filter((x) => x.layout_id === l.id) : []
+    const x = all.find((y) => y.device === dev) ?? all[0]
+    return x?.url ? { url: x.url, vw: x.vw, width: x.width, height: x.height, boxes: x.boxes } : null
+  }
   const load = () => {
     if (!project || !id || !cloud) return
     void listStudies(project.id).then((l) => setStudy(l.find((s) => s.id === id) ?? null))
@@ -400,7 +411,20 @@ export function StudyResults() {
               </section>
             )
           })()}
-          {data.events.some((e) => e.kind === 'gaze') && <GazeReport runs={runs} events={data.events} onView={(pg, k) => openHeat(pg, k === 'gaze')} />}
+          {data.events.some((e) => e.kind === 'gaze') && (() => {
+            // Layouts never mixed: a page with more than one layout becomes one report page per layout.
+            const multi = new Set(groupByLayout(data.events.filter((e) => e.kind === 'gaze'), layoutOf, () => null).filter((g) => g.length > 1).map((g) => g[0].page))
+            const tag = (e: EventRow) => (multi.has(e.page) ? { ...e, page: `${e.page} · ${layoutOf(e).n ? `layout ${layoutOf(e).n}` : 'unknown layout'}` } : e)
+            const snapFor = (key: string) => { const [pg, l] = key.split(' · layout '); return snapOf(pg, l ? Number(l) : (lays.layouts.filter((x) => x.page === pg).length === 1 ? 1 : 0)) }
+            return <GazeReport runs={runs} events={data.events.map(tag)} snapFor={snapFor} onView={(pg, k) => openHeat(pg.split(' · ')[0], k === 'gaze')} />
+          })()}
+          {clicks.length > 0 && (
+            <section className="up-card" data-snapshot-heat="">
+              <h2><Flame size={16} /> Heatmaps on your pages</h2>
+              <p className="up-muted">Clicks drawn on a snapshot of each page (form fields emptied, private parts greyed out). Each layout of a page has its own map; they are never mixed.</p>
+              <div className="sh-list">{groupByLayout(clicks, layoutOf, (pg, n) => snapOf(pg, n)).slice(0, 12).map((g) => <LayoutSplit key={g[0].page} groups={g} />)}</div>
+            </section>
+          )}
           <section className="up-card">
             <h2><Flame size={16} /> Clicks by page</h2>
             {!heatOn && <p className="up-warn"><TriangleAlert size={13} /> To see the heatmap over your page, turn on Heatmaps in Products and update your site.</p>}

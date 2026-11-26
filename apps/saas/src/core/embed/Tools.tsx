@@ -9,7 +9,7 @@ import { HOST_TAG, MAX_FILE, RULE_LABEL, applyTokens, dropProbe, inspect, pageTo
 import { NS } from './store'
 import { drawHeat, drawHeatGroups, LEGEND } from '../heat'
 import * as server from './server'
-import { deviceOf, prepare, type Anchor, type Device, type RawPt } from './heatmath'
+import { currentLayout, deviceOf, prepare, type Anchor, type Device, type RawPt } from './heatmath'
 import { binsToPoints, exposureWeight, fmtShare, place, rowOf, tagOfLabel, type Resolve } from '../heatstats'
 import { cleanSummary, compareViews, MIN_EXPOSURES, verName, versionsOf, viewOf, type Summary } from './heatsummary'
 import { defaultInvite, inviteUrl, labelOf, moduleInvite, pageOf, reviewerClicksOff, setReviewerClicksOff, type Invite } from './research'
@@ -365,6 +365,7 @@ function HeatmapTool({ project, onClose, report }: { project: string; onClose: (
   const [goodOnly, setGoodOnly] = useState(true)
   const [exposed, setExposed] = useState(false)
   const [ver, setVer] = useState<string | null>(null)
+  const [layoutNote, setLayoutNote] = useState<{ since: string; left: number } | null>(null)
   const [vs, setVs] = useState<string | null>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [top, setTop] = useState(0)
@@ -386,7 +387,7 @@ function HeatmapTool({ project, onClose, report }: { project: string; onClose: (
     const k = `${project}|${page}|${study}|${kind}`
     if (key0.current !== k) { key0.current = k; setData(null) }
     setError('')
-    const pts = server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[]; anchors?: Anchor[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null, p_kind: kind })
+    const pts = server.rpc<{ studies: { id: string; name: string }[]; points: HeatPt[]; anchors?: Anchor[]; layouts?: { n: number; since: string }[] }>('heatmap_points', { p_public_id: project, p_page: page, p_study: study || null, p_kind: kind })
     const sum = kind === 'click' ? server.rpc<unknown>('heatmap_summary', { p_public_id: project, p_page: page, p_study: study || null }).then(cleanSummary).catch(() => null) : Promise.resolve(null)
     Promise.all([pts, sum])
       .then(([d, summary]) => {
@@ -395,7 +396,10 @@ function HeatmapTool({ project, onClose, report }: { project: string; onClose: (
         const real = (d.points ?? []).length > 0
         if (!real && onDemoPage() && kind === 'click') { setSample(true); setData({ studies: d.studies ?? [], points: samplePoints(), anchors: [], summary: null }); return }
         setSample(false)
-        setData({ studies: d.studies ?? [], points: d.points ?? [], anchors: d.anchors ?? [], summary })
+        // A page whose layout changed: only the current layout's points (the summary mixes layouts, so it's left out).
+        const cur = currentLayout(d.points ?? [], d.layouts ?? [])
+        setLayoutNote(cur.since ? { since: cur.since, left: cur.left } : null)
+        setData({ studies: d.studies ?? [], points: cur.points, anchors: d.anchors ?? [], summary: cur.since ? null : summary })
       })
       .catch((e: Error) => {
         if (!live) return
@@ -507,6 +511,7 @@ function HeatmapTool({ project, onClose, report }: { project: string; onClose: (
               </div>
             )}
             <div className="vc-seg" role="group" aria-label="Device">{(['all', 'desktop', 'tablet', 'mobile'] as Device[]).map((d) => <button key={d} aria-pressed={device === d} onClick={() => setDevice(d)}>{d === 'all' ? 'All' : d[0].toUpperCase() + d.slice(1)}</button>)}</div>
+              {layoutNote && <p className="vc-muted" data-vc-layout-note="">Layout changed on {new Date(layoutNote.since).toLocaleDateString()}: showing the current layout only. {layoutNote.left} earlier point{layoutNote.left === 1 ? '' : 's'} are in your panel, split into before and after.</p>}
             {versions.length > 1 && (
               <label className="vc-q">Site version (never mixed)
                 <select value={version} onChange={(e) => setVer(e.target.value)}>{versions.map((v) => <option key={v.ver} value={v.ver}>{verName(v.ver)} · {v.people} {v.people === 1 ? 'person' : 'people'}</option>)}</select>

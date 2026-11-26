@@ -20,7 +20,7 @@ import wasmBinaryPath from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?ur
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
 
 export type { Features, Model, Quality, CalSample } from '../../core/gaze-model'
-export { startCamera, stopCamera, features, fit, predict, CALIBRATION, VALIDATION, QUICK, isBlink, headDrift, headWeight, stableFrames, calibrationOrder, validate, qualityOf, clickTeaches, CLICK_WEIGHT, SETTLE_MS, COLLECT_MS, RunMeter } from '../../core/gaze-model'
+export { startCamera, stopCamera, cameraError, liveTracks, features, fit, predict, CALIBRATION, VALIDATION, QUICK, isBlink, headDrift, headWeight, stableFrames, calibrationOrder, validate, qualityOf, clickTeaches, CLICK_WEIGHT, SETTLE_MS, COLLECT_MS, RunMeter } from '../../core/gaze-model'
 
 let landmarker: Promise<FaceLandmarker> | null = null
 
@@ -41,3 +41,12 @@ export function loadLandmarker(): Promise<FaceLandmarker> {
   return landmarker
 }
 
+
+/** A landmarker whose detect threw is closed and made again on the next start. */
+export function resetLandmarker() {
+  const l = landmarker
+  landmarker = null
+  void l?.then((x) => { try { x.close() } catch { /* already gone */ } }, () => {})
+}
+import { liveTracks as _lt } from '../../core/gaze-model'
+if (typeof window !== 'undefined') (window as unknown as { __vibeGazeTracks?: () => number }).__vibeGazeTracks = _lt

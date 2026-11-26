@@ -233,12 +233,17 @@ async function paged<T>(page: (from: number, to: number) => PromiseLike<{ data: 
   return out
 }
 
+/** layout_hash exists once 2026-12-01-snapshots-layouts.sql has run; read without it before. */
+let layoutCols = true
 /** The events of these runs, oldest first, at most `max` (20,000 by default). */
 async function eventsOf(ids: string[], max = 20000): Promise<EventRow[]> {
+  try { return await eventsOf0(ids, max) } catch (e) { if (!layoutCols) throw e; layoutCols = false; return eventsOf0(ids, max) }
+}
+async function eventsOf0(ids: string[], max: number): Promise<EventRow[]> {
   const events: EventRow[] = []
   for (let i = 0; i < ids.length && events.length < max; i += 100) {
     const chunk = ids.slice(i, i + 100)
-    events.push(...await paged<EventRow>((from, to) => supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit, x, y, vw').in('kind', ['click', 'page', 'gaze', 'door'])
+    events.push(...await paged<EventRow>((from, to) => supabase!.from('run_events').select(`run_id, t, task, kind, page, label, sel, rage, dead, hit, x, y, vw, ex, ey${layoutCols ? ', layout_hash' : ''}`).in('kind', ['click', 'page', 'gaze', 'door'])
       .in('run_id', chunk).order('run_id').order('t').order('id').range(from, to), max - events.length))
   }
   return events
@@ -376,7 +381,11 @@ export async function clearCloud(publicId: string, what: 'comments' | 'reviewers
   if (!id) throw new Error('This project isn’t on the server.')
   if (what === 'links') { const { error } = await supabase!.rpc('revoke_review_links', { p_project: id }); if (error) throw error; return }
   // Participants' runs: their clicks, gaze, answers and results go with them; the studies stay.
-  if (what === 'research') { const { error } = await supabase!.from('runs').delete().eq('project_id', id); if (error) throw error; return }
+  if (what === 'research') {
+    const { error } = await supabase!.from('runs').delete().eq('project_id', id); if (error) throw error
+    await clearSnapshots(publicId).catch(() => { /* before 2026-12-01-snapshots-layouts.sql: none */ })
+    return
+  }
   // Voice notes' audio goes with the comments (a server without voice notes has no such column).
   if (what === 'comments') {
     const { data } = await supabase!.from('threads').select('audio').eq('project_id', id).not('audio', 'is', null)
@@ -423,7 +432,7 @@ export interface StudyRow { id: string; kind: StudyKind; name: string; config: R
 export type StudyModule = 'heatmap' | 'gaze' | 'fivesec' | 'usability'
 export const studyModule = (s: Pick<StudyRow, 'kind' | 'eye_tracking' | 'module'>): StudyModule => s.module ?? (s.kind === 'usability' ? 'usability' : s.kind === 'fivesec' ? 'fivesec' : s.eye_tracking ? 'gaze' : 'heatmap')
 export interface RunRow { id: string; started_at: string; finished_at: string | null; device: string | null; vw: number | null; gaze_accuracy: number | null; result: { tasks?: { id: string; outcome: string; ms: number; pages?: string[]; clicks?: number; firstClickHit?: boolean | null }[]; answers?: string[] }; events: number }
-export interface EventRow { run_id: string; t: number; task: string | null; kind: 'click' | 'page' | 'gaze' | 'door'; page: string; label: string | null; sel: string | null; rage: boolean | null; dead: boolean | null; hit: boolean | null; /** page px, for the eye-tracking report's fixations and drift */ x?: number | null; y?: number | null; vw?: number | null }
+export interface EventRow { run_id: string; t: number; task: string | null; kind: 'click' | 'page' | 'gaze' | 'door'; page: string; label: string | null; sel: string | null; rage: boolean | null; dead: boolean | null; hit: boolean | null; /** page px, for the eye-tracking report's fixations and drift */ x?: number | null; y?: number | null; vw?: number | null; ex?: number | null; ey?: number | null; /** the page's layout fingerprint hash (absent: unknown layout) */ layout_hash?: string | null }
 
 export async function listStudies(publicId: string): Promise<StudyRow[]> {
   const id = dbIds.get(publicId)
@@ -457,10 +466,14 @@ export async function studyLink(id: string, days = 30): Promise<string> {
 export async function revokeStudyLink(id: string) { const { error } = await supabase!.rpc('revoke_study_link', { p_study: id }); if (error) throw error }
 /** A study's runs, and their events (the latest 20,000). */
 export async function studyResults(id: string): Promise<{ runs: RunRow[]; events: EventRow[] }> {
-  const { data: runs, error } = await supabase!.from('runs').select('id, started_at, finished_at, device, vw, gaze_accuracy, result, events').eq('study_id', id).order('started_at', { ascending: false }).limit(1000) // Supabase's per-request maximum
+  const read = (c: string) => supabase!.from('runs').select(c).eq('study_id', id).order('started_at', { ascending: false }).limit(1000) // Supabase's per-request maximum
+  let { data: runs, error } = await read('id, started_at, finished_at, device, vw, gaze_accuracy, result, events, excluded')
+  if (error) ({ data: runs, error } = await read('id, started_at, finished_at, device, vw, gaze_accuracy, result, events'))
   if (error) throw error
-  const events = await eventsOf((runs ?? []).map((r) => r.id as string))
-  return { runs: runs as RunRow[], events }
+  // Runs that can't count (an eye-tracking run without gaze) are left out of results.
+  const kept = ((runs ?? []) as unknown as (RunRow & { excluded?: boolean })[]).filter((r) => !r.excluded)
+  const events = await eventsOf(kept.map((r) => r.id))
+  return { runs: kept, events }
 }
 /** A page's heatmap pre-aggregated on the server over every event of the study (bounded: bins, elements, depth). */
 export async function studyHeatmap(id: string, page: string): Promise<unknown> {
@@ -537,4 +550,53 @@ export async function unsubscribeCloud(token: string): Promise<boolean> {
   const { data, error } = await supabase!.functions.invoke('send-emails', { body: { unsubscribe: token } })
   if (error) return false
   return !!(data as { ok?: boolean } | null)?.ok
+}
+
+/* ---------- layouts and page snapshots (2026-12-01-snapshots-layouts.sql) ---------- */
+
+export interface LayoutRow { id: string; page: string; n: number; created_at: string; hashes: string[] }
+export interface SnapshotRow { page: string; layout_id: string; device: string; path: string; width: number; height: number; scroll_h: number; vw: number; boxes: Record<string, [number, number, number, number]>; taken_at: string; url?: string }
+
+/** The project's page layouts with their fingerprint hashes ([] before the SQL file has run). */
+export async function pageLayouts(publicId: string): Promise<LayoutRow[]> {
+  const id = dbIds.get(publicId)
+  if (!id) return []
+  const ls = await paged<{ id: string; page: string; n: number; created_at: string }>((f, t) => supabase!.from('page_layouts').select('id, page, n, created_at').eq('project_id', id).order('page').order('n').order('id').range(f, t), 5000).catch(() => [])
+  if (!ls.length) return []
+  const hs = await paged<{ layout_id: string; hash: string }>((f, t) => supabase!.from('layout_hashes').select('layout_id, hash').eq('project_id', id).order('layout_id').order('hash').range(f, t), 20000).catch(() => [])
+  return ls.map((l) => ({ ...l, hashes: hs.filter((h) => h.layout_id === l.id).map((h) => h.hash) }))
+}
+/** The project's snapshots, each with a signed link for an hour (the bucket is private). */
+export async function pageSnapshots(publicId: string): Promise<SnapshotRow[]> {
+  const id = dbIds.get(publicId)
+  if (!id) return []
+  const { data, error } = await supabase!.from('page_snapshots').select('page, layout_id, device, path, width, height, scroll_h, vw, boxes, taken_at').eq('project_id', id).order('taken_at', { ascending: false }).limit(1000)
+  if (error || !data?.length) return []
+  const rows = data as SnapshotRow[]
+  const { data: urls } = await supabase!.storage.from('snapshots').createSignedUrls(rows.map((r) => r.path), 3600)
+  for (const u of urls ?? []) { const r = rows.find((x) => x.path === u.path); if (r && u.signedUrl) r.url = u.signedUrl }
+  return rows.filter((r) => r.url)
+}
+/** Deletes the project's snapshot pictures and their records (Settings → Data, Clear research). */
+export async function clearSnapshots(publicId: string) {
+  const id = dbIds.get(publicId)
+  if (!id) return
+  const { data } = await supabase!.from('page_snapshots').select('path').eq('project_id', id).limit(1000)
+  const files = ((data ?? []) as { path: string }[]).map((r) => r.path)
+  for (let i = 0; i < files.length; i += 100) await supabase!.storage.from('snapshots').remove(files.slice(i, i + 100)).catch(() => {})
+  await supabase!.from('page_snapshots').delete().eq('project_id', id)
+}
+/** "Save page snapshots" for a project (null before the SQL file has run). */
+export async function getSnapshotsOn(publicId: string): Promise<boolean | null> {
+  const id = dbIds.get(publicId)
+  if (!id) return null
+  const { data, error } = await supabase!.from('projects').select('snapshots').eq('id', id).maybeSingle()
+  return error || !data ? null : !!(data as { snapshots: boolean }).snapshots
+}
+export async function setSnapshotsOn(publicId: string, on: boolean) {
+  const id = dbIds.get(publicId)
+  if (!id) throw new Error('This project isn’t on the server.')
+  const { error } = await supabase!.from('projects').update({ snapshots: on }).eq('id', id)
+  if (error) throw error
+  if (!on) await clearSnapshots(publicId)
 }

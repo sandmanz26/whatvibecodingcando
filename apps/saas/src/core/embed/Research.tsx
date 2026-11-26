@@ -51,7 +51,7 @@ export function VisitorConsent({ project, m, accent, gazeUrl, onStart, onCancel 
 import { useEffect, useRef, useState } from 'react'
 import { Check, Eye, Flag, Timer, X } from 'lucide-react'
 import { OneEuro } from '../gaze-analysis'
-import { Recorder, pageOf, cleanConfig, finishRun, pageMatches, saveRun, startRun, startVisitorRun, type Door, type Outcome, type RunState, type VisitorModule } from './research'
+import { Recorder, pageOf, cleanConfig, discardRun, eyeIsRequired, finishRun, pageMatches, saveRun, startRun, startVisitorRun, type Door, type Outcome, type RunState, type VisitorModule } from './research'
 
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const KIND_LABEL = { usability: 'tasks on this site', fivesec: 'a 5-second test', browse: 'a short visit' } as const
@@ -67,7 +67,8 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
   const [, tick] = useState(0)
   const stRef = useRef(st)
   stRef.current = st
-  const update = (next: RunState) => { setSt(next); saveRun(project, next.phase === 'declined' ? null : next); if (next.phase === 'declined') onEnd?.() }
+  useEffect(() => () => stopEyes(), [])
+  const update = (next: RunState) => { setSt(next); saveRun(project, next.phase === 'declined' ? null : next); if (next.phase === 'declined') { stopEyes(); onEnd?.() } }
 
   const tasks = st.config?.tasks ?? []
   const task = st.kind === 'usability' ? tasks[st.index] : undefined
@@ -115,7 +116,8 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
         setSt(next); saveRun(project, next)
         const rule = s.kind === 'usability' ? s.config?.tasks?.[s.index]?.success : undefined
         if (rule?.kind === 'page' && pageMatches(rule.page, page)) window.setTimeout(() => endTask('success'), 300)
-      }, version)
+      // Snapshots: participants who came with a study link (told so on the consent screen), never visitors.
+      }, version, !!s0.token)
     recRef.current = rec
     rec.start(() => (stRef.current.kind === 'usability' ? stRef.current.config?.tasks?.[stRef.current.index]?.id : stRef.current.kind), (el) => {
       const rule = stRef.current.config?.tasks?.[stRef.current.index]?.success
@@ -168,7 +170,8 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
           <ul className="vc-list">
             <li><Check size={14} /> Recorded: where you click, which pages you open, and how long things take.</li>
             <li><Check size={14} /> Never recorded: what you type into this site, your screen as video, or your camera.</li>
-            {info?.eye && <li><Eye size={14} /> You’ll also be asked whether to use your camera for eye tracking. Video stays in your browser; only where you look on the page is saved. You can say no.</li>}
+            {info?.eye && <li><Eye size={14} /> You’ll also be asked whether to use your camera for eye tracking. Video stays in your browser; only where you look on the page is saved. {info.kind === 'browse' ? 'This study needs the camera: without it, nothing is recorded.' : 'You can say no and still do the test.'}</li>}
+            <li><Check size={14} /> The site may save one picture of a page as it looks (for the team’s heatmap), with every form field emptied and private parts greyed out.</li>
             <li><Check size={14} /> Only for this study, in this tab. Close the tab to stop at any time.</li>
           </ul>
           {error && <p className="vc-bad">{error}</p>}
@@ -181,8 +184,25 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
       </div>
     )
   }
-  if (st.phase === 'eyes') return <div className="vc" style={style}><EyeSetup gazeUrl={gazeUrl} onDone={(eye) => update({ ...st, phase: 'intro', eye })} /></div>
-  const eyes = recording && st.eye?.on && st.eye.model ? <EyeTracker gazeUrl={gazeUrl} model={st.eye.model} calib={st.eye.calib ?? []} accuracy={st.eye.accuracy} rec={recRef} onDrift={setHeadFar} task={task?.id ?? st.kind} onLost={setFaceLost} onFail={() => update({ ...stRef.current, eye: { ...stRef.current.eye!, on: false } })} /> : null
+  // Eye tracking study (its module is Eye tracking: kind browse with eye tracking): the camera is
+  // required, so saying no (or no camera, or calibration abandoned) ends it and the run is discarded.
+  // Eye tracking added to a usability or 5-second test is optional: the test goes on without gaze.
+  const eyeRequired = eyeIsRequired(st.kind)
+  const noCamera = () => { const run = stRef.current.run; stopEyes(); if (run) void discardRun(run).catch(() => {}); recRef.current = null; update({ ...stRef.current, phase: 'nocam', run: undefined, eye: { on: false } }); saveRun(project, null) }
+  if (st.phase === 'eyes') return <div className="vc" style={style}><EyeSetup gazeUrl={gazeUrl} required={eyeRequired} onDone={(eye) => (eyeRequired && !eye?.on ? noCamera() : update({ ...st, phase: 'intro', eye }))} /></div>
+  if (st.phase === 'nocam') {
+    return (
+      <div className="vc vc-scrim" style={style}>
+        <div className="vc-modal" role="dialog" aria-label="Eye tracking" data-vc-nocam="">
+          <span className="vc-kicker">Eye tracking</span>
+          <h2>Eye tracking needs your camera. Nothing was recorded.</h2>
+          <p>This study is about where people look, so it can’t run without the camera. You can carry on using the site as normal.</p>
+          <div className="vc-row"><span className="vc-grow" /><button className="vc-btn primary" onClick={() => update({ ...st, phase: 'declined' })}><X size={13} /> Back to the site</button></div>
+        </div>
+      </div>
+    )
+  }
+  const eyes = recording && st.eye?.on && st.eye.model ? <EyeTracker gazeUrl={gazeUrl} model={st.eye.model} calib={st.eye.calib ?? []} accuracy={st.eye.accuracy} rec={recRef} onDrift={setHeadFar} task={task?.id ?? st.kind} onLost={setFaceLost} onFail={() => (eyeRequired ? noCamera() : update({ ...stRef.current, eye: { ...stRef.current.eye!, on: false } }))} /> : null
   if (st.phase === 'intro') {
     const prompt = st.kind === 'usability' ? task?.prompt : st.config?.prompt
     return (
@@ -311,25 +331,36 @@ type Gaze = typeof import('./gaze-entry')
 let gazeMod: Promise<Gaze> | null = null
 const loadGaze = (url: string) => (gazeMod ??= import(/* @vite-ignore */ url) as Promise<Gaze>)
 let cam: { stream: MediaStream; video: HTMLVideoElement } | null = null
+/**
+ * The hidden <video> lives in one container in the widget's shadow root, not inside a component
+ * that unmounts. Every start stops the earlier stream and asks for the camera fresh; a stream is
+ * reused only while its track is live and the video has frames.
+ */
 async function camera(g: Gaze, host: HTMLElement): Promise<HTMLVideoElement> {
-  if (cam && cam.stream.active) return cam.video
+  const tr = cam?.stream.getVideoTracks()[0]
+  if (cam && tr?.readyState === 'live' && cam.video.isConnected && cam.video.readyState >= 2) return cam.video
+  stopEyes()
+  const root = host.getRootNode() as ShadowRoot | Document
+  let box = (root as ParentNode).querySelector?.('.vc-camhold') as HTMLElement | null
+  if (!box) { box = document.createElement('div'); box.className = 'vc-camhold vc-cambox'; box.setAttribute('aria-hidden', 'true'); ((root as ShadowRoot).host ? root : document.body).appendChild(box) }
   const video = document.createElement('video')
   video.className = 'vc-cam'
-  host.appendChild(video)
-  const stream = await g.startCamera(video)
-  cam = { stream, video }
+  box.appendChild(video)
+  try { cam = { stream: await g.startCamera(video), video } } catch (e) { video.remove(); throw e }
   return video
 }
 /** The current run's eye-tracking meter (data loss, head movement, ms per frame). */
 let eyeMeter: import('../gaze-model').RunMeter | null = null
-function stopEyes() { if (cam) { cam.stream.getTracks().forEach((t) => t.stop()); cam.video.remove(); cam = null } }
+function stopEyes() { if (cam) { cam.stream.getTracks().forEach((t) => t.stop()); cam.video.srcObject = null; cam.video.remove(); cam = null } }
+// Leaving the page always lets the camera go.
+if (typeof window !== 'undefined') { window.addEventListener('pagehide', stopEyes); window.addEventListener('beforeunload', stopEyes) }
 
 /**
  * Asks, starts the camera, calibrates (13 dots in random order) and checks accuracy on 5 new dots.
  * Each dot: frames for 1 s after the click, the first 300 ms dropped, then blinks and glances away.
  * Poor accuracy: five more dots are offered once, then the check runs again.
  */
-function EyeSetup({ gazeUrl, onDone }: { gazeUrl: string; onDone: (eye: RunState['eye']) => void }) {
+function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; required?: boolean; onDone: (eye: RunState['eye']) => void }) {
   const [phase, setPhase] = useState<'ask' | 'loading' | 'calibrate' | 'validate' | 'result' | 'error'>('ask')
   const [step, setStep] = useState(0)
   const [hint, setHint] = useState('')
@@ -339,6 +370,9 @@ function EyeSetup({ gazeUrl, onDone }: { gazeUrl: string; onDone: (eye: RunState
   const [order, setOrder] = useState<{ x: number; y: number }[]>([])
   const box = useRef<HTMLDivElement>(null)
   const ref = useRef<{ g: Gaze; lm: Awaited<ReturnType<Gaze['loadLandmarker']>>; video: HTMLVideoElement; samples: import('../gaze-model').CalSample[]; model?: import('../gaze-model').Model; checks: { x: number; y: number; frames: number[][] }[] } | null>(null)
+  const ok = useRef(false)
+  // Leaving the setup without finishing it lets the camera go.
+  useEffect(() => () => { if (!ok.current) stopEyes() }, [])
   const start = async () => {
     setPhase('loading')
     try {
@@ -348,7 +382,8 @@ function EyeSetup({ gazeUrl, onDone }: { gazeUrl: string; onDone: (eye: RunState
       setOrder(g.calibrationOrder()); setStep(0); setPhase('calibrate')
     } catch (e) {
       stopEyes()
-      setHint(!window.isSecureContext || !navigator.mediaDevices ? 'The camera only works on a secure (https) page.' : /Permission|NotAllowed/i.test(String((e as Error).name ?? e)) ? 'The camera wasn’t allowed.' : /NotFound|Overconstrained/i.test(String((e as Error).name ?? e)) ? 'No camera was found.' : 'Eye tracking couldn’t start on this device.')
+      if (gazeMod) void gazeMod.then((g) => g.resetLandmarker()).catch(() => {})
+      setHint(gazeMod ? await gazeMod.then((g) => g.cameraError(e)).catch(() => 'Eye tracking couldn’t start on this device.') : 'Eye tracking couldn’t start on this device.')
       setPhase('error')
     }
   }
@@ -394,27 +429,28 @@ function EyeSetup({ gazeUrl, onDone }: { gazeUrl: string; onDone: (eye: RunState
       <div ref={box} className="vc-cambox" aria-hidden />
       {(phase === 'calibrate' || phase === 'validate') && dot ? (
         <div className="vc-calib">
-          <div className="vc-taskbar" role="status"><span className="vc-kicker">{phase === 'calibrate' ? 'Calibrating' : 'Checking'} · {step + 1} of {dots.length}</span><span className="vc-taskprompt">Look at the dot, then click it.</span><button className="vc-btn" onClick={skip}>Skip eye tracking</button></div>
+          <div className="vc-taskbar" role="status"><span className="vc-kicker">{phase === 'calibrate' ? 'Calibrating' : 'Checking'} · {step + 1} of {dots.length}</span><span className="vc-taskprompt">Look at the dot, then click it.</span><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Skip eye tracking'}</button></div>
           {hint && <div className="vc-toast error" role="alert">{hint}</div>}
           <button className="vc-dot" style={{ left: `${dot.x * 100}%`, top: `${dot.y * 100}%` }} onClick={() => void hit()} aria-label={`Calibration dot ${step + 1}`} />
         </div>
       ) : (
         <div className="vc-scrim">
           <div className="vc-modal" role="dialog" aria-label="Eye tracking">
-            <span className="vc-kicker">Optional</span>
+            <span className="vc-kicker">{required ? 'Needed for this study' : 'Optional'}</span>
             {phase === 'result' ? <>
               <h2>Eye tracking is ready</h2>
-              <p>On new dots the estimate was on average <b>{accuracy} px</b>{q ? ` (${q.accuracyDeg}°)` : ''} from where you looked ({grade === 'good' ? 'good' : grade === 'rough' ? 'rough, still useful' : quickUsed ? 'poor: try again with more light, or go on without' : 'poor: five more dots usually help'}).</p>
-              <div className="vc-row"><button className="vc-btn" onClick={skip}>Go on without</button><span className="vc-grow" />
+              <p>On new dots the estimate was on average <b>{accuracy} px</b>{q ? ` (${q.accuracyDeg}°)` : ''} from where you looked ({grade === 'good' ? 'good' : grade === 'rough' ? 'rough, still useful' : quickUsed ? (required ? 'poor: try again with more light' : 'poor: try again with more light, or go on without') : 'poor: five more dots usually help'}).</p>
+              <div className="vc-row"><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Continue the test without eye tracking'}</button><span className="vc-grow" />
                 {grade === 'poor' && !quickUsed
                   ? <button className="vc-btn" onClick={() => { ref.current!.checks = []; setQuickUsed(true); setOrder(ref.current!.g.QUICK); setStep(0); setPhase('calibrate') }}>Five more dots</button>
                   : <button className="vc-btn" onClick={() => { ref.current!.samples = []; ref.current!.checks = []; setQuickUsed(false); setOrder(ref.current!.g.calibrationOrder()); setStep(0); setPhase('calibrate') }}>Calibrate again</button>}
-                <button className="vc-btn primary" onClick={() => onDone({ on: true, model: ref.current!.model, accuracy, accuracyDeg: q?.accuracyDeg, precision: q?.precision, distance: q?.distance, calib: ref.current!.samples.map((x) => ({ f: x.f.map((v) => Math.round(v * 1e5) / 1e5), x: Math.round(x.x), y: Math.round(x.y) })) })}>Continue</button></div>
+                <button className="vc-btn primary" onClick={() => { ok.current = true; onDone({ on: true, model: ref.current!.model, accuracy, accuracyDeg: q?.accuracyDeg, precision: q?.precision, distance: q?.distance, calib: ref.current!.samples.map((x) => ({ f: x.f.map((v) => Math.round(v * 1e5) / 1e5), x: Math.round(x.x), y: Math.round(x.y) })) }) }}>Continue</button></div>
             </> : <>
               <h2>Use your camera for eye tracking?</h2>
               <p>It estimates where on the page you look. Video stays in your browser and is never saved or sent; only the points you look at are. First a short calibration: look at 13 dots and click each, then 5 more to measure accuracy. About a minute.</p>
-              {phase === 'error' && <p className="vc-bad">{hint} You can go on without it.</p>}
-              <div className="vc-row"><span className="vc-grow" /><button className="vc-btn" onClick={skip}>No, go on without</button>{phase !== 'error' && <button className="vc-btn primary" disabled={phase === 'loading'} onClick={() => void start()}>{phase === 'loading' ? 'Starting the camera…' : 'Turn on the camera'}</button>}</div>
+              {required && <p>This study is about where people look: it needs the camera. If you say no, nothing is recorded.</p>}
+              {phase === 'error' && <p className="vc-bad">{hint} {required ? '' : 'You can continue the test without it.'}</p>}
+              <div className="vc-row"><span className="vc-grow" /><button className="vc-btn" onClick={skip} data-vc-eye-skip="">{required ? 'No thanks' : 'Continue the test without eye tracking'}</button>{phase !== 'error' && <button className="vc-btn primary" disabled={phase === 'loading'} onClick={() => void start()}>{phase === 'loading' ? 'Starting the camera…' : 'Turn on the camera'}</button>}</div>
             </>}
           </div>
         </div>
@@ -462,7 +498,8 @@ function EyeTracker({ gazeUrl, model, calib, accuracy, rec, task, onFail, onLost
         off = () => document.removeEventListener('pointerdown', click, true)
         iv = window.setInterval(() => {
           const now = performance.now()
-          const f = g.features(lm, video, now)
+          let f: number[] | null
+          try { f = g.features(lm, video, now) } catch { window.clearInterval(iv); g.resetLandmarker(); stopEyes(); if (live) onFail(); return }
           const ms = performance.now() - now
           if (!f) { meter.frame('lost', ms); misses++; if (misses >= 15 && !lost) { lost = true; onLost(true) }; return }
           if (lost) { lost = false; onLost(false); fx.reset(); fy.reset() }
@@ -480,9 +517,9 @@ function EyeTracker({ gazeUrl, model, calib, accuracy, rec, task, onFail, onLost
           const el = document.elementFromPoint(x, y)
           rec.current?.gaze(x + window.scrollX, y + window.scrollY, task, el && !/^vibe-collab/i.test(el.tagName) ? el : null)
         }, 200)
-      } catch { if (live) onFail() }
+      } catch { if (gazeMod) void gazeMod.then((g) => g.resetLandmarker()).catch(() => {}); if (live) onFail() }
     })()
-    return () => { live = false; window.clearInterval(iv); off(); onLost(false); onDrift?.(false) }
+    return () => { live = false; window.clearInterval(iv); off(); stopEyes(); onLost(false); onDrift?.(false) }
   }, [gazeUrl, model, task]) // eslint-disable-line react-hooks/exhaustive-deps
   return <div ref={box} className="vc-cambox" aria-hidden />
 }

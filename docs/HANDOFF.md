@@ -44,6 +44,7 @@ Centang di sini setiap kali selesai. ✅ = sudah dikonfirmasi pemilik/tes, ⬜ =
 | `2026-11-28-default-heatmap.sql` | heatmap otomatis: studi "Site heatmap", klik reviewer/tim, link undangan (jalankan setelah install-flow) | ⬜ |
 | `2026-11-28-demo-origin.sql` | demo di ourhunch.com bisa dipakai link review | ⬜ |
 | `2026-11-29-default-studies.sql` | satu studi default ★ per modul riset, pengunjung di mode Everyone (persetujuan satu klik), pengunjung tidak bisa membaca hasil (jalankan setelah demo-origin) | ⬜ |
+| `2026-12-01-snapshots-layouts.sql` | eye tracking wajib kamera (run tanpa gaze dikecualikan, `discard_run`), versi layout per halaman, snapshot halaman + bucket privat `snapshots` + policy (jalankan setelah default-studies). Kalau baris `insert into storage.buckets` ditolak: buat bucket manual (lihat README Supabase "Page snapshots") lalu jalankan ulang | ⬜ |
 
 Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into public.platform_admins (user_id) select id from auth.users where email = '<email>';` ✅
 
@@ -88,10 +89,34 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - PostHog `visitor_consented` **tidak dibuat**: aturan proyek melarang PostHog di script yang berjalan di situs pelanggan. Yang dikirim dari panel: `study_added`, `study_default_changed` (id/modul saja).
 - **Hasil dibaca di dashboard**, bukan di situs: tombol Heatmap di widget = partisipasi (+ link ke panel); overlay hasil hanya terbuka lewat *View heatmap* di panel. Item menu untuk modul yang mati **disembunyikan** (bukan diredupkan) agar menu pendek; halaman Research tetap menunjukkan modul "Off".
 - Ditahan: "Fixed, please check", error konsol di komentar, MCP.
+- **Eye tracking wajib kamera di modul Eye tracking**: menolak kamera / tanpa kamera / kalibrasi dihentikan = partisipasi selesai, run dihapus, pesan "Eye tracking needs your camera. Nothing was recorded.". Di server run modul gaze tanpa titik gaze ditandai `excluded` dan tidak dihitung. Hanya di studi lain (usability/5-detik dengan eye tracking tambahan) boleh lanjut: "Continue the test without eye tracking".
+- **Snapshot halaman**: ON untuk proyek baru, **OFF untuk proyek lama** (instalasi lama tidak berubah). Hanya dari tim/reviewer/peserta lewat link (diberi tahu di layar persetujuan), tidak pernah dari pengunjung biasa. Selalu disamarkan. Mematikan setting menghapus snapshot tersimpan.
+- **Versi layout otomatis**: hasil tidak pernah dicampur antar layout; data lama = "unknown layout".
 
 ---
 
 ## 4. Log perubahan (terbaru di atas)
+
+### 1 Des 2026 — eye tracking wajib kamera, kamera bisa dipakai berulang, versi layout, snapshot halaman
+**Yang berubah**
+- **Bug eye tracking tanpa kamera (diperbaiki)**: di studi Eye tracking, "No, go on without" dulu meneruskan run tanpa gaze. Sekarang tombolnya "No thanks" (label "Needed for this study"); menolak, kamera tidak ada/ditolak, atau berhenti saat kalibrasi → pesan jujur + "Back to the site", run dihapus (`discard_run`). Di server `finish_run` menandai run modul gaze tanpa gaze `excluded`; heatmap, ringkasan, laporan gaze dan hasil studi mengabaikannya. Usability/5-detik dengan eye tracking tambahan: "Continue the test without eye tracking".
+- **Bug kamera hanya jalan ±2 kali (diperbaiki)**: `<video>` tersembunyi kini di satu wadah tetap di shadow root; setiap mulai menghentikan stream lama lalu meminta kamera baru (timeout 15 dtk, pesan untuk NotReadable "Your camera is being used by another app or tab", Abort, Timeout, play() gagal); kamera dimatikan saat unmount, tolak, selesai, `pagehide`/`beforeunload`; timestamp MediaPipe selalu naik antar run; landmarker yang error ditutup dan dibuat ulang. Sama di konsol (`GazeRunner.tsx`, `engine.ts`, `gaze-model.ts`).
+- **Versi layout**: widget menghitung sidik struktur halaman (tag, landmark, atribut stabil, jumlah; tanpa teks). Kemiripan < 0,8 = layout baru. Setiap event membawa hash layout. Panel memisah hasil per halaman+layout: "Layout changed on … — results split into before/after" + Compare; overlay di situs hanya menampilkan layout terbaru.
+- **Snapshot halaman**: sekali per (proyek, halaman, layout, perangkat) dari browser tim/reviewer/peserta link: DOM disalin + gaya, disamarkan (field kosong, `data-private`/frame situs lain abu-abu, email/nomor diganti), digambar ke WebP/JPEG ≤ 1280 px lebar, ≤ 4000 px tinggi, ≤ 580 KB (halaman tes: 7 KB). Disimpan di bucket privat `snapshots` (satu path per klaim, rate limit 5/jam/orang); panel membaca lewat signed URL. Heatmap klik dan laporan eye tracking digambar di atas snapshot (titik yang terikat elemen memakai peta kotak elemen); tanpa snapshot → skema abu-abu. Setting baru Settings → *Save page snapshots*.
+- Widget app +18 KB (423 KB mentah, 132 KB gzip); loader `vibe.js` tetap 1.558 byte; snippet tidak berubah.
+- Tes: `tests/layout.test.ts`, `supabase/tests/snapshots_layouts_test.sql`, e2e `tests/e2e/snapshots-layouts.mjs` dan `camera-runs.mjs` (kamera palsu Chromium, 5× widget + 5× konsol, tidak ada track kamera tersisa).
+
+**Yang harus dilakukan pemilik**
+1. Jalankan `2026-12-01-snapshots-layouts.sql` (setelah `2026-11-29-default-studies.sql`). Cek Storage → bucket `snapshots` private. Tidak ada Edge Function baru.
+2. Deploy (push ke main sudah). Snippet pelanggan tidak perlu diganti.
+3. Proyek lama: kalau mau snapshot, nyalakan *Save page snapshots* di Settings.
+
+**Belum terverifikasi**
+- Belum dicoba di Supabase sungguhan: upload ke storage dari widget (policy `can_write_snapshot`), signed URL di panel, `insert into storage.buckets` di SQL editor.
+- Kualitas gambar snapshot di situs nyata: font web dan gambar dari CDN lain tidak ikut (kotak abu-abu); Safari menggambar foreignObject secara berbeda (bisa gagal → tidak ada snapshot, hasil tetap tampil di skema).
+- Tes kamera ulang memuat ulang halaman di setiap run; mulai-berhenti berkali-kali tanpa reload di halaman yang sama hanya dites secara manual-logika. Model wajah (GPU) di headless tidak diverifikasi; tes memeriksa kamera dan frame.
+- Ringkasan heatmap server (`heatmap_summary`) belum dipisah per layout; overlay memakai titik mentah (≤ 20.000) bila layout pernah berubah.
+- Membersihkan hasil satu studi tidak menghapus snapshot (snapshot milik proyek); hapus lewat Settings → Data atau mematikan setting.
 
 ### 30 Nov 2026 — menu panel, laporan eye tracking, hasil hanya dari dashboard
 - **Menu kiri** didesain ulang: Overview · Setup · **Feedback** (Comments, Component reviews, Voice notes, Rounds, Report) · **Research** (All studies, Usability tests, 5-second tests, Heatmaps, Eye tracking, Participant paths) · Reviewers · Settings · User guide. Bug lama: `?module=` diabaikan sehingga 5 item tersorot sekaligus; sekarang **tepat satu** item aktif (halaman hasil studi → "All studies"). Badge jumlah di grup dihapus (tidak berguna). Alamat lama tetap jalan (termasuk `?kind=eyes`).

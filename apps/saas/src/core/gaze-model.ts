@@ -23,16 +23,44 @@ import type { FaceLandmarker, NormalizedLandmark } from '@mediapipe/tasks-vision
 
 export type Features = number[]
 
+/** Streams this module started and hasn't stopped: every start stops the earlier ones first. */
+const live = new Set<MediaStream>()
+/** Live camera tracks this page holds (tests check nothing leaks between runs). */
+export const liveTracks = () => [...live].reduce((n, s) => n + s.getTracks().filter((t) => t.readyState === 'live').length, 0)
+const timeout = <T,>(p: Promise<T>, ms: number, what: string) => new Promise<T>((res, rej) => {
+  const t = setTimeout(() => rej(Object.assign(new Error(what), { name: 'TimeoutError' })), ms)
+  p.then((v) => { clearTimeout(t); res(v) }, (e) => { clearTimeout(t); rej(e) })
+})
+/**
+ * Starts the camera fresh into `video`: any stream started before is stopped first (a stream is
+ * never reused), getUserMedia gives up after 15 s, and a failed play() stops the new stream.
+ */
 export async function startCamera(video: HTMLVideoElement): Promise<MediaStream> {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false })
-  video.srcObject = stream
-  video.muted = true
-  video.playsInline = true
-  await video.play()
+  for (const s of live) stopCamera(s)
+  const stream = await timeout(navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }, audio: false }), 15000, 'camera_timeout')
+  live.add(stream)
+  try {
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+    await timeout(video.play(), 15000, 'camera_timeout')
+  } catch (e) { stopCamera(stream); video.srcObject = null; throw e }
   return stream
 }
 
-export const stopCamera = (stream: MediaStream | null) => stream?.getTracks().forEach((t) => t.stop())
+export const stopCamera = (stream: MediaStream | null) => { if (!stream) return; stream.getTracks().forEach((t) => t.stop()); live.delete(stream) }
+
+/** A plain sentence for why the camera didn't start. */
+export function cameraError(e: unknown): string {
+  const n = String((e as Error)?.name ?? e)
+  if (typeof window !== 'undefined' && (!window.isSecureContext || !navigator.mediaDevices)) return 'The camera only works on a secure (https) page.'
+  if (/NotAllowed|Permission|Security/i.test(n)) return 'The camera wasn’t allowed.'
+  if (/NotFound|Overconstrained/i.test(n)) return 'No camera was found.'
+  if (/NotReadable/i.test(n)) return 'Your camera is being used by another app or tab.'
+  if (/Abort/i.test(n)) return 'The camera stopped while starting. Try again.'
+  if (/Timeout/i.test(n)) return 'The camera took too long to start. Try again.'
+  return 'Eye tracking couldn’t start on this device.'
+}
 
 /* ---------- features ---------- */
 
@@ -76,8 +104,12 @@ export function featuresOf(face: P[], m?: ArrayLike<number> | null): Features | 
 }
 
 /** One frame → a feature vector, or null when no face (or no irises) is found. */
+/** MediaPipe throws when a frame's timestamp isn't later than the last one (across runs too). */
+let lastTs = 0
 export function features(lm: FaceLandmarker, video: HTMLVideoElement, at: number): Features | null {
-  const r = lm.detectForVideo(video, at)
+  if (video.readyState < 2) return null
+  const ts = Math.max(Math.round(at), lastTs + 1); lastTs = ts
+  const r = lm.detectForVideo(video, ts)
   return featuresOf(r.faceLandmarks[0] as NormalizedLandmark[], r.facialTransformationMatrixes?.[0]?.data)
 }
 

@@ -424,3 +424,21 @@ Prioritas: **P0** (tidak bisa daftar/login, data hilang, data bocor) → perbaik
 - [ ] Lebar ponsel (390px): tidak ada scroll horizontal, teks terbaca.
 - [ ] Dengan/ tanpa `VITE_POSTHOG_KEY`: bagian Analytics berubah sesuai.
 - [ ] Semua teks widget, panel dan email berbahasa Inggris.
+
+## Snapshot halaman, versi layout, eye tracking wajib kamera (1 Des 2026)
+
+Otomatis:
+- [ ] `node apps/saas/tests/layout.test.ts` → 6 tes lulus (perubahan kecil = layout sama, redesign = layout baru, teks diabaikan, penempatan titik di snapshot, email/nomor disamarkan).
+- [ ] `bash apps/saas/supabase/tests/run.sh` → `snapshots_layouts_test.sql` ALL PASS (run eye tracking tanpa gaze dikecualikan, decline menghapus run, layout 1/2, satu snapshot per halaman+layout+perangkat, bucket privat, orang luar tidak melihat apa pun).
+- [ ] `apps/saas/tests/e2e`: `node serve.mjs &`, lalu `node snapshots-layouts.mjs` dan `node camera-runs.mjs` → ALL PASS.
+
+Manual (dengan server):
+- [ ] Jalankan `2026-12-01-snapshots-layouts.sql`. Storage → bucket `snapshots` ada dan **private**.
+- [ ] Settings proyek lama: *Save page snapshots* = **Off**. Proyek baru: **On**.
+- [ ] Proyek baru → Open my site → buka 2–3 halaman, tunggu ±5 detik → di Research hasil studi, "Heatmaps on your pages" memperlihatkan gambar halaman (field form kosong, bagian `data-private` abu-abu).
+- [ ] Ubah struktur satu halaman (mis. tambah section/aside), buka lagi → muncul "Layout changed on … — results split into before/after", tombol Layout 1/Layout 2 dan Compare.
+- [ ] Teks halaman saja yang berubah → tidak ada layout baru.
+- [ ] Studi Eye tracking lewat link → I agree → **No thanks** → pesan "Eye tracking needs your camera. Nothing was recorded." → *Back to the site*. Di panel tidak ada peserta baru.
+- [ ] Usability test dengan eye tracking sebagai tambahan → tombol **Continue the test without eye tracking** → tugas tetap berjalan.
+- [ ] Eye tracking 5× berturut-turut (mulai, kalibrasi, berhenti) di laptop yang sama → kamera selalu menyala lagi; lampu kamera mati setiap kali berhenti.
+- [ ] Matikan *Save page snapshots* → snapshot yang tersimpan terhapus; heatmap kembali ke skema abu-abu.

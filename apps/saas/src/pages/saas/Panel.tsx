@@ -10,7 +10,7 @@ import { addAddress, draftOf, liveOf, openAsReviewer, publishProducts, releasabl
 import { InstallCheck, InstallSteps, StrayBanner } from './InstallFlow'
 import { SAAS_ERROR, canHash, checkPassword, freeId, hashPassword, isOnboarded, isSignedIn, newProject, originOf, passwordProblem, slug, useSaas, useSaasReady, validEmail, type Project, type SaasState, type Notify } from '../../saas/account'
 import { cloud, supabase, authMessage, anonymousSignInsOn, captcha } from '../../saas/supabase'
-import { MAX_LIST, PanelBackend, voiceUrl, clearCloud, getMarketingCloud, setMarketingCloud, deleteAccountCloud, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
+import { getSnapshotsOn, setSnapshotsOn, MAX_LIST, PanelBackend, voiceUrl, clearCloud, getMarketingCloud, setMarketingCloud, deleteAccountCloud, listReviewers, removeReviewer, type ReviewerRow } from '../../saas/cloud'
 import { inviteLink } from '../../saas/widget'
 import { ShareList } from './ShareList'
 import { PanelNav } from './Nav'
@@ -488,6 +488,7 @@ export function SettingsPage() {
       )}
       <NotificationsCard />
       {project && <RoundsCard />}
+      {project && <SnapshotsCard project={project} />}
       {project && <DataCard project={project} />}
       <section className="up-card danger">
         <h2>Danger zone</h2>
@@ -765,7 +766,22 @@ const CLEAR: Record<Clearable, { title: string; text: string; cloudOnly?: boolea
   reviewers: { title: 'Remove all reviewers', text: 'Everyone loses access to comment, and review links not used yet stop working. Comments are kept.', cloudOnly: true },
   links: { title: 'Revoke review links', text: 'Review and invite links not used yet stop working. Reviewers already in keep their access.', cloudOnly: true },
   reports: { title: 'Clear installation reports', text: 'The list of sites where the script was seen. It fills again as pages load.' },
-  research: { title: 'Clear research data and heatmaps', text: 'Every participant’s run in every study: their clicks, pages, eye tracking, answers and results, so every heatmap starts empty. The studies and their links stay. To clear one study, use Clear results on it.', cloudOnly: true },
+  research: { title: 'Clear research data and heatmaps', text: 'Every participant’s run in every study: their clicks, pages, eye tracking, answers and results, so every heatmap starts empty, plus the page snapshots. The studies and their links stay. To clear one study, use Clear results on it.', cloudOnly: true },
+}
+
+/** "Save page snapshots": a masked picture per page layout, for drawing heatmaps on (server only). */
+function SnapshotsCard({ project }: { project: Project }) {
+  const { toast } = useStore()
+  const [on, setOn] = useState<boolean | null>(null)
+  useEffect(() => { if (cloud) void getSnapshotsOn(project.id).then(setOn) }, [project.id])
+  if (!cloud || on === null) return null
+  const flip = () => void setSnapshotsOn(project.id, !on).then(() => { setOn(!on); toast(on ? 'Snapshots off; saved ones deleted' : 'Snapshots on') }).catch((e: Error) => toast(`Not changed: ${e.message}`, 'error'))
+  return (
+    <section className="up-card" data-snapshots-setting="">
+      <div className="up-row"><h2 className="lp-grow">Save page snapshots</h2><button className={`lp-btn sm ${on ? '' : 'primary'}`} role="switch" aria-checked={on} onClick={flip}>{on ? 'On' : 'Off'}</button></div>
+      <p className="up-muted">Once per page layout and device, the browser of a team member, reviewer or study participant (never a visitor) saves one picture of the page, so heatmaps and eye-tracking reports are drawn on it. Every form field is emptied, parts marked private and other sites’ frames are greyed out, emails and phone numbers are replaced. Only your team sees them. Turning this off deletes the saved ones. On by default for new projects; projects made before this setting existed start off.</p>
+    </section>
+  )
 }
 
 /** Clearing a project's data, one kind at a time, after typing the project id. */

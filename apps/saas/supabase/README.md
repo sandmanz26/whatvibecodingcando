@@ -254,3 +254,8 @@ Remove an admin: `delete from public.platform_admins where user_id = (select id 
 - Enable row level security on every new table, and add policies for the panel only.
 - Repeat `revoke all on all tables in schema public from anon`: Supabase grants new tables to anon by default.
 - Add the new table's cases to `tests/rls_test.sql` and keep `tests/run.sh` passing.
+
+
+## Page snapshots (2026-12-01-snapshots-layouts.sql)
+
+The SQL file creates the private bucket `snapshots` (600 KB, WebP/JPEG) and its storage policies. If the SQL editor refuses the `insert into storage.buckets` line, create the bucket by hand in Storage → New bucket: name `snapshots`, **private**, file size limit 600 KB, allowed types `image/webp, image/jpeg`, then run the file again (the policies need the bucket). No Edge Function is needed: the widget uploads with its own session to the one path `snapshot_claim` reserved.

@@ -13,6 +13,9 @@
 import * as server from './server'
 import { NS, selectorFor } from './store'
 import { takeHint } from './hints'
+import { redact } from './redact'
+import { hashOf, pageFingerprint } from './layout'
+import { deviceOf, elementBoxes, rasterise, serialisePage, snapSize } from './snapshot'
 
 export type StudyKind = 'usability' | 'fivesec' | 'browse'
 import { RESEARCH_MODULES, type ResearchModule } from './decide'
@@ -33,7 +36,7 @@ export interface RunState {
   token: string
   /** a visitor's run under "Everyone": the module whose default (★) study it records into (no link) */
   module?: ResearchModule
-  phase: 'consent' | 'eyes' | 'intro' | 'task' | 'showing' | 'questions' | 'done' | 'declined'
+  phase: 'consent' | 'eyes' | 'nocam' | 'intro' | 'task' | 'showing' | 'questions' | 'done' | 'declined'
   /** eye tracking, when the study asks for it and the participant agreed and calibrated */
   eye?: {
     on: boolean; model?: import('../gaze-model').Model; accuracy?: number; calib?: { f: number[]; x: number; y: number; w?: number }[]
@@ -112,7 +115,7 @@ export function pageOf(path: string): string {
 
 /* ---------- the click recorder ---------- */
 
-interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze' | 'seen' | 'depth'; version?: string; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
+interface Ev { t: number; task?: string; kind: 'click' | 'page' | 'door' | 'gaze' | 'seen' | 'depth'; version?: string; lh?: string; page: string; x?: number; y?: number; vw?: number; doc_h?: number; sel?: string; label?: string; ex?: number; ey?: number; hit?: boolean; rage?: boolean; dead?: boolean }
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [role=button], [role=link], [role=tab], [role=menuitem], [role=checkbox], [onclick], [contenteditable=""], [contenteditable=true]'
 /**
@@ -120,9 +123,7 @@ const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [
  * beyond a pattern, but email addresses, phone numbers and long numbers such as card, order or
  * account numbers are not): replaced before a label leaves the browser.
  */
-export const redact = (s: string) => s
-  .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[email]')
-  .replace(/\+?\d[\d\s().-]{6,}\d/g, (m) => (m.replace(/\D/g, '').length >= 7 ? '[number]' : m))
+export { redact }
 /** Marked private by the site: data-private / data-vibe-private, or a class "private", on it or around it. */
 const PRIVATE = '[data-private], [data-vibe-private], .private, [data-sensitive]'
 /** A short label of what an element shows. A form field: its tag and its label only, never its value. */
@@ -144,7 +145,9 @@ export class Recorder {
   private stop: (() => void) | null = null
   private lastPage = ''
   private exposure: Exposure | null = null
-  constructor(private run: string, private t0: number, private onClick: (e: { el: Element; page: string }) => void, private onPage: (page: string) => void, private version = '') {
+  private lh = ''
+  private layoutTimer = 0
+  constructor(private run: string, private t0: number, private onClick: (e: { el: Element; page: string }) => void, private onPage: (page: string) => void, private version = '', private snap = false) {
     // Clicks the previous page of this tab couldn't send before it closed.
     try {
       const kept = JSON.parse(sessionStorage.getItem(this.backlogKey) ?? '[]')
@@ -193,6 +196,10 @@ export class Recorder {
       if (p === this.lastPage) { this.exposure?.scan(); return }
       if (this.exposure) this.exposure.end()
       this.lastPage = p
+      this.lh = layoutNow(p)
+      window.clearTimeout(this.layoutTimer)
+      // Pages often finish drawing after the address changes: look again once it has settled.
+      this.layoutTimer = window.setTimeout(() => { if (window.location.pathname !== p) return; this.lh = layoutNow(p); void layoutSettled(this.run, p, this.lh, this.snap) }, 1500)
       this.push({ t: now(), task: task?.(), kind: 'page', page: p })
       this.exposure = new Exposure((e) => this.push({ t: now(), task: task?.(), page: p, ...e }))
       this.onPage(p)
@@ -215,7 +222,7 @@ export class Recorder {
       document.removeEventListener('pointerdown', down, true)
       document.removeEventListener('visibilitychange', hidden)
       window.removeEventListener('pagehide', leave)
-      window.clearInterval(iv); window.clearInterval(this.timer)
+      window.clearInterval(iv); window.clearInterval(this.timer); window.clearTimeout(this.layoutTimer)
       this.exposure?.end(); this.exposure = null
     }
   }
@@ -232,13 +239,50 @@ export class Recorder {
   door(d: { page: string; sel: string; label: string }, hit: boolean, task?: string) {
     this.push({ t: Math.max(0, Math.round(Date.now() - this.t0)), task, kind: 'door', page: window.location.pathname, sel: d.sel.slice(0, 400), label: d.label.slice(0, 80), hit })
   }
-  private push(e: Ev) { if (this.queue.length < 1000) this.queue.push({ ...e, page: pageOf(e.page), ...(this.version ? { version: this.version } : {}) }) }
+  private push(e: Ev) { if (this.queue.length < 1000) this.queue.push({ ...e, page: pageOf(e.page), ...(this.version ? { version: this.version } : {}), ...(this.lh ? { lh: this.lh } : {}) }) }
   async flush(leaving = false) {
     if (!this.queue.length) return
     if (leaving) { while (this.queue.length) server.rpcOnLeave('log_events', { p_run: this.run, p_events: this.queue.splice(0, 200) }); return }
     const batch = this.queue.splice(0, 200)
     try { await server.rpc('log_events', { p_run: this.run, p_events: batch }) } catch { if (this.queue.length < 800) this.queue.unshift(...batch) }
   }
+}
+
+/* ---------- layout versions and snapshots ---------- */
+
+/** The page's layout hash now (fingerprint of its structure, never its text). */
+function layoutNow(_page: string): string { try { return hashOf(pageFingerprint()) } catch { return '' } }
+const seen = new Set<string>()
+/**
+ * Tells the server this page's layout (once per page and hash in this tab), then, for reviewers and
+ * participants of a project that saves snapshots, takes the one snapshot of this layout and device
+ * if nobody has yet. Best effort: a failure records nothing more.
+ */
+const webpOk = () => { try { const c = document.createElement('canvas'); c.width = c.height = 1; return c.toDataURL('image/webp').startsWith('data:image/webp') } catch { return false } }
+async function layoutSettled(run: string, path: string, lh: string, snap: boolean) {
+  const page = pageOf(path)
+  if (!lh || seen.has(`${page}|${lh}`)) return
+  seen.add(`${page}|${lh}`)
+  try { await server.rpc('layout_seen', { p_run: run, p_page: page, p_hash: lh, p_fp: pageFingerprint() }) } catch { return }
+  if (!snap || document.visibilityState !== 'visible') return
+  const done = `${NS}snap:${page}|${lh}|${deviceOf(window.innerWidth)}`
+  try { if (sessionStorage.getItem(done)) return; sessionStorage.setItem(done, '1') } catch { /* try once */ }
+  try {
+    // Reserve first (cheap): only the one browser that gets the path draws the picture.
+    const size = snapSize()
+    const k = Math.min(1, 1280 / size.vw)
+    const ext = webpOk() ? 'webp' : 'jpg'
+    const path_ = await server.rpc<string | null>('snapshot_claim', { p_run: run, p_page: page, p_hash: lh, p_device: deviceOf(size.vw), p_ext: ext,
+      p_width: Math.round(size.vw * k), p_height: Math.round(size.height * k), p_scroll_h: size.scrollH, p_vw: size.vw, p_boxes: elementBoxes(size.height) })
+    if (!path_) return
+    const ser = serialisePage()
+    // The browser-only demo keeps the last masked page for its tests (never with a server).
+    if (!server.hasServer && ser) (window as unknown as { __vibeSnapSvg?: string }).__vibeSnapSvg = ser.svg
+    const pic = ser && await rasterise(ser.svg, ser.vw, ser.height, ext)
+    if (!pic) return
+    await server.uploadSnapshot(path_, pic.blob)
+    await server.rpc('snapshot_done', { p_path: path_ })
+  } catch { /* nothing more */ }
 }
 
 /* ---------- exposure: what each participant actually saw ---------- */
@@ -310,6 +354,10 @@ export const studyInfo = (project: string, token: string) =>
   server.rpc<{ name: string; kind: StudyKind; eye: boolean; tasks: number }>('study_info', { p_public_id: project, p_token: token }, { anon: true })
 export const startRun = (project: string, token: string) =>
   server.rpc<{ run: string; kind: StudyKind; name: string; config: unknown; eye: boolean }>('start_run', { p_public_id: project, p_token: token, p_vw: window.innerWidth, p_vh: window.innerHeight }, { signIn: true })
+/** The Eye tracking module's studies (browse with eye tracking) need the camera; elsewhere it is an add-on. */
+export const eyeIsRequired = (kind?: StudyKind) => kind === 'browse'
+/** The participant said no to the camera in an eye-tracking study: their run is deleted (nothing kept). */
+export const discardRun = (run: string) => server.rpc('discard_run', { p_run: run })
 export const finishRun = (run: string, result: Record<string, unknown>, gaze?: number) => server.rpc('finish_run', { p_run: run, p_result: result, p_gaze: gaze ?? null })
 
 /* ---------- reviewers' and the team's clicks (the default "Site heatmap" study) ---------- */
@@ -341,7 +389,7 @@ export function startReviewerClicks(project: string, version: string): () => voi
       try { sessionStorage.setItem(k, JSON.stringify(kept)) } catch { /* new run next page */ }
     }
     if (stopped || !kept) return
-    rec = new Recorder(kept.run, kept.started, () => {}, () => {}, version)
+    rec = new Recorder(kept.run, kept.started, () => {}, () => {}, version, true)
     rec.start()
   })()
   return () => { stopped = true; void rec?.end() }

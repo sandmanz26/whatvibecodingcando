@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Eye, ExternalLink, Flame, TriangleAlert } from 'lucide-react'
 import { gazeReport, GOOD_ACC, MIN_PEOPLE, type GazeEvent, type GazeRun, type PageReport } from '../../saas/gaze-report'
 import type { Interval } from '../../core/heatstats'
+import type { Snap } from './SnapshotHeat'
 
 /**
  * Eye-tracking results (Labs) for one study: summary first, then the pages with a preview of where
@@ -28,18 +29,19 @@ function ShareBar({ c, label, muted }: { c: Interval; label: string; muted?: boo
   )
 }
 
-/** Where eyes rested, drawn as dots on the page's width (no screenshot is stored, so it's a schematic). */
-function Preview({ p, big }: { p: PageReport; big?: boolean }) {
+/** Where eyes rested: on the page's snapshot when there is one, else a schematic of the page's width. */
+function Preview({ p, big, snap }: { p: PageReport; big?: boolean; snap?: Snap | null }) {
   const maxDur = Math.max(1, ...p.dots.map((d) => d.dur))
+  const sh = snap ? Math.round(snap.height * (snap.vw / Math.max(1, snap.width)) * (p.vw / snap.vw)) : 0
   return (
     <svg className={`gz-thumb ${big ? 'big' : ''}`} viewBox={`0 0 ${p.vw} ${p.height}`} preserveAspectRatio="xMidYMin meet" role="img" aria-label={`Preview of ${p.page}: ${p.dots.length} fixations from ${p.people} people`}>
-      <rect x="0" y="0" width={p.vw} height={p.height} className="gz-page" />
+      {snap ? <image href={snap.url} x="0" y="0" width={p.vw} height={sh} preserveAspectRatio="none" data-snapshot="yes" /> : <rect x="0" y="0" width={p.vw} height={p.height} className="gz-page" />}
       {p.dots.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={10 + 30 * Math.sqrt(d.dur / maxDur)} className="gz-dot" />)}
     </svg>
   )
 }
 
-export function GazeReport({ runs, events, sample, onView }: { runs: GazeRun[]; events: GazeEvent[]; sample?: boolean; onView?: (page: string, kind: 'click' | 'gaze') => void }) {
+export function GazeReport({ runs, events, sample, onView, snapFor }: { runs: GazeRun[]; events: GazeEvent[]; sample?: boolean; onView?: (page: string, kind: 'click' | 'gaze') => void; snapFor?: (page: string) => Snap | null }) {
   const r = useMemo(() => gazeReport(runs, events), [runs, events])
   const [pick, setPick] = useState<string | null>(null)
   if (!r.participants && !r.pages.length) return null
@@ -61,7 +63,7 @@ export function GazeReport({ runs, events, sample, onView }: { runs: GazeRun[]; 
       <ul className="gz-pages" role="list">
         {r.pages.map((p) => (
           <li key={p.page}><button type="button" className={`gz-pagebtn ${p === page ? 'on' : ''}`} aria-pressed={p === page} onClick={() => setPick(p.page)} data-gaze-page={p.page}>
-            <Preview p={p} /><span><code>{p.page}</code><small className="up-muted">{p.people} {p.people === 1 ? 'person' : 'people'}</small></span>
+            <Preview p={p} snap={snapFor?.(p.page)} /><span><code>{p.page}</code><small className="up-muted">{p.people} {p.people === 1 ? 'person' : 'people'}</small></span>
           </button></li>
         ))}
       </ul>
@@ -72,7 +74,7 @@ export function GazeReport({ runs, events, sample, onView }: { runs: GazeRun[]; 
             {onView && <><button className="lp-btn sm" onClick={() => onView(page.page, 'gaze')} data-view-heat="gaze"><Eye size={13} /> View gaze heatmap <ExternalLink size={12} /></button><button className="lp-btn sm ghost" onClick={() => onView(page.page, 'click')} data-view-heat="click"><Flame size={13} /> View click heatmap <ExternalLink size={12} /></button></>}
           </div>
           <div className="gz-cols">
-            <figure className="gz-fig"><Preview p={page} big /><figcaption className="up-muted">Each dot is a fixation; bigger means longer. Schematic: drawn on the page’s width, no screenshot is stored. <b>View gaze heatmap</b> shows it over the real page.</figcaption></figure>
+            <figure className="gz-fig"><Preview p={page} big snap={snapFor?.(page.page)} /><figcaption className="up-muted">Each dot is a fixation; bigger means longer. {snapFor?.(page.page) ? 'Drawn on a snapshot of the page (fields emptied, private parts greyed out).' : 'Schematic: drawn on the page’s width (no snapshot of this page yet).'} <b>View gaze heatmap</b> shows it over the real page.</figcaption></figure>
             <div className="gz-first">
               <h4>What people looked at first</h4>
               <ol>{page.elements.filter((e) => e.first > 0).sort((a, b) => b.first - a.first).slice(0, 5).map((e) => <li key={e.label}><span className="lp-grow">{e.label}</span> <b>{e.first}</b> <small className="up-muted">of {page.people}</small></li>)}</ol>

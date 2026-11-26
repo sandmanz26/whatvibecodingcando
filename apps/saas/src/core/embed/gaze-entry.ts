@@ -5,7 +5,7 @@
  * Video never leaves the browser: each frame becomes face landmarks and is dropped.
  */
 import type { FaceLandmarker } from '@mediapipe/tasks-vision'
-export { startCamera, stopCamera, features, fit, predict, CALIBRATION, VALIDATION, QUICK, isBlink, headDrift, headWeight, stableFrames, calibrationOrder, validate, qualityOf, clickTeaches, CLICK_WEIGHT, SETTLE_MS, COLLECT_MS, RunMeter } from '../gaze-model'
+export { startCamera, stopCamera, cameraError, liveTracks, features, fit, predict, CALIBRATION, VALIDATION, QUICK, isBlink, headDrift, headWeight, stableFrames, calibrationOrder, validate, qualityOf, clickTeaches, CLICK_WEIGHT, SETTLE_MS, COLLECT_MS, RunMeter } from '../gaze-model'
 export type { Features, Model, Quality, CalSample } from '../gaze-model'
 
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
@@ -21,3 +21,12 @@ export function loadLandmarker(): Promise<FaceLandmarker> {
   landmarker.catch(() => { landmarker = null })
   return landmarker
 }
+
+/** A landmarker whose detect threw is closed and made again on the next start. */
+export function resetLandmarker() {
+  const l = landmarker
+  landmarker = null
+  void l?.then((x) => { try { x.close() } catch { /* already gone */ } }, () => {})
+}
+import { liveTracks as _lt } from '../gaze-model'
+if (typeof window !== 'undefined') (window as unknown as { __vibeGazeTracks?: () => number }).__vibeGazeTracks = _lt

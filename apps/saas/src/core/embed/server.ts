@@ -11,7 +11,7 @@
  */
 import { NS, type Backend, type RoundState, type Thread } from './store'
 import { parseConfig, type Release, type WidgetConfig } from './config'
-import { localRpc } from './localheat'
+import { localRpc, localSnapshot } from './localheat'
 
 const URL_ = (import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? ''
 const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? ''
@@ -248,6 +248,11 @@ async function storage(method: string, path: string, body?: BodyInit, type?: str
   const r = await fetch(`${URL_}/storage/v1/object/${path}`, { method, headers: { apikey: KEY, Authorization: `Bearer ${s.access_token}`, ...(type ? { 'Content-Type': type } : {}) }, body })
   if (!r.ok) throw new ServerError(String(r.status))
   return r
+}
+/** Uploads a page snapshot to the path snapshot_claim reserved (the demo keeps it in this browser). */
+export async function uploadSnapshot(path: string, blob: Blob): Promise<void> {
+  if (!hasServer) { localSnapshot(path, await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(blob) })); return }
+  await storage('POST', `snapshots/${path}`, blob, blob.type)
 }
 /** Uploads a voice note's audio; its path ("<project>/<id>.<ext>") goes with the comment. */
 export async function uploadAudio(project: string, id: string, blob: Blob): Promise<string> {

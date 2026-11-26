@@ -704,3 +704,11 @@ a.db-kpi:hover { box-shadow: 3px 3px 0 var(--lp-ink); }
 .gz-key.ci { height: 0; border-top: 1.5px solid var(--gz-ink); border-radius: 0; }
 .gz-notes { margin: 8px 0; padding-left: 18px; font-size: 13.5px; }
 @media (max-width: 760px) { .gz-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gz-cols { grid-template-columns: 1fr; } }
+
+/* Heatmaps on page snapshots (SnapshotHeat.tsx) */
+.lp .sh-list, .up .sh-list { display: grid; gap: 16px; margin-top: 8px; }
+.lp .sh-page, .up .sh-page { display: grid; gap: 8px; }
+.lp .sh-pic, .up .sh-pic { width: 100%; max-height: 520px; display: block; border-radius: 6px; border: 1px solid rgba(127,127,127,.25); background: #f4f4f5; }
+.lp .sh-pic.small, .up .sh-pic.small { max-height: 120px; }
+.lp .sh-compare, .up .sh-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 700px) { .lp .sh-compare, .up .sh-compare { grid-template-columns: 1fr; } }
