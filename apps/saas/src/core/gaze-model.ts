@@ -107,22 +107,35 @@ export function featuresOf(face: P[], m?: ArrayLike<number> | null): Features | 
 /** MediaPipe throws when a frame's timestamp isn't later than the last one (across runs too). */
 let lastTs = 0
 export function features(lm: FaceLandmarker, video: HTMLVideoElement, at: number): Features | null {
-  if (video.readyState < 2) return null
+  return detect(lm, video, at).f
+}
+/** One frame → features plus where the face is in the (unmirrored) image, for the pre-check. */
+export function detect(lm: FaceLandmarker, video: HTMLVideoElement, at: number): { f: Features | null; face: { cx: number; cy: number } | null } {
+  if (video.readyState < 2) return { f: null, face: null }
   const ts = Math.max(Math.round(at), lastTs + 1); lastTs = ts
   const r = lm.detectForVideo(video, ts)
-  return featuresOf(r.faceLandmarks[0] as NormalizedLandmark[], r.facialTransformationMatrixes?.[0]?.data)
+  const pts = r.faceLandmarks[0] as NormalizedLandmark[] | undefined
+  const face = pts && pts.length > 263 ? { cx: (pts[33].x + pts[263].x) / 2, cy: (pts[33].y + pts[263].y + 2 * pts[1].y) / 4 } : null
+  return { f: featuresOf(pts as NormalizedLandmark[], r.facialTransformationMatrixes?.[0]?.data), face }
 }
 
 /* ---------- the model ---------- */
 
+export type Basis = 'poly2' | 'eye1' | 'eye1h' | 'eye2h'
 export interface Model {
   mean: number[]; std: number[]; wx: number[]; wy: number[]
-  /** v2: the basis the weights are for; absent = v1 (linear in all features) */
-  basis?: 'poly2'
+  /** the basis the weights are for; absent = v1 (linear in all features) */
+  basis?: Basis
   /** lambdas chosen by cross-validation, per axis */
   lx?: number; ly?: number
-  /** head pose and eye openness at calibration (for drift and blink checks) */
-  pose?: number[]; ear?: number
+  /** head pose at calibration: median (v3; mean before), and its spread (1.4826 × MAD) per HEAD slot */
+  pose?: number[]; spread?: number[]
+  /** eye openness at calibration (blinks) */
+  ear?: number
+  /** leave-one-dot-out error of the chosen model, px (what a new screen position is likely to be off by) */
+  cv?: number
+  /** 3 = floors and clipped head terms (models saved before predict as they did) */
+  v?: 3
 }
 
 export interface CalSample { f: Features; x: number; y: number; /** weight (default 1); clicks use less */ w?: number }
@@ -146,21 +159,37 @@ function solve(A: number[][], b: number[]): number[] {
 }
 
 const HEAD = [F.YAW, F.PITCH, F.TX, F.TY, F.ROLL, F.SCALE]
+/**
+ * Smallest spread a feature is standardised by (raw units). Without it a feature that barely moves
+ * during calibration (the head, when the participant sits still) is divided by its own landmark
+ * noise: that noise becomes a unit-size input the regression can fit, and the head's ordinary
+ * movement afterwards becomes 10–50 standard deviations, so predictions fly off the screen.
+ * About 2° of turn, 1.5% of the distance sideways, 3% nearer/further.
+ */
+const STD_FLOOR: Partial<Record<number, number>> = { [F.YAW]: 0.035, [F.PITCH]: 0.035, [F.TX]: 0.015, [F.TY]: 0.015, [F.ROLL]: 0.035 }
+const SCALE_FLOOR = 0.03
+/** Standardised head terms are clipped here, so a head far from calibration can't throw the estimate off the screen. */
+const HEAD_CLIP = 3
+const clip = (v: number) => (v > HEAD_CLIP ? HEAD_CLIP : v < -HEAD_CLIP ? -HEAD_CLIP : v)
 
 /** The regression basis for one standardised feature vector z (last term is the intercept). */
-function basisOf(z: number[], kind: Model['basis']): number[] {
-  if (kind !== 'poly2' || z.length < N_FEATURES) return [...z, 1]
+function basisOf(z: number[], kind: Model['basis'], clipOn = true): number[] {
+  if (!kind || z.length < N_FEATURES) return [...z, 1]
   // Eye-in-head direction: both eyes averaged (less noise), x from corners, y from corners and lids.
   const gx = (z[F.LX] + z[F.RX]) / 2
   const gy = (z[F.LY] + z[F.RY]) / 2
   const gl = (z[F.LLID] + z[F.RLID]) / 2
-  const h = HEAD.map((i) => z[i])
+  const c = clipOn ? clip : (v: number) => v
+  const yaw = c(z[F.YAW]), pitch = c(z[F.PITCH]), tx = c(z[F.TX]), ty = c(z[F.TY]), roll = c(z[F.ROLL]), scale = c(z[F.SCALE])
+  if (kind === 'eye1') return [gx, gy, gl, z[F.OPEN], 1]
+  if (kind === 'eye1h') return [gx, gy, gl, z[F.OPEN], yaw, pitch, tx, ty, scale, 1]
+  if (kind === 'eye2h') return [gx, gy, gl, z[F.OPEN], gx * gx, gy * gy, gx * gy, gx * gl, yaw, pitch, tx, ty, scale, 1]
   return [
     gx, gy, gl, z[F.LX] - z[F.RX], z[F.OPEN],
     gx * gx, gy * gy, gl * gl, gx * gy, gx * gl,
-    ...h,
+    yaw, pitch, tx, ty, roll, scale,
     // Head-pose compensation: the same iris position means a different screen point when the head turns or moves.
-    gx * z[F.YAW], gy * z[F.PITCH], gl * z[F.PITCH], gx * z[F.SCALE], gy * z[F.SCALE],
+    gx * yaw, gy * pitch, gl * pitch, gx * scale, gy * scale,
     1,
   ]
 }
@@ -169,72 +198,115 @@ function standardise(samples: CalSample[]) {
   const k = samples[0].f.length
   const W = samples.reduce((a, s) => a + (s.w ?? 1), 0) || 1
   const mean = Array.from({ length: k }, (_, j) => samples.reduce((a, s) => a + (s.w ?? 1) * s.f[j], 0) / W)
-  const std = Array.from({ length: k }, (_, j) => Math.sqrt(samples.reduce((a, s) => a + (s.w ?? 1) * (s.f[j] - mean[j]) ** 2, 0) / W) || 1)
+  const std = Array.from({ length: k }, (_, j) => {
+    const sd = Math.sqrt(samples.reduce((a, s) => a + (s.w ?? 1) * (s.f[j] - mean[j]) ** 2, 0) / W)
+    const floor = k >= N_FEATURES ? (j === F.SCALE ? Math.abs(mean[j]) * SCALE_FLOOR : STD_FLOOR[j] ?? 0) : 0
+    return Math.max(sd, floor) || 1
+  })
   return { mean, std }
 }
 
-function ridge(X: number[][], t: number[], w: number[], lambda: number): number[] {
+/** Weighted normal equations Σ w·x·xᵀ and Σ w·x·t (both axes) for a set of rows. */
+function normal(X: number[][], tx: number[], ty: number[], w: number[], idx: number[]) {
   const n = X[0].length
   const A = Array.from({ length: n }, () => new Array<number>(n).fill(0))
-  const b = new Array<number>(n).fill(0)
-  for (let s = 0; s < X.length; s++) {
+  const bx = new Array<number>(n).fill(0), by = new Array<number>(n).fill(0)
+  for (const s of idx) {
     const r = X[s], ws = w[s]
-    for (let i = 0; i < n; i++) { b[i] += ws * r[i] * t[s]; const ri = ws * r[i]; for (let j = i; j < n; j++) A[i][j] += ri * r[j] }
+    for (let i = 0; i < n; i++) { const ri = ws * r[i]; bx[i] += ri * tx[s]; by[i] += ri * ty[s]; for (let j = i; j < n; j++) A[i][j] += ri * r[j] }
   }
-  for (let i = 0; i < n; i++) { for (let j = 0; j < i; j++) A[i][j] = A[j][i]; if (i < n - 1) A[i][i] += lambda }
-  return solve(A, b)
+  for (let i = 0; i < n; i++) for (let j = 0; j < i; j++) A[i][j] = A[j][i]
+  return { A, bx, by }
+}
+/** Ridge solution from normal equations (the intercept, last, is not shrunk). */
+function ridgeFrom(A: number[][], b: number[], lambda: number): number[] {
+  const n = b.length
+  return solve(A.map((row, i) => row.map((v, j) => (i === j && i < n - 1 ? v + lambda : v))), b)
+}
+function ridge(X: number[][], t: number[], w: number[], lambda: number): number[] {
+  const { A, bx } = normal(X, t, t, w, X.map((_, i) => i))
+  return ridgeFrom(A, bx, lambda)
 }
 
 const dot = (a: number[], b: number[]) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * (b[i] ?? 0); return s }
-const LAMBDAS = [0.03, 0.1, 0.3, 1, 3, 10, 30, 100]
+const LAMBDAS = [0.03, 0.1, 0.3, 1, 3, 10, 30, 100, 300, 1000]
+/** Candidate models, simplest first: a richer one is only picked when it is clearly better on dots it didn't see. */
+export const BASES: Basis[] = ['eye1', 'eye1h', 'eye2h', 'poly2']
+const BETTER = 0.97
 
-export interface FitOptions { /** 'linear' = the v1 model (all features, linear) */ basis?: 'linear' | 'poly2'; /** fixed lambda (skips cross-validation) */ lambda?: number }
+export interface FitOptions {
+  /** 'linear' = the v1 model; a Basis forces it; 'auto' (default) picks by leave-one-dot-out error */
+  basis?: 'linear' | 'auto' | Basis
+  /** fixed lambda (skips cross-validation) */
+  lambda?: number
+  /** v2 behaviour, for comparisons: no std floors and mean pose (tests only) */
+  legacy?: boolean
+}
+
+const medianOf = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0 }
 
 /**
- * Fits the model. With the v2 basis and at least 6 calibration dots, each axis gets the lambda with
- * the lowest leave-one-dot-out error (a dot's samples are left out together, so the choice reflects
- * new screen positions, not new frames of the same look).
+ * Fits the model. With at least 6 calibration dots, every candidate basis and lambda is scored by
+ * leave-one-dot-out error (a dot's samples are left out together, so the score reflects new screen
+ * positions, not new frames of the same look), and the best is kept. With 16 features and 13 dots a
+ * 22-term polynomial can memorise the calibration; the simpler bases usually win on real webcams.
  */
 export function fit(samples: CalSample[], opt: FitOptions | number = {}): Model {
   const o: FitOptions = typeof opt === 'number' ? { basis: 'linear', lambda: opt } : opt
-  const poly = (o.basis ?? 'poly2') === 'poly2' && samples[0].f.length >= N_FEATURES
-  const basis: Model['basis'] = poly ? 'poly2' : undefined
-  const { mean, std } = standardise(samples)
-  const X = samples.map((s) => basisOf(s.f.map((v, j) => (v - mean[j]) / std[j]), basis))
+  const full = samples[0].f.length >= N_FEATURES
+  const want = o.basis ?? 'auto'
+  const { mean, std } = o.legacy ? standardiseLegacy(samples) : standardise(samples)
   const w = samples.map((s) => s.w ?? 1)
   const tx = samples.map((s) => s.x), ty = samples.map((s) => s.y)
   const groups = new Map<string, number[]>()
   samples.forEach((s, i) => { if ((s.w ?? 1) >= 1) { const k = `${Math.round(s.x)},${Math.round(s.y)}`; const g = groups.get(k); if (g) g.push(i); else groups.set(k, [i]) } })
-  const pick = (t: number[]): number => {
-    if (o.lambda != null) return o.lambda
-    if (!poly || groups.size < 6) return poly ? 3 : 0.5
-    let best = LAMBDAS[0], bestErr = Infinity
-    for (const lam of LAMBDAS) {
-      let err = 0, cnt = 0
-      for (const idx of groups.values()) {
-        const out = new Set(idx)
-        const keep = X.map((_, i) => i).filter((i) => !out.has(i))
-        const wt = ridge(keep.map((i) => X[i]), keep.map((i) => t[i]), keep.map((i) => w[i]), lam)
-        // The dot's mean prediction vs its target: what validation measures.
-        let p = 0
-        for (const i of idx) p += dot(X[i], wt)
-        err += (p / idx.length - t[idx[0]]) ** 2; cnt++
-      }
-      if (err / cnt < bestErr) { bestErr = err / cnt; best = lam }
+  const all = samples.map((_, i) => i)
+  const zs = samples.map((s) => s.f.map((v, j) => (v - mean[j]) / std[j]))
+  const cands: Model['basis'][] = !full || want === 'linear' ? [undefined] : want === 'auto' ? BASES : [want]
+  let best: { basis: Model['basis']; lx: number; ly: number; err: number; X: number[][] } | null = null
+  for (const basis of cands) {
+    const X = zs.map((z) => basisOf(z, basis, !o.legacy))
+    if (o.lambda != null || groups.size < 6) {
+      const lam = o.lambda ?? (basis === 'poly2' ? 3 : basis ? 1 : 0.5)
+      // Too few dots to compare: the small eye + head model (or the one asked for).
+      if (cands.length === 1 || basis === 'eye1h') { best = { basis, lx: lam, ly: lam, err: NaN, X }; break }
+      continue
     }
-    return best
+    const tot = normal(X, tx, ty, w, all)
+    const folds = [...groups.values()].map((idx) => {
+      const g = normal(X, tx, ty, w, idx)
+      const xbar = X[0].map((_, j) => idx.reduce((a, i) => a + X[i][j], 0) / idx.length)
+      return { A: tot.A.map((row, i) => row.map((v, j) => v - g.A[i][j])), bx: tot.bx.map((v, i) => v - g.bx[i]), by: tot.by.map((v, i) => v - g.by[i]), xbar, x: tx[idx[0]], y: ty[idx[0]] }
+    })
+    // Per axis: each lambda's held-out errors, per dot.
+    const errs = (axis: 'x' | 'y') => LAMBDAS.map((lam) => folds.map((fd) => dot(fd.xbar, ridgeFrom(fd.A, axis === 'x' ? fd.bx : fd.by, lam)) - fd[axis]))
+    const ex = errs('x'), ey = errs('y')
+    const sse = (e: number[]) => e.reduce((a, v) => a + v * v, 0)
+    const ix = ex.map(sse).reduce((bi, v, i, a) => (v < a[bi] ? i : bi), 0)
+    const iy = ey.map(sse).reduce((bi, v, i, a) => (v < a[bi] ? i : bi), 0)
+    const err = folds.reduce((a, _, k) => a + Math.hypot(ex[ix][k], ey[iy][k]), 0) / folds.length
+    if (!best || err < best.err * BETTER) best = { basis, lx: LAMBDAS[ix], ly: LAMBDAS[iy], err, X }
   }
-  const lx = pick(tx), ly = pick(ty)
-  const full = samples[0].f.length >= N_FEATURES
-  const pose = full ? HEAD.map((i) => mean[i]) : undefined
+  const b = best!
+  const head = samples.filter((s) => (s.w ?? 1) >= 1)
+  const pose = full ? HEAD.map((i) => (o.legacy ? mean[i] : medianOf(head.map((s) => s.f[i])))) : undefined
+  const spread = full && !o.legacy ? HEAD.map((i, k) => 1.4826 * medianOf(head.map((s) => Math.abs(s.f[i] - pose![k])))) : undefined
   const ear = full ? (mean[F.EARL] + mean[F.EARR]) / 2 : undefined
-  return { mean, std, wx: ridge(X, tx, w, lx), wy: ridge(X, ty, w, ly), basis, lx, ly, pose, ear }
+  return { mean, std, wx: ridge(b.X, tx, w, b.lx), wy: ridge(b.X, ty, w, b.ly), basis: b.basis, lx: b.lx, ly: b.ly, pose, spread, ear, ...(o.legacy ? {} : { v: 3 as const }), ...(Number.isFinite(b.err) ? { cv: Math.round(b.err) } : {}) }
+}
+/** v2's standardisation (no floors), kept to measure what the floors change. */
+function standardiseLegacy(samples: CalSample[]) {
+  const k = samples[0].f.length
+  const W = samples.reduce((a, s) => a + (s.w ?? 1), 0) || 1
+  const mean = Array.from({ length: k }, (_, j) => samples.reduce((a, s) => a + (s.w ?? 1) * s.f[j], 0) / W)
+  const std = Array.from({ length: k }, (_, j) => Math.sqrt(samples.reduce((a, s) => a + (s.w ?? 1) * (s.f[j] - mean[j]) ** 2, 0) / W) || 1)
+  return { mean, std }
 }
 
 export function predict(m: Model, f: Features): { x: number; y: number } {
   // A v1 model uses only the first slots, so it keeps working with v2 features.
   const z = m.mean.map((mu, j) => ((f[j] ?? mu) - mu) / m.std[j])
-  const b = basisOf(z, m.basis)
+  const b = basisOf(z, m.basis, m.v === 3)
   return { x: dot(b, m.wx), y: dot(b, m.wy) }
 }
 
@@ -245,20 +317,67 @@ export const isBlink = (m: Model, f: Features) =>
   m.ear != null && f.length >= N_FEATURES ? Math.min(f[F.EARL], f[F.EARR]) < m.ear * 0.6 : f[F.OPEN] < m.mean[F.OPEN] * 0.55
 
 /**
- * How far the head is from where it was during calibration, as a multiple of what the model can
- * absorb: < 1 fine, ≥ 1 too far (≈ 10° of turn, or 15% nearer/further, or a shift of ~4 cm).
+ * Head limits: how far from the calibration pose the model still copes (it has head terms):
+ * yaw and pitch ≈ 15°, a shift of ≈ 12% of the distance (≈ 7 cm at 60 cm), 20% nearer/further.
+ */
+export const HEAD_LIMITS = { yaw: 0.26, pitch: 0.26, shift: 0.12, scale: 0.2 }
+/** Tolerance is never tighter than this many times the head's own spread during calibration. */
+export const SPREAD_K = 2.5
+
+/**
+ * How far the head is from where it was during calibration, as a multiple of the tolerance:
+ * < 1 fine, ≥ 1 too far. The tolerance per axis is the larger of the head limit and 2.5× the
+ * spread measured during calibration (so a face model that is jittery on this camera doesn't warn).
  */
 export function headDrift(m: Model, f: Features): number {
   if (!m.pose || f.length < N_FEATURES) return 0
   const [yaw, pitch, tx, ty, , scale] = m.pose
+  const sp = m.spread ?? [0, 0, 0, 0, 0, 0]
+  const tol = (lim: number, s: number) => Math.max(lim, SPREAD_K * s)
+  const sc = Math.max(1e-6, scale)
   return Math.max(
-    Math.abs(f[F.YAW] - yaw) / 0.17, Math.abs(f[F.PITCH] - pitch) / 0.17,
-    Math.abs(f[F.TX] - tx) / 0.09, Math.abs(f[F.TY] - ty) / 0.09,
-    Math.abs(Math.log(Math.max(1e-6, f[F.SCALE]) / Math.max(1e-6, scale))) / 0.15,
+    Math.abs(f[F.YAW] - yaw) / tol(HEAD_LIMITS.yaw, sp[0]), Math.abs(f[F.PITCH] - pitch) / tol(HEAD_LIMITS.pitch, sp[1]),
+    Math.abs(f[F.TX] - tx) / tol(HEAD_LIMITS.shift, sp[2]), Math.abs(f[F.TY] - ty) / tol(HEAD_LIMITS.shift, sp[3]),
+    Math.abs(Math.log(Math.max(1e-6, f[F.SCALE]) / sc)) / tol(HEAD_LIMITS.scale, sp[5] / sc),
   )
 }
 /** Weight of a sample given head drift: 1 near the calibration pose, falling to 0 at twice the limit. */
 export const headWeight = (drift: number) => (drift <= 1 ? 1 : Math.max(0, 2 - drift))
+
+export type HeadState = 'ok' | 'far' | 'lost'
+/**
+ * What the participant is told about their head, with hysteresis so noise never flickers it:
+ * - 'far' only after the head has been beyond the tolerance for `enterMs` (2 s) without a break
+ *   longer than a moment, and back to 'ok' once it has been well inside (drift < 0.8) for `exitMs`;
+ * - 'lost' when no face has been seen for `lostMs`: the head warning is dropped meanwhile (we can't
+ *   know where the head is), and "We can't see your face" is shown instead.
+ */
+export class HeadCheck {
+  state: HeadState = 'ok'
+  private farSince: number | null = null
+  private inSince: number | null = null
+  private lastFace: number | null = null
+  private model: Model
+  private opt: { enterMs: number; exitMs: number; lostMs: number }
+  constructor(model: Model, opt = { enterMs: 2000, exitMs: 600, lostMs: 1000 }) { this.model = model; this.opt = opt }
+  setModel(m: Model) { this.model = m }
+  update(f: Features | null, now: number): HeadState {
+    if (!f) {
+      if (this.lastFace == null) this.lastFace = now
+      if (now - this.lastFace >= this.opt.lostMs) { this.state = 'lost'; this.farSince = null; this.inSince = null }
+      return this.state
+    }
+    this.lastFace = now
+    if (this.state === 'lost') this.state = 'ok'
+    const d = headDrift(this.model, f)
+    if (this.state === 'ok') {
+      if (d > 1) { this.farSince ??= now; if (now - this.farSince >= this.opt.enterMs) { this.state = 'far'; this.inSince = null } }
+      else if (d < 0.9) this.farSince = null
+    } else if (d < 0.8) { this.inSince ??= now; if (now - this.inSince >= this.opt.exitMs) { this.state = 'ok'; this.farSince = null } }
+    else this.inSince = null
+    return this.state
+  }
+}
 
 /* ---------- calibration sampling ---------- */
 
@@ -267,15 +386,13 @@ export const SETTLE_MS = 300
 /** How long frames are collected for each dot, after the settle time. */
 export const COLLECT_MS = 700
 
-const medianOf = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0 }
-
 /**
  * The fixation-stable part of one dot's frames: drops the first SETTLE_MS, blinks (when a model
  * exists to compare with, or by the window's own openness), and frames whose eye features are far
  * from the window's median (glances away, landmark jitter). Returns [] when too little is left.
  */
-export function stableFrames(frames: { t: number; f: Features }[], t0: number, minKeep = 5): Features[] {
-  let fs = frames.filter((x) => x.t - t0 >= SETTLE_MS).map((x) => x.f)
+export function stableFrames(frames: { t: number; f: Features }[], t0: number, minKeep = 5, settle = SETTLE_MS): Features[] {
+  let fs = frames.filter((x) => x.t - t0 >= settle).map((x) => x.f)
   if (fs.length < minKeep) return []
   const open = medianOf(fs.map((f) => f[F.OPEN]))
   fs = fs.filter((f) => f[F.OPEN] >= open * 0.6)
@@ -285,6 +402,56 @@ export function stableFrames(frames: { t: number; f: Features }[], t0: number, m
   const mad = medianOf(dist) || 1e-6
   const kept = fs.filter((_, i) => dist[i] <= 3 * mad + 1e-4)
   return kept.length >= minKeep ? kept : []
+}
+
+/**
+ * Automatic collection (v3): the dot appears and shrinks; frames are read from the moment it shows.
+ * The first AUTO_SETTLE_MS are dropped (the eyes need ~200 ms to start moving and land), then the dot
+ * is done as soon as at least AUTO_MIN_FRAMES steady frames are in (≥ 75% of the window steady), or
+ * at AUTO_MAX_MS with whatever steady frames there are. No click needed: reading frames *after* a
+ * click (v2) caught eyes already leaving for the next dot.
+ */
+export const AUTO_SETTLE_MS = 450
+export const AUTO_MIN_MS = 1100
+export const AUTO_MAX_MS = 3200
+export const AUTO_MIN_FRAMES = 15
+export function dotDone(frames: { t: number; f: Features }[], t0: number, now: number): Features[] | null {
+  const after = frames.filter((x) => x.t - t0 >= AUTO_SETTLE_MS).length
+  if (now - t0 < AUTO_MIN_MS) return null
+  const kept = stableFrames(frames, t0, 5, AUTO_SETTLE_MS)
+  if (kept.length >= AUTO_MIN_FRAMES && kept.length >= 0.75 * after) return kept
+  if (now - t0 >= AUTO_MAX_MS) return kept
+  return null
+}
+
+/* ---------- the pre-check (camera preview, before calibration) ---------- */
+
+export type PrecheckIssue = 'noface' | 'left' | 'right' | 'up' | 'down' | 'close' | 'far' | 'dark' | 'bright'
+/**
+ * What to fix before calibrating, most important first. `face` is the face's centre in the raw
+ * (unmirrored) camera image, 0–1; the preview is shown mirrored, so "move left" means the person's
+ * own left. `brightness` is the mean luma of the frame, 0–255.
+ */
+export function precheck(p: { face: { cx: number; cy: number } | null; irisW?: number | null; brightness?: number | null }): PrecheckIssue[] {
+  if (!p.face) return ['noface']
+  const out: PrecheckIssue[] = []
+  const mx = 1 - p.face.cx
+  if (mx > 0.62) out.push('left'); else if (mx < 0.38) out.push('right')
+  if (p.face.cy < 0.28) out.push('down'); else if (p.face.cy > 0.68) out.push('up')
+  if (p.irisW) { const cm = distanceCm(p.irisW); if (cm < 40) out.push('close'); else if (cm > 80) out.push('far') }
+  if (p.brightness != null) { if (p.brightness < 60) out.push('dark'); else if (p.brightness > 225) out.push('bright') }
+  return out
+}
+export const PRECHECK_TEXT: Record<PrecheckIssue, string> = {
+  noface: 'We can’t see your face. Sit in front of the camera.',
+  left: 'Move a little to your left, so your face is in the middle.',
+  right: 'Move a little to your right, so your face is in the middle.',
+  up: 'Raise the screen or sit up a little: your face is low in the picture.',
+  down: 'Lower the screen a little: your face is high in the picture.',
+  close: 'Sit a little further back (about an arm’s length).',
+  far: 'Come a little closer (about an arm’s length).',
+  dark: 'It’s too dark. Turn on a light in front of you.',
+  bright: 'Too much light behind or on the camera. Face the light, not a window behind you.',
 }
 
 /** Calibration dots, as fractions of the window: a 3 × 3 grid plus four between them (13). */
@@ -358,15 +525,20 @@ export function validate(model: Model, dots: { x: number; y: number; frames: Fea
 }
 
 /** Accuracy labels shown to the participant, and the limit beyond which a quick recalibration is offered. */
-export const GOOD_PX = 120
-export const POOR_PX = 220
-/** Same limits in degrees (about 3° and 5.5° at 60 cm). */
-export const GOOD_DEG = 3
-export const POOR_DEG = 5.5
+/**
+ * Realistic for a laptop webcam at arm's length: good ≤ 150 px (about the size of a button group),
+ * okay ≤ 250 px (areas of the page), poor above. In pixels, the unit people see on the page; degrees
+ * are shown beside them (the distance estimate behind degrees is coarse).
+ */
+export const GOOD_PX = 150
+export const POOR_PX = 250
+/** The same limits in degrees at 60 cm (kept for reports that only have degrees). */
+export const GOOD_DEG = 3.5
+export const POOR_DEG = 6
 export const qualityOf = (q: { accuracy: number; accuracyDeg?: number | null }): 'good' | 'rough' | 'poor' => {
+  if (Number.isFinite(q.accuracy)) return q.accuracy <= GOOD_PX ? 'good' : q.accuracy <= POOR_PX ? 'rough' : 'poor'
   const deg = q.accuracyDeg
-  if (deg != null && Number.isFinite(deg)) return deg <= GOOD_DEG ? 'good' : deg <= POOR_DEG ? 'rough' : 'poor'
-  return q.accuracy <= GOOD_PX ? 'good' : q.accuracy <= POOR_PX ? 'rough' : 'poor'
+  return deg != null && Number.isFinite(deg) ? (deg <= GOOD_DEG ? 'good' : deg <= POOR_DEG ? 'rough' : 'poor') : 'poor'
 }
 
 /** Per-run quality after recording: data loss and head movement, as shares of the frames. */

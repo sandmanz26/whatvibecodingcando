@@ -11,7 +11,7 @@ import { GazeReport } from './GazeReport'
 import { LayoutSplit, LocalPageHeat, groupByLayout, type Snap } from './SnapshotHeat'
 import { productOf } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
-import { pageLayouts, pageSnapshots, type LayoutRow, type SnapshotRow, clearStudyResults, deleteRun, deleteStudy, listStudies, makeDefaultStudy, projectSessions, revokeStudyLink, saveStudy, studyLink, studyModule, studyResults, type EventRow, type RunRow, type StudyKind, type StudyModule, type StudyRow } from '../../saas/cloud'
+import { getSnapshotsOn, setSnapshotsOn, pageLayouts, pageSnapshots, type LayoutRow, type SnapshotRow, clearStudyResults, deleteRun, deleteStudy, listStudies, makeDefaultStudy, projectSessions, revokeStudyLink, saveStudy, studyLink, studyModule, studyResults, type EventRow, type RunRow, type StudyKind, type StudyModule, type StudyRow } from '../../saas/cloud'
 import { localStudies, setLocalStudyOpen } from '../../core/embed/localheat'
 import { ago, usePanel } from './Panel'
 import { download, toCsv } from '../../saas/stats'
@@ -311,6 +311,13 @@ export function StudyResults() {
   const [clearing, setClearing] = useState(false)
   const [lays, setLays] = useState<{ layouts: LayoutRow[]; snaps: SnapshotRow[] }>({ layouts: [], snaps: [] })
   useEffect(() => { if (project && cloud) void Promise.all([pageLayouts(project.id), pageSnapshots(project.id)]).then(([layouts, snaps]) => setLays({ layouts, snaps })).catch(() => {}) }, [project?.id])
+  // "Save page snapshots" (Settings), switched on from the eye-tracking report when it's off.
+  const [snapsOn, setSnapsOn] = useState<boolean | null>(null)
+  useEffect(() => { if (project && cloud) void getSnapshotsOn(project.id).then(setSnapsOn).catch(() => {}) }, [project?.id])
+  const turnOnSnapshots = async () => {
+    if (!project) return
+    try { await setSnapshotsOn(project.id, true); setSnapsOn(true); toast('Snapshots on: new visits will save a picture of each page') } catch (e) { toast(`Not changed: ${(e as Error).message}`, 'error') }
+  }
   const layoutOf = (e: { page: string; layout_hash?: string | null }) => { const l = e.layout_hash ? lays.layouts.find((x) => x.page === e.page && x.hashes.includes(e.layout_hash!)) : undefined; return { n: l?.n ?? 0, since: l?.created_at ?? null } }
   const snapOf = (page: string, n: number, dev = 'desktop'): Snap | null => {
     const l = lays.layouts.find((x) => x.page === page && x.n === n)
@@ -416,7 +423,7 @@ export function StudyResults() {
             const multi = new Set(groupByLayout(data.events.filter((e) => e.kind === 'gaze'), layoutOf, () => null).filter((g) => g.length > 1).map((g) => g[0].page))
             const tag = (e: EventRow) => (multi.has(e.page) ? { ...e, page: `${e.page} · ${layoutOf(e).n ? `layout ${layoutOf(e).n}` : 'unknown layout'}` } : e)
             const snapFor = (key: string) => { const [pg, l] = key.split(' · layout '); return snapOf(pg, l ? Number(l) : (lays.layouts.filter((x) => x.page === pg).length === 1 ? 1 : 0)) }
-            return <GazeReport runs={runs} events={data.events.map(tag)} snapFor={snapFor} onView={(pg, k) => openHeat(pg.split(' · ')[0], k === 'gaze')} />
+            return <GazeReport runs={runs} events={data.events.map(tag)} snapFor={snapFor} snapshots={{ on: snapsOn, toggle: turnOnSnapshots }} onView={(pg, k) => openHeat(pg.split(' · ')[0], k === 'gaze')} />
           })()}
           {clicks.length > 0 && (
             <section className="up-card" data-snapshot-heat="">

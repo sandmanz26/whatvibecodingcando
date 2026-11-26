@@ -171,6 +171,18 @@ export const CSS = `
 .vc-door span { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; background: rgba(255,255,255,.25); padding: 2px 5px; border-radius: 4px; }
 .vc-cambox { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; left: 0; top: 0; }
 .vc-cam { width: 320px; height: 240px; }
+.vc-pre { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: #111; }
+.vc-pre canvas { width: 100%; height: 100%; display: block; }
+.vc-pre .vc-oval { position: absolute; left: 30%; top: 14%; width: 40%; height: 66%; border: 3px dashed rgba(255,255,255,.7); border-radius: 50%; pointer-events: none; }
+.vc-pre .vc-oval.ok { border-style: solid; border-color: #40c057; }
+.vc-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.vc-checks li { display: flex; gap: 6px; align-items: flex-start; }
+.vc-checks li.no { color: #c92a2a; }
+.vc-checks li.yes { color: #237032; }
+.vc-dot.auto { animation: vc-shrink 1.1s ease-out forwards; }
+@keyframes vc-shrink { from { transform: scale(1.6); } to { transform: scale(.55); } }
+.vc-grade { font-weight: 700; }
+.vc-grade.good { color: #237032; } .vc-grade.rough { color: #a35a00; } .vc-grade.poor { color: #c92a2a; }
 .vc-calib { position: fixed; inset: 0; z-index: 2147483005; background: rgba(244,244,244,.96); }
 .vc-dot { position: fixed; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; border: 4px solid #fff; background: var(--vc-accent); box-shadow: 0 0 0 3px var(--vc-accent), 0 4px 14px rgba(0,0,0,.3); cursor: pointer; animation: vc-pulse 1.2s ease-in-out infinite; }
 @keyframes vc-pulse { 50% { transform: scale(.75); } }

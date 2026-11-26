@@ -225,7 +225,7 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
         <div className="vc-taskbar" role="status">
           <span className="vc-kicker">{st.kind === 'usability' ? `${st.index + 1}/${tasks.length}` : 'Visit'}</span>
           <span className="vc-taskprompt" title={task?.prompt}>{st.kind === 'usability' ? task?.prompt : (st.config?.prompt || 'Use the site as you normally would')}</span>
-          {eyes && <span className={`vc-clock ${faceLost || headFar ? 'vc-lostface' : ''}`} title="Eye tracking is on: video stays in your browser"><Eye size={13} />{faceLost ? ' Face the camera' : headFar ? ' Move back to where you sat for calibration' : ''}</span>}
+          {eyes && <span className={`vc-clock ${faceLost || headFar ? 'vc-lostface' : ''}`} title="Eye tracking is on: video stays in your browser"><Eye size={13} />{faceLost ? ' We can’t see your face' : headFar ? ' Move back to where you sat for calibration' : ''}</span>}
           <span className="vc-clock"><Timer size={13} /> {mmss(limitMs - elapsed)}</span>
           {st.kind === 'usability' && <button className="vc-btn" onClick={() => endTask('gave_up')}><Flag size={13} /> Give up</button>}
           <button className="vc-btn primary" onClick={() => endTask(st.kind === 'browse' ? 'done' : 'done')}><Check size={13} /> {st.kind === 'browse' ? 'Finish' : 'Done'}</button>
@@ -355,21 +355,35 @@ function stopEyes() { if (cam) { cam.stream.getTracks().forEach((t) => t.stop())
 // Leaving the page always lets the camera go.
 if (typeof window !== 'undefined') { window.addEventListener('pagehide', stopEyes); window.addEventListener('beforeunload', stopEyes) }
 
+/** Team-only, opt-in: `?vibe_gaze_debug=1` on the page shows "Download diagnostics" after calibration. */
+const gazeDebug = () => { try { return new URLSearchParams(window.location.search).get('vibe_gaze_debug') === '1' } catch { return false } }
+
+type Dot = { x: number; y: number; frames: number[][] }
 /**
- * Asks, starts the camera, calibrates (13 dots in random order) and checks accuracy on 5 new dots.
- * Each dot: frames for 1 s after the click, the first 300 ms dropped, then blinks and glances away.
- * Poor accuracy: five more dots are offered once, then the check runs again.
+ * Asks, starts the camera, then:
+ * 1. Pre-check: a small mirrored preview (drawn on a canvas here, never stored or sent) with live
+ *    checks: face in the middle, distance, light; hints for glasses and "move only your eyes".
+ * 2. Calibration: 13 dots in random order. Each dot appears large and shrinks; frames are read while
+ *    it is on screen and the dot moves on by itself once the eyes are steady (clicking is optional).
+ *    The target is the dot's own position on screen (getBoundingClientRect), the same frame as clicks
+ *    and gaze points, so a scrollbar, zoom or transformed page can't shift it.
+ * 3. Validation on 5 other dots, the same way, then the grade (good ≤ 150 px, okay ≤ 250 px) with
+ *    what to do next. Poor: one suggestion to calibrate again.
  */
 function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; required?: boolean; onDone: (eye: RunState['eye']) => void }) {
-  const [phase, setPhase] = useState<'ask' | 'loading' | 'calibrate' | 'validate' | 'result' | 'error'>('ask')
+  const [phase, setPhase] = useState<'ask' | 'loading' | 'precheck' | 'calibrate' | 'validate' | 'result' | 'error'>('ask')
   const [step, setStep] = useState(0)
   const [hint, setHint] = useState('')
-  const [accuracy, setAccuracy] = useState(0)
   const [q, setQ] = useState<import('../gaze-model').Quality | null>(null)
-  const [quickUsed, setQuickUsed] = useState(false)
+  const [retried, setRetried] = useState(false)
   const [order, setOrder] = useState<{ x: number; y: number }[]>([])
+  const [issues, setIssues] = useState<import('./gaze-entry').PrecheckIssue[] | null>(null)
+  const [steadyFor, setSteadyFor] = useState(0)
   const box = useRef<HTMLDivElement>(null)
-  const ref = useRef<{ g: Gaze; lm: Awaited<ReturnType<Gaze['loadLandmarker']>>; video: HTMLVideoElement; samples: import('../gaze-model').CalSample[]; model?: import('../gaze-model').Model; checks: { x: number; y: number; frames: number[][] }[] } | null>(null)
+  const canvas = useRef<HTMLCanvasElement>(null)
+  const dotEl = useRef<HTMLButtonElement>(null)
+  const ref = useRef<{ g: Gaze; lm: Awaited<ReturnType<Gaze['loadLandmarker']>>; video: HTMLVideoElement; samples: import('../gaze-model').CalSample[]; model?: import('../gaze-model').Model; cal: Dot[]; checks: Dot[] } | null>(null)
+  const clickNow = useRef(false)
   const ok = useRef(false)
   // Leaving the setup without finishing it lets the camera go.
   useEffect(() => () => { if (!ok.current) stopEyes() }, [])
@@ -378,8 +392,8 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
     try {
       const g = await loadGaze(gazeUrl)
       const [lm, video] = await Promise.all([g.loadLandmarker(), camera(g, box.current!)])
-      ref.current = { g, lm, video, samples: [], checks: [] }
-      setOrder(g.calibrationOrder()); setStep(0); setPhase('calibrate')
+      ref.current = { g, lm, video, samples: [], cal: [], checks: [] }
+      setPhase('precheck')
     } catch (e) {
       stopEyes()
       if (gazeMod) void gazeMod.then((g) => g.resetLandmarker()).catch(() => {})
@@ -387,67 +401,147 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
       setPhase('error')
     }
   }
-  /** The steady frames of one look (about 1 s, ~30 a second); [] when the eyes weren't seen steadily. */
-  const read = async () => {
+
+  /* ---- 1. pre-check: the preview is drawn here only, mirrored; nothing of it is kept ---- */
+  useEffect(() => {
+    if (phase !== 'precheck') return
     const r = ref.current!
-    const got: { t: number; f: number[] }[] = []
-    const t0 = performance.now()
-    while (performance.now() - t0 < r.g.SETTLE_MS + r.g.COLLECT_MS) {
+    let goodSince = 0
+    const iv = window.setInterval(() => {
+      const c = canvas.current
       const now = performance.now()
-      const f = r.g.features(r.lm, r.video, now)
-      if (f) got.push({ t: now, f })
-      await new Promise((res) => setTimeout(res, 33))
-    }
-    return r.g.stableFrames(got, t0)
-  }
+      let brightness: number | null = null
+      if (c && r.video.readyState >= 2) {
+        const ctx = c.getContext('2d', { willReadFrequently: true })
+        if (ctx) {
+          ctx.save(); ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(r.video, 0, 0, c.width, c.height); ctx.restore()
+          const px = ctx.getImageData(0, 0, c.width, c.height).data
+          let sum = 0, n = 0
+          for (let i = 0; i < px.length; i += 16) { sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; n++ }
+          brightness = n ? sum / n : null
+        }
+      }
+      let d: ReturnType<Gaze['detect']> = { f: null, face: null }
+      try { d = r.g.detect(r.lm, r.video, now) } catch { /* next frame */ }
+      const list = r.g.precheck({ face: d.face, irisW: d.f ? d.f[15] : null, brightness })
+      setIssues(list)
+      if (list.length) goodSince = 0; else if (!goodSince) goodSince = now
+      setSteadyFor(goodSince ? now - goodSince : 0)
+    }, 120)
+    return () => window.clearInterval(iv)
+  }, [phase])
+  const beginCalibration = () => { const r = ref.current!; r.samples = []; r.cal = []; r.checks = []; setOrder(r.g.calibrationOrder()); setStep(0); setHint(''); setPhase('calibrate') }
+
+  /* ---- 2–3. dots: collected automatically once the eyes are steady on the shrinking dot ---- */
   const dots = phase === 'validate' ? ref.current?.g.VALIDATION ?? [] : order
   const dot = dots[step]
-  const reading = useRef(false)
-  const hit = async () => {
-    const r = ref.current
-    // One reading at a time: a quick second click doesn't count twice or skip a dot.
-    if (!r || !dot || reading.current) return
-    reading.current = true
-    const fs = await read().finally(() => { reading.current = false })
-    if (!fs.length) { setHint('We couldn’t see your eyes steadily. Face the camera, with some light on you, and keep looking at the dot.'); return }
-    setHint('')
-    const x = dot.x * window.innerWidth, y = dot.y * window.innerHeight
-    if (phase === 'calibrate') {
-      for (const f of fs) r.samples.push({ f, x, y })
-      if (step + 1 < dots.length) setStep(step + 1)
-      else { r.model = r.g.fit(r.samples); r.checks = []; setStep(0); setPhase('validate') }
-    } else {
-      r.checks.push({ x, y, frames: fs })
-      if (step + 1 < r.g.VALIDATION.length) setStep(step + 1)
-      else { const v = r.g.validate(r.model!, r.checks); setQ(v); setAccuracy(v.accuracy); setPhase('result') }
+  useEffect(() => {
+    if ((phase !== 'calibrate' && phase !== 'validate') || !dot) return
+    const r = ref.current!
+    const frames: { t: number; f: number[] }[] = []
+    let t0 = performance.now()
+    let alive = true, misses = 0
+    clickNow.current = false
+    const tick = () => {
+      if (!alive) return
+      const now = performance.now()
+      let f: number[] | null = null
+      try { f = r.g.features(r.lm, r.video, now) } catch { /* next frame */ }
+      if (f) frames.push({ t: now, f }); else misses++
+      let fs = r.g.dotDone(frames, t0, now)
+      // A click on the dot finishes it early, once enough steady frames are in.
+      if (!fs && clickNow.current && now - t0 > 750) { const k = r.g.stableFrames(frames, t0, 8, 450); if (k.length) fs = k }
+      if (!fs) { window.setTimeout(tick, 33); return }
+      alive = false
+      if (fs.length < 5) {
+        setHint(misses > frames.length ? 'We can’t see your face. Face the camera, with some light on you.' : 'Keep looking at the dot until it moves on. Move only your eyes, not your head.')
+        // The same dot again, from the start.
+        window.setTimeout(() => { alive = true; frames.length = 0; misses = 0; clickNow.current = false; t0 = performance.now(); tick() }, 400)
+        return
+      }
+      setHint('')
+      const rect = dotEl.current?.getBoundingClientRect()
+      const x = rect ? rect.left + rect.width / 2 : dot.x * window.innerWidth
+      const y = rect ? rect.top + rect.height / 2 : dot.y * window.innerHeight
+      if (phase === 'calibrate') {
+        r.cal.push({ x, y, frames: fs })
+        for (const f2 of fs) r.samples.push({ f: f2, x, y })
+        if (step + 1 < dots.length) setStep(step + 1)
+        else { r.model = r.g.fit(r.samples); r.checks = []; setStep(0); setPhase('validate') }
+      } else {
+        r.checks.push({ x, y, frames: fs })
+        if (step + 1 < r.g.VALIDATION.length) setStep(step + 1)
+        else { setQ(r.g.validate(r.model!, r.checks)); setPhase('result') }
+      }
     }
-  }
+    // A short pause between dots, so the eyes have somewhere to go.
+    const first = window.setTimeout(tick, step === 0 ? 700 : 150)
+    return () => { alive = false; window.clearTimeout(first) }
+  }, [phase, step, order]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const grade = q ? ref.current?.g.qualityOf(q) ?? 'rough' : 'rough'
   const skip = () => { stopEyes(); onDone({ on: false }) }
+  const download = () => {
+    const r = ref.current
+    if (!r) return
+    const round = (fs: number[][]) => fs.map((f) => f.map((v) => Math.round(v * 1e5) / 1e5))
+    const d = {
+      v: 1, at: new Date().toISOString(),
+      screen: { w: window.innerWidth, h: window.innerHeight, clientW: document.documentElement.clientWidth, clientH: document.documentElement.clientHeight, dpr: window.devicePixelRatio, zoom: window.visualViewport?.scale ?? 1 },
+      video: { w: r.video.videoWidth, h: r.video.videoHeight },
+      calibration: r.cal.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y), frames: round(c.frames) })),
+      validation: r.checks.map((c) => ({ x: Math.round(c.x), y: Math.round(c.y), frames: round(c.frames) })),
+      model: r.model ? { basis: r.model.basis, cv: r.model.cv, lx: r.model.lx, ly: r.model.ly, pose: r.model.pose, spread: r.model.spread } : null,
+      quality: q,
+    }
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' }))
+    a.download = 'ourhunch-gaze-diagnostics.json'
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+  }
+  const T = ref.current?.g.PRECHECK_TEXT
+  const has = (k: import('./gaze-entry').PrecheckIssue[]) => issues?.some((i) => k.includes(i))
+  const continueOn = () => { ok.current = true; onDone({ on: true, model: ref.current!.model, accuracy: q?.accuracy, accuracyDeg: q?.accuracyDeg, precision: q?.precision, distance: q?.distance, calib: ref.current!.samples.map((x) => ({ f: x.f.map((v) => Math.round(v * 1e5) / 1e5), x: Math.round(x.x), y: Math.round(x.y) })) }) }
   return (
     <>
       <div ref={box} className="vc-cambox" aria-hidden />
       {(phase === 'calibrate' || phase === 'validate') && dot ? (
-        <div className="vc-calib">
-          <div className="vc-taskbar" role="status"><span className="vc-kicker">{phase === 'calibrate' ? 'Calibrating' : 'Checking'} · {step + 1} of {dots.length}</span><span className="vc-taskprompt">Look at the dot, then click it.</span><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Skip eye tracking'}</button></div>
+        <div className="vc-calib" data-vc-calib={phase}>
+          <div className="vc-taskbar" role="status"><span className="vc-kicker">{phase === 'calibrate' ? 'Calibrating' : 'Checking'} · {step + 1} of {dots.length}</span><span className="vc-taskprompt">Follow the dot with your eyes. Keep your head still. It moves on by itself.</span><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Skip eye tracking'}</button></div>
           {hint && <div className="vc-toast error" role="alert">{hint}</div>}
-          <button className="vc-dot" style={{ left: `${dot.x * 100}%`, top: `${dot.y * 100}%` }} onClick={() => void hit()} aria-label={`Calibration dot ${step + 1}`} />
+          <button ref={dotEl} key={`${phase}-${step}`} className="vc-dot auto" style={{ left: `${dot.x * 100}%`, top: `${dot.y * 100}%` }} onClick={() => { clickNow.current = true }} aria-label={`Dot ${step + 1} of ${dots.length}`} />
         </div>
       ) : (
         <div className="vc-scrim">
-          <div className="vc-modal" role="dialog" aria-label="Eye tracking">
+          <div className="vc-modal" role="dialog" aria-label="Eye tracking" data-vc-eye={phase}>
             <span className="vc-kicker">{required ? 'Needed for this study' : 'Optional'}</span>
-            {phase === 'result' ? <>
-              <h2>Eye tracking is ready</h2>
-              <p>On new dots the estimate was on average <b>{accuracy} px</b>{q ? ` (${q.accuracyDeg}°)` : ''} from where you looked ({grade === 'good' ? 'good' : grade === 'rough' ? 'rough, still useful' : quickUsed ? (required ? 'poor: try again with more light' : 'poor: try again with more light, or go on without') : 'poor: five more dots usually help'}).</p>
-              <div className="vc-row"><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Continue the test without eye tracking'}</button><span className="vc-grow" />
-                {grade === 'poor' && !quickUsed
-                  ? <button className="vc-btn" onClick={() => { ref.current!.checks = []; setQuickUsed(true); setOrder(ref.current!.g.QUICK); setStep(0); setPhase('calibrate') }}>Five more dots</button>
-                  : <button className="vc-btn" onClick={() => { ref.current!.samples = []; ref.current!.checks = []; setQuickUsed(false); setOrder(ref.current!.g.calibrationOrder()); setStep(0); setPhase('calibrate') }}>Calibrate again</button>}
-                <button className="vc-btn primary" onClick={() => { ok.current = true; onDone({ on: true, model: ref.current!.model, accuracy, accuracyDeg: q?.accuracyDeg, precision: q?.precision, distance: q?.distance, calib: ref.current!.samples.map((x) => ({ f: x.f.map((v) => Math.round(v * 1e5) / 1e5), x: Math.round(x.x), y: Math.round(x.y) })) }) }}>Continue</button></div>
+            {phase === 'precheck' ? <>
+              <h2>Get ready</h2>
+              <div className="vc-pre"><canvas ref={canvas} width={240} height={180} /><span className={`vc-oval ${issues && !issues.length ? 'ok' : ''}`} /></div>
+              <p className="vc-muted">Only you see this preview. It isn’t saved or sent.</p>
+              <ul className="vc-checks" data-vc-checks="">
+                <li className={!issues ? '' : has(['noface', 'left', 'right', 'up', 'down']) ? 'no' : 'yes'}>{has(['noface', 'left', 'right', 'up', 'down']) ? T?.[issues!.find((i) => ['noface', 'left', 'right', 'up', 'down'].includes(i))!] : <><Check size={14} /> Face in the middle</>}</li>
+                <li className={!issues || has(['noface']) ? '' : has(['close', 'far']) ? 'no' : 'yes'}>{has(['close', 'far']) ? T?.[issues!.find((i) => i === 'close' || i === 'far')!] : <><Check size={14} /> About an arm’s length away</>}</li>
+                <li className={!issues ? '' : has(['dark', 'bright']) ? 'no' : 'yes'}>{has(['dark', 'bright']) ? T?.[issues!.find((i) => i === 'dark' || i === 'bright')!] : <><Check size={14} /> Enough light on your face</>}</li>
+              </ul>
+              <p className="vc-muted">Glasses: if the lenses reflect the screen, tilt the screen a little or dim it. During calibration, <b>keep your head still and move only your eyes</b>.</p>
+              <div className="vc-row"><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Skip eye tracking'}</button><span className="vc-grow" />
+                {issues && issues.length > 0 && <button className="vc-btn" onClick={beginCalibration}>Start anyway</button>}
+                <button className="vc-btn primary" disabled={!issues || issues.length > 0 || steadyFor < 600} onClick={beginCalibration}>Start calibration</button></div>
+            </> : phase === 'result' ? <>
+              <h2>{grade === 'good' ? 'Eye tracking is ready' : grade === 'rough' ? 'Eye tracking is okay' : 'Eye tracking is rough'}</h2>
+              <p data-vc-grade={grade}>On dots it hadn’t seen, the estimate was on average <b>{q?.accuracy} px</b>{q ? ` (${q.accuracyDeg}°)` : ''} from the dot: <span className={`vc-grade ${grade}`}>{grade === 'good' ? 'good' : grade === 'rough' ? 'okay' : 'poor'}</span>.</p>
+              <p className="vc-muted">{grade === 'good' ? 'Good enough to see which parts of the page you look at.' : grade === 'rough' ? 'Good enough to see which areas of the page you look at, not small details. You can continue.' : retried ? 'Still rough. The results will only show broad areas. You can continue, or stop.' : 'Usually better after another try: sit facing a light (not a window behind you), keep your face in the middle, and keep your head still while your eyes follow the dot.'}</p>
+              {gazeDebug() && <p className="vc-muted">Team diagnostics: <button className="vc-btn" onClick={download} data-vc-diag="">Download diagnostics</button> (features and dot positions only, no video or pictures; saved on this computer).</p>}
+              <div className="vc-row"><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Continue without eye tracking'}</button><span className="vc-grow" />
+                {grade === 'poor' && !retried
+                  ? <><button className="vc-btn" onClick={continueOn}>Continue anyway</button><button className="vc-btn primary" onClick={() => { setRetried(true); setPhase('precheck') }} data-vc-retry="">Calibrate again</button></>
+                  : <><button className="vc-btn" onClick={() => { setRetried(true); setPhase('precheck') }}>Calibrate again</button><button className="vc-btn primary" onClick={continueOn}>Continue</button></>}
+              </div>
             </> : <>
               <h2>Use your camera for eye tracking?</h2>
-              <p>It estimates where on the page you look. Video stays in your browser and is never saved or sent; only the points you look at are. First a short calibration: look at 13 dots and click each, then 5 more to measure accuracy. About a minute.</p>
+              <p>It estimates where on the page you look. Video stays in your browser and is never saved or sent; only the points you look at are. First a quick check of your position, then follow 18 dots with your eyes. About a minute.</p>
               {required && <p>This study is about where people look: it needs the camera. If you say no, nothing is recorded.</p>}
               {phase === 'error' && <p className="vc-bad">{hint} {required ? '' : 'You can continue the test without it.'}</p>}
               <div className="vc-row"><span className="vc-grow" /><button className="vc-btn" onClick={skip} data-vc-eye-skip="">{required ? 'No thanks' : 'Continue the test without eye tracking'}</button>{phase !== 'error' && <button className="vc-btn primary" disabled={phase === 'loading'} onClick={() => void start()}>{phase === 'loading' ? 'Starting the camera…' : 'Turn on the camera'}</button>}</div>
@@ -469,6 +563,7 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
  * - The element under the point is kept, so results can say what was looked at.
  * - No face for three seconds: the participant is told, and nothing is recorded meanwhile.
  */
+const DEBUG = typeof window !== 'undefined' && gazeDebug()
 function EyeTracker({ gazeUrl, model, calib, accuracy, rec, task, onFail, onLost, onDrift }: { gazeUrl: string; model: import('../gaze-model').Model; calib: { f: number[]; x: number; y: number; w?: number }[]; accuracy?: number; rec: React.MutableRefObject<Recorder | null>; task?: string; onFail: () => void; onLost: (lost: boolean) => void; onDrift?: (far: boolean) => void }) {
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -483,7 +578,9 @@ function EyeTracker({ gazeUrl, model, calib, accuracy, rec, task, onFail, onLost
         let m = model
         const clicks: { f: number[]; x: number; y: number; w: number }[] = []
         const fx = new OneEuro(), fy = new OneEuro()
-        let misses = 0, lost = false, farFor = 0
+        const head = new g.HeadCheck(m, { enterMs: 2000, exitMs: 600, lostMs: 1500 })
+        let shown: string = 'ok', debugAt = 0
+        const show = (st: string) => { if (st === shown) return; onLost(st === 'lost'); onDrift?.(st === 'far'); shown = st }
         let last: number[] | null = null
         eyeMeter ??= new g.RunMeter()
         const meter = eyeMeter
@@ -492,7 +589,7 @@ function EyeTracker({ gazeUrl, model, calib, accuracy, rec, task, onFail, onLost
           if (g.isBlink(m, last) || g.headDrift(m, last) > 1 || !g.clickTeaches(g.predict(m, last), { x: e.clientX, y: e.clientY }, accuracy ?? 150)) return
           clicks.push({ f: last, x: e.clientX, y: e.clientY, w: g.CLICK_WEIGHT })
           if (clicks.length > 20) clicks.shift()
-          if (calib.length >= 9) { try { m = g.fit([...calib, ...clicks]) } catch { /* keep the model */ } }
+          if (calib.length >= 9) { try { m = g.fit([...calib, ...clicks]); head.setModel(m) } catch { /* keep the model */ } }
         }
         document.addEventListener('pointerdown', click, true)
         off = () => document.removeEventListener('pointerdown', click, true)
@@ -501,14 +598,15 @@ function EyeTracker({ gazeUrl, model, calib, accuracy, rec, task, onFail, onLost
           let f: number[] | null
           try { f = g.features(lm, video, now) } catch { window.clearInterval(iv); g.resetLandmarker(); stopEyes(); if (live) onFail(); return }
           const ms = performance.now() - now
-          if (!f) { meter.frame('lost', ms); misses++; if (misses >= 15 && !lost) { lost = true; onLost(true) }; return }
-          if (lost) { lost = false; onLost(false); fx.reset(); fy.reset() }
-          misses = 0
+          // Face lost: "We can't see your face" (never "move back"); head beyond its tolerance for 2 s: "move back".
+          const was = shown
+          show(head.update(f, now))
+          if (!f) { meter.frame('lost', ms); return }
+          if (was === 'lost') { fx.reset(); fy.reset() }
           last = f
+          if (DEBUG && now - debugAt > 5000) { debugAt = now; console.info('[ourhunch gaze] head drift', Math.round(g.headDrift(m, f) * 100) / 100, 'state', shown) }
           if (g.isBlink(m, f)) { meter.frame('blink', ms); return }
           const w = g.headWeight(g.headDrift(m, f))
-          // Head away from the calibration pose for ~2 s (10 samples): ask the participant to move back.
-          if (w < 1) { if (++farFor === 10) onDrift?.(true) } else if (farFor) { if (farFor >= 10) onDrift?.(false); farFor = 0 }
           if (w === 0) { meter.frame('moved', ms); return }
           meter.frame('ok', ms)
           const p = g.predict(m, f)

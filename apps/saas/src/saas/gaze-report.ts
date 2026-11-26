@@ -12,6 +12,7 @@
  */
 import { fixationsOf, idtFor, type Sample } from '../core/gaze-analysis'
 import { cleanGaze, driftOf, pairsOf, smoothGaze, wilson, type Interval } from '../core/heatstats'
+import { pageOf } from '../core/embed/pages'
 
 export interface GazeRun { id: string; gaze_accuracy: number | null; vw?: number | null }
 export interface GazeEvent { run_id: string; t: number; kind: string; page: string; label: string | null; sel?: string | null; x?: number | null; y?: number | null; vw?: number | null }
@@ -42,6 +43,12 @@ export interface ElementStat {
 export interface PageReport {
   page: string
   people: number
+  /** the runs (people) on this page: counted across pages and layouts without double counting */
+  runs: string[]
+  /** fixations of everyone on the page */
+  fixations: number
+  /** the element most people looked at (not "elsewhere"), or null */
+  top: string | null
   /** layout width the fixations are drawn at, and the drawing's height */
   vw: number; height: number
   /** fixations of every person (page px at `vw`), for the preview; at most 800 */
@@ -77,9 +84,13 @@ export function gazeReport(runs: GazeRun[], events: GazeEvent[]): GazeReport {
   const byPage = new Map<string, Map<string, GazeEvent[]>>()
   for (const e of events) {
     if (e.kind !== 'gaze' && e.kind !== 'click' && e.kind !== 'page') continue
-    const m = byPage.get(e.page) ?? new Map<string, GazeEvent[]>()
+    // The same key rule as the script (ids → :id), so rows saved before a rule change still merge;
+    // a layout suffix (" · layout 2") is kept as it is.
+    const [path, ...rest] = e.page.split(' · ')
+    const key = [pageOf(path), ...rest].join(' · ')
+    const m = byPage.get(key) ?? new Map<string, GazeEvent[]>()
     const l = m.get(e.run_id) ?? []
-    l.push(e); m.set(e.run_id, l); byPage.set(e.page, m)
+    l.push(e); m.set(e.run_id, l); byPage.set(key, m)
   }
   const correctedRuns = new Set<string>()
   const pages: PageReport[] = []
@@ -165,13 +176,25 @@ export function gazeReport(runs: GazeRun[], events: GazeEvent[]): GazeReport {
     const dots = people.flatMap((p) => p.fix.filter((f) => f.x || f.y).map((f) => ({ x: f.x, y: f.y, dur: f.dur }))).slice(0, 800)
     const height = Math.round(Math.min(vw * 3, Math.max(vw * 0.6, ...dots.map((d) => d.y + 80))))
     pages.push({
-      page, people: n, vw, height, dots, elements,
+      page, people: n, runs: people.map((p) => p.id), fixations: people.reduce((a, p) => a + p.fix.length, 0),
+      top: elements.find((e) => e.label !== ELSEWHERE)?.label ?? null, vw, height, dots, elements,
       paths: [...pathCount].map(([k, c]) => ({ steps: k.split('\u0000'), people: c })).sort((a, b) => b.people - a.people).slice(0, 4),
       clickPeople: people.filter((p) => p.clicked.size > 0).length, corrected,
     })
   }
   pages.sort((a, b) => b.people - a.people)
   return { participants: withEyes.length, good, goodShare: wilson(good, accs.length), medianAcc: median(accs), corrected: correctedRuns.size, pages }
+}
+
+/** One row of the page table: a page with all its layouts (people counted once across them). */
+export interface PageRow { page: string; people: number; fixations: number; top: string | null; layouts: PageReport[] }
+export function pageRows(pages: PageReport[]): PageRow[] {
+  const m = new Map<string, PageReport[]>()
+  for (const p of pages) { const k = p.page.split(' · ')[0]; m.set(k, [...(m.get(k) ?? []), p]) }
+  return [...m].map(([page, ls]) => {
+    const sorted = [...ls].sort((a, b) => b.people - a.people)
+    return { page, people: new Set(ls.flatMap((l) => l.runs)).size, fixations: ls.reduce((a, l) => a + l.fixations, 0), top: sorted[0].top, layouts: sorted }
+  }).sort((a, b) => b.people - a.people || b.fixations - a.fixations)
 }
 
 /**

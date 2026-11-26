@@ -14,6 +14,7 @@ import * as server from './server'
 import { NS, selectorFor } from './store'
 import { takeHint } from './hints'
 import { redact } from './redact'
+import { pageOf } from './pages'
 import { hashOf, pageFingerprint } from './layout'
 import { deviceOf, elementBoxes, rasterise, serialisePage, snapSize } from './snapshot'
 
@@ -108,10 +109,7 @@ export const pageMatches = (rule: string, p: string) => (rule.endsWith('*') ? p.
  * A page as studies keep it: its path, with ids folded into ":id" (/product/123 → /product/:id), so
  * pages of one kind share a heatmap and ids (order numbers, user names in addresses) aren't kept.
  */
-export function pageOf(path: string): string {
-  const out = path.split('/').map((seg) => (/^\d+$/.test(seg) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) || /^[0-9a-f]{12,}$/i.test(seg) || (seg.length >= 16 && /\d/.test(seg) && /^[\w-]+$/.test(seg)) ? ':id' : seg)).join('/')
-  return out.slice(0, 300) || '/'
-}
+export { pageOf }
 
 /* ---------- the click recorder ---------- */
 

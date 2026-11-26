@@ -213,8 +213,10 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 9.11b | Satu peserta klik 100× di halaman yang sama | Heatmap menghitung maksimal 60 klik orang itu; daftar **Most clicked elements** menampilkan % orang dan first click | [ ] |
 | 9.11c | Klik 3× cepat di gambar yang tidak bisa diklik | Dihitung sebagai rage dan dead click; klik dari script (`el.click()`) tidak tercatat | [ ] |
 | 9.11d | `node apps/saas/tests/heatmap.test.ts` | Semua tes lulus (0/1 titik, titik sama, 100k titik, perangkat campur, Wilson CI, z-test, exposure, koreksi drift, KDE bin ≈ KDE titik, klik yang tidak bisa ditempatkan) | [ ] |
-| 9.11e | `node apps/saas/tests/gaze.test.ts` | Semua tes lulus; angka tercetak: akurasi v1 → v2 (kepala diam ±137 → ±58 px, kepala bergerak ±268 → ±120 px), kedip tertangkap 300/300, fiksasi precision/recall ≥ 0,9, waktu per frame dalam µs | [ ] |
-| 9.11f | Eye tracking dengan webcam asli (`#/?gaze` atau link studi Eye tracking) | 13 titik dalam urutan acak, lalu 5 titik cek. Hasil menampilkan px **dan derajat** serta jitter. Jika buruk muncul **Five more dots** (sekali). Saat merekam, putar kepala jauh ~3 detik → muncul "Move back to where you sat for calibration"; kembali → hilang. Kamera mati setelah Stop | [ ] |
+| 9.11e | Di `apps/saas`: `npm run test:gaze` | Semua tes lulus. Angka tercetak (simulasi webcam realistis): akurasi validasi v2 ±163 px → v3 ±49 px; saat browsing (kepala bergerak normal) ±562 → ±209 px; model yang dipilih (`eye1h` biasanya); peringatan kepala: diam & gerak kecil = 0, gerak besar → muncul setelah ±2 dtk; laporan: "/" 3 orang, "/product/:id" 2 orang | [ ] |
+| 9.11f | Eye tracking dengan webcam asli (link studi Eye tracking, tambahkan `?vibe_gaze_debug=1` di alamat halaman) | Setelah **Turn on the camera**: layar **Get ready** dengan pratinjau kecil (cermin) dan 3 cek: wajah di tengah, jarak ±1 lengan, cahaya cukup. **Start calibration** baru aktif kalau semua hijau. Lalu titik muncul besar dan mengecil; **tidak perlu klik**, titik pindah sendiri saat mata tenang (18 titik, ±1 menit). Hasil: px + derajat + label **good (≤150) / okay (≤250) / poor**. Target realistis 100–200 px. Kalau poor: saran **Calibrate again** sekali. Klik **Download diagnostics** dan simpan file JSON-nya | [ ] |
+| 9.11f-2 | `node apps/saas/tests/gaze-replay.ts ~/Downloads/ourhunch-gaze-diagnostics.json` | Tercetak: ukuran layar, dpr, zoom, akurasi model v2 vs v3 pada data Anda sendiri, model terpilih, sebaran pose kepala. Kirim angka ini ke developer kalau masih poor | [ ] |
+| 9.11f-3 | Saat merekam: duduk diam 1 menit, lalu gerak kecil (bersandar, menoleh sedikit) | **Tidak ada** "Move back to where you sat for calibration". Putar kepala jauh (±30°) atau mundur jauh ±3 dtk → pesan muncul setelah ±2 dtk; kembali → hilang. Tutup kamera dengan tangan → "We can’t see your face" (bukan pesan kepala). Dengan `?vibe_gaze_debug=1`, konsol browser mencetak `[ourhunch gaze] head drift …` tiap 5 dtk | [ ] |
 | 9.11e | Peserta scroll setengah halaman lalu selesai; buka Results → **Heatmap numbers, every click** | Kurva **How far people scrolled** turun di bawah 100%; kolom **Per view** = yang klik ÷ yang melihat elemen; angka tampil sebagai "38% ± 9" | [ ] |
 | 9.11f | Centang **Adjust for how many people saw it** | Panas di bagian bawah halaman naik (tidak lagi "dingin" karena sedikit yang scroll); legenda menulis "(adjusted)" | [ ] |
 | 9.11g | Ubah **Version** di Widget, kumpulkan klik baru, hapus satu elemen dari halaman | Pilihan **Site version** muncul, versi tidak pernah dicampur; klik di elemen yang hilang dihitung sebagai "N clicks couldn't be placed", tidak digambar di posisi lama | [ ] |
@@ -368,6 +370,16 @@ select indexname from pg_indexes where indexname in ('runs_project_started_idx',
 ```
 
 ---
+
+## 14c. Laporan eye tracking yang ringkas (panel, studi Eye tracking)
+
+| # | Langkah | Hasil yang diharapkan | ✓ |
+|---|---|---|---|
+| 14c.1 | Buka hasil studi Eye tracking (atau demo `#/app/research/sample-gaze`) | Satu baris ringkasan (orang, kalibrasi baik, akurasi median, drift-corrected, jumlah halaman); di bawahnya **tabel halaman** di kiri dan **detail** di kanan (di HP: detail di bawah tabel). Tidak perlu scroll panjang | [ ] |
+| 14c.2 | Kolom **People** | Jumlah orang berbeda per halaman (mis. 5 peserta, 3 dengan eye tracking → "/" = 3 kalau ketiganya membuka "/"), bukan "1" di semua baris. Halaman dengan beberapa layout = satu baris + tab layout di detail (hasil tetap tidak dicampur) | [ ] |
+| 14c.3 | Klik judul kolom Page / People / Fixations | Tabel terurut; klik baris → detail berganti | [ ] |
+| 14c.4 | Snapshot OFF (Settings → Save page snapshots) | Di detail: kartu "Turn on page snapshots to see the page here" + tombol **Turn on** (sekali klik). Setelah ON: "The next visit will save a picture of this page". Kunjungan berikutnya (tim/reviewer/peserta link) → titik digambar di atas gambar halaman | [ ] |
+| 14c.5 | e2e: `npm run build` (root), lalu di `apps/saas/tests/e2e`: `node serve.mjs &` dan `node gaze-calib-report.mjs` | ALL PASS (kamera palsu Chromium: layar Get ready, titik mengecil, "We can’t see your face"; tabel + detail desktop & HP) | [ ] |
 
 ## 14b. Menu panel, laporan eye tracking, View heatmap (mode demo)
 

@@ -2,7 +2,7 @@
 
 *Dokumen serah-terima utama. Setiap pekerjaan baru **wajib** menambah catatan di "Log perubahan" dan memperbarui bagian "Yang harus dilakukan pemilik". Ditulis untuk pemilik (Bahasa Indonesia) dan bisa dibaca AI/developer lain.*
 
-Terakhir diperbarui: 30 November 2026
+Terakhir diperbarui: 2 Desember 2026
 
 ---
 
@@ -91,11 +91,42 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - Ditahan: "Fixed, please check", error konsol di komentar, MCP.
 - **Eye tracking wajib kamera di modul Eye tracking**: menolak kamera / tanpa kamera / kalibrasi dihentikan = partisipasi selesai, run dihapus, pesan "Eye tracking needs your camera. Nothing was recorded.". Di server run modul gaze tanpa titik gaze ditandai `excluded` dan tidak dihitung. Hanya di studi lain (usability/5-detik dengan eye tracking tambahan) boleh lanjut: "Continue the test without eye tracking".
 - **Snapshot halaman**: ON untuk proyek baru, **OFF untuk proyek lama** (instalasi lama tidak berubah). Hanya dari tim/reviewer/peserta lewat link (diberi tahu di layar persetujuan), tidak pernah dari pengunjung biasa. Selalu disamarkan. Mematikan setting menghapus snapshot tersimpan.
-- **Versi layout otomatis**: hasil tidak pernah dicampur antar layout; data lama = "unknown layout".
+- **Versi layout otomatis**: hasil tidak pernah dicampur antar layout; data lama = "unknown layout". Di laporan eye tracking satu halaman = satu baris (orang unik), layout = tab.
+- **Kalibrasi eye tracking**: layar Get ready + titik otomatis (tanpa klik); label good ≤150 px / okay ≤250 px / poor; satu kali saran ulang. Diagnostik hanya lewat `?vibe_gaze_debug=1` (tim), lokal, tanpa video/gambar.
 
 ---
 
 ## 4. Log perubahan (terbaru di atas)
+
+### 2 Des 2026 — eye tracking: akurasi kalibrasi, layar persiapan, cek kepala, laporan ringkas
+**Penyebab yang ditemukan (dengan bukti, `apps/saas/tests/gaze-calib.test.ts`, simulator webcam realistis `tests/gaze-sim.ts`)**
+1. **Frame dibaca setelah klik (penyebab terbesar).** Dulu titik diklik, lalu 1 detik frame dibaca *sesudah* klik. Sekitar separuh orang sudah memindahkan mata mencari titik berikutnya → model belajar titik yang salah. Simulasi: 163 px → 49 px hanya dengan memperbaiki cara mengambil sampel (model sama).
+2. **Model terlalu besar untuk 13 titik + fitur kepala dibagi noise-nya sendiri.** Polinomial 22 suku pada 13 titik; fitur kepala yang hampir diam saat kalibrasi distandarkan dengan noise landmark-nya sendiri, jadi gerakan kepala biasa saat browsing = 10–50× → titik terlempar. Saat browsing (kepala bergerak normal): 562 px → 209 px. Sekarang 4 kandidat model (paling sederhana dulu), dipilih otomatis lewat error leave-one-dot-out, lambda 0,03–1000, batas bawah standar fitur kepala, suku kepala dijepit ±3. Hampir selalu terpilih model mata + kepala linear (`eye1h`).
+3. **Bingkai koordinat.** Target dulu `x × window.innerWidth` (termasuk lebar scrollbar; salah total kalau halaman punya `transform`/zoom pada induk). Sekarang target = pusat titik di layar (`getBoundingClientRect`), bingkai yang sama dengan klik dan titik gaze. Scrollbar 15 px hampir tidak berpengaruh; bingkai yang meleset 300 px menambah ±95 px.
+4. **Bukan penyebab:** video tercermin (model mempelajari tandanya sendiri: 47 vs 37 px), devicePixelRatio (semua dalam px CSS).
+5. **"Move back…" terus muncul:** batas tetap (10°, 4 cm, 15%) + baseline rata-rata + noise pose MediaPipe. Dari kode saja **tidak bisa direproduksi** dengan kepala diam di simulasi; kemungkinan ada selisih tetap antara pose kalibrasi dan saat browsing (mis. bersandar). Sekarang toleransi adaptif dan diagnostik tersedia (lihat bawah).
+6. **Laporan "1 person" di setiap ubin:** halaman dipecah per layout (setiap kunjungan bisa jadi layout sendiri kalau sidik halamannya berbeda) dan varian `/product/123` vs `/product/:id` tidak digabung → daftar panjang, tiap ubin 1 orang.
+
+**Yang berubah**
+- **Layar persiapan "Get ready"** setelah kamera menyala: pratinjau kecil tercermin (canvas di dialog, lokal, tidak disimpan/dikirim), cek langsung: wajah di tengah, jarak ±1 lengan (ukuran iris), cahaya (kecerahan); tips kacamata dan "keep your head still, move only your eyes". *Start calibration* aktif setelah semua hijau; *Start anyway* tersedia.
+- **Kalibrasi otomatis**: titik muncul besar lalu mengecil; frame dibaca sejak titik tampil, 450 ms pertama dibuang, titik pindah sendiri setelah ≥15 frame tenang (atau 3,2 dtk). Klik opsional. 13 + 5 titik.
+- **Hasil**: good ≤150 px, okay ≤250 px, poor di atas (sebelumnya 120/220 dan derajat), dengan panduan jelas; poor → saran **Calibrate again** satu kali saja. Laporan panel memakai batas yang sama (150 px).
+- **Diagnostik tim**: tambahkan `?vibe_gaze_debug=1` di alamat halaman → tombol **Download diagnostics** di hasil (fitur + posisi titik, tanpa video/gambar, disimpan di komputer Anda). `node apps/saas/tests/gaze-replay.ts <file>` menghitung ulang model lama vs baru dari data Anda. Dengan flag yang sama, konsol mencetak drift kepala tiap 5 dtk saat merekam.
+- **Cek kepala baru** (`HeadCheck`): baseline = median pose saat kalibrasi; toleransi = yang lebih besar dari batas model (±15°, geser 12%, jarak 20%) dan 2,5× sebaran saat kalibrasi; pesan baru muncul setelah >2 dtk terus-menerus di luar, hilang setelah 0,6 dtk kembali; saat wajah tidak terlihat: "We can’t see your face" (tidak pernah pesan kepala).
+- **Laporan eye tracking**: baris ringkasan; tabel halaman (thumbnail kecil, path, orang, fiksasi, elemen paling dilihat) dengan sortir; panel detail di samping (desktop) / di bawah (HP). Satu baris per halaman; layout = tab di detail (tidak dicampur); orang dihitung unik lintas layout. Kunci halaman memakai aturan yang sama dengan script (`src/core/embed/pages.ts`): id di bawah level atas jadi `:id`; halaman level atas tidak lagi jadi `/:id` hanya karena slug berangka (kecuali UUID/hex panjang/angka ≥5 digit). Snapshot OFF → kartu "Turn on page snapshots to see the page here" + tombol satu klik (setting yang sama di Settings, teks privasi sama); ON tapi belum ada gambar → "The next visit will save a picture of this page".
+- Tes: `npm run test:gaze` (di `apps/saas`): `gaze.test.ts`, `gaze-calib.test.ts` (9 tes), `gaze-report.test.ts` (3 tes); e2e `tests/e2e/gaze-calib-report.mjs` (ALL PASS, kamera palsu). Tidak ada SQL baru.
+
+**Yang harus dilakukan pemilik**
+1. Tidak ada SQL, secret atau setting baru. Deploy = push ke main (sudah).
+2. Tes dengan webcam Anda (`docs/TESTING.md` 9.11f, 9.11f-2, 9.11f-3, 14c): buka link studi Eye tracking dengan `?vibe_gaze_debug=1`, ikuti Get ready, kalibrasi, lalu **Download diagnostics** dan jalankan `node apps/saas/tests/gaze-replay.ts <file>`. Kirim angka v2 → v3 dan baris "head pose spread" ke developer.
+3. Kalau laporan masih menunjukkan banyak tab layout untuk satu halaman: catat halamannya — artinya sidik layout halaman itu berubah antar kunjungan (konten dinamis), perlu disesuaikan terpisah.
+
+**Belum terverifikasi**
+- Akurasi webcam asli: angka di atas dari simulasi. Target realistis 100–200 px; belum diukur di laptop Anda.
+- Penyebab pasti "Move back…" di laptop Anda (belum bisa direproduksi dari kode); toleransi baru jauh lebih longgar dan adaptif, diagnostik di konsol akan menunjukkannya.
+- Cek cahaya hanya kecerahan rata-rata (lampu dari belakang yang tetap terang rata-rata tidak terdeteksi); silau kacamata hanya tips, tidak dideteksi.
+- Konsol riset (`#/console/gaze`) memakai model baru dan batas baru, tapi belum mendapat layar Get ready/titik otomatis (masih klik).
+- Model lama yang tersimpan di run yang sedang berjalan tetap memprediksi seperti dulu (tanpa jepit), sampai kalibrasi baru.
 
 ### 1 Des 2026 — eye tracking wajib kamera, kamera bisa dipakai berulang, versi layout, snapshot halaman
 **Yang berubah**
