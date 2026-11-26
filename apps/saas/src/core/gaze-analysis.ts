@@ -26,6 +26,13 @@ export interface IdtOptions {
   minDur: number
   /** a gap longer than this (blink, face lost) ends a fixation, ms */
   maxGap: number
+  /**
+   * Hybrid I-VT/I-DT: a sample-to-sample speed above this (px/s) is a saccade and always ends a
+   * fixation, even when the dispersion would still allow it (two looks close together). Off when absent.
+   */
+  vel?: number
+  /** two fixations closer than this (px) with a gap ≤ 75 ms are merged; default half the dispersion */
+  merge?: number
 }
 
 /** Dispersion threshold scaled to tracking quality: a noisy webcam needs a wider window. */
@@ -34,6 +41,27 @@ export const idtFor = (accuracyPx: number | null): IdtOptions => ({
   minDur: 100,
   maxGap: 150,
 })
+
+/**
+ * Thresholds from the measured quality (v2): dispersion from accuracy as before, but never below
+ * about 4× the precision (RMS-S2S), so noise alone can't break a fixation; the saccade speed is set
+ * well above what that noise produces at the sample rate (hz), and a fixation is at least 100 ms.
+ */
+export function adaptiveIdt(accuracyPx: number | null, precisionPx: number | null, hz = 30): IdtOptions {
+  const base = idtFor(accuracyPx)
+  const prec = precisionPx ?? Math.max(10, (accuracyPx ?? 110) * 0.25)
+  const dispersion = Math.round(Math.min(260, Math.max(base.dispersion, prec * 4)))
+  // Noise speed ≈ precision × rate; a saccade between two things on a screen is far faster.
+  const vel = Math.max(600, prec * hz * 3.5)
+  return { dispersion, minDur: 100, maxGap: base.maxGap, vel, merge: Math.round(dispersion * 0.5) }
+}
+
+/** I-VT part of the hybrid: is the step from sample k to k + 1 a saccade? */
+const fast = (s: Sample[], k: number, o: IdtOptions) => {
+  if (!o.vel || k + 1 >= s.length) return false
+  const dt = (s[k + 1].t - s[k].t) / 1000
+  return dt > 0 && Math.hypot(s[k + 1].x - s[k].x, s[k + 1].y - s[k].y) / dt > o.vel
+}
 
 const spread = (s: Sample[], a: number, b: number) => {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
@@ -50,17 +78,22 @@ export function fixationsOf(samples: Sample[], o: IdtOptions): Fixation[] {
   while (i < s.length) {
     // The smallest window covering the minimum duration, without a gap inside it.
     let j = i
-    while (j + 1 < s.length && s[j].t - s[i].t < o.minDur && s[j + 1].t - s[j].t <= o.maxGap) j++
+    while (j + 1 < s.length && s[j].t - s[i].t < o.minDur && s[j + 1].t - s[j].t <= o.maxGap && !fast(s, j, o)) j++
     if (s[j].t - s[i].t < o.minDur) { i = j + 1; continue }
     if (spread(s, i, j) > o.dispersion) { i++; continue }
     // Grow it while the points stay together, forwards, then back over samples skipped while the
     // window was settling (the start of the look, just after the saccade's landing).
-    while (j + 1 < s.length && s[j + 1].t - s[j].t <= o.maxGap && spread(s, i, j + 1) <= o.dispersion) j++
-    while (i - 1 > lastEnd && s[i].t - s[i - 1].t <= o.maxGap && spread(s, i - 1, j) <= o.dispersion) i--
-    let sx = 0, sy = 0
-    for (let k = i; k <= j; k++) { sx += s[k].x; sy += s[k].y }
+    while (j + 1 < s.length && s[j + 1].t - s[j].t <= o.maxGap && !fast(s, j, o) && spread(s, i, j + 1) <= o.dispersion) j++
+    while (i - 1 > lastEnd && s[i].t - s[i - 1].t <= o.maxGap && !fast(s, i - 1, o) && spread(s, i - 1, j) <= o.dispersion) i--
+    // Centre weighted by time (each sample stands for the interval it covers), so uneven frame
+    // timing doesn't pull the centre toward bursts of samples.
+    let sx = 0, sy = 0, sw = 0
+    for (let k = i; k <= j; k++) {
+      const w = o.vel ? Math.max(1, Math.min(o.maxGap, ((s[k + 1]?.t ?? s[k].t) - (s[k - 1]?.t ?? s[k].t)) / 2 || 1)) : 1
+      sx += s[k].x * w; sy += s[k].y * w; sw += w
+    }
     const n = j - i + 1
-    out.push({ x: sx / n, y: sy / n, start: s[i].t, dur: s[j].t - s[i].t, n })
+    out.push({ x: sx / sw, y: sy / sw, start: s[i].t, dur: s[j].t - s[i].t, n })
     lastEnd = j
     i = j + 1
   }
@@ -76,12 +109,12 @@ function mergeAdjacent(f: Fixation[], o: IdtOptions): Fixation[] {
   const out: Fixation[] = []
   for (const x of f) {
     const p = out[out.length - 1]
-    if (p && x.start - (p.start + p.dur) <= 75 && Math.hypot(x.x - p.x, x.y - p.y) <= o.dispersion / 2) {
+    if (p && x.start - (p.start + p.dur) <= 75 && Math.hypot(x.x - p.x, x.y - p.y) <= (o.merge ?? o.dispersion / 2)) {
       const n = p.n + x.n
       out[out.length - 1] = { x: (p.x * p.n + x.x * x.n) / n, y: (p.y * p.n + x.y * x.n) / n, start: p.start, dur: x.start + x.dur - p.start, n }
     } else out.push(x)
   }
-  return out
+  return out.filter((x) => !o.vel || x.dur >= o.minDur)
 }
 
 export function saccadesOf(f: Fixation[]): Saccade[] {

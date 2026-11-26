@@ -157,7 +157,7 @@ export function Guide() {
               <li><b>One device at a time</b> (desktop, tablet, phone), because the same button sits in a different place on each.</li>
               <li><b>Each person counts the same</b> (on by default), so one person who clicked 200 times doesn’t outweigh everyone else.</li>
               <li><b>Gaze becomes fixations:</b> raw eye samples are grouped into the moments a person actually looked at something, weighted by how long.</li>
-              <li><b>Poor calibration is left out:</b> eye tracking less accurate than about 220 px is left out by default, and the heatmap says how many people that was.</li>
+              <li><b>Poor calibration is left out:</b> eye tracking whose accuracy check (5 dots after calibration) was worse than about 220 px is left out by default, and the heatmap says how many people that was.</li>
               <li><b>Pages with ids are combined:</b> <code>/product/12</code> and <code>/product/98</code> count as one page, <code>/product/:id</code>.</li>
             </ul>
             <p><b>Getting good eye tracking:</b> ask participants to sit at arm’s length in good, even light (no window behind them), keep their head fairly still, and follow the calibration dots carefully. Every click they make afterwards fine-tunes it. The video never leaves their browser and is never stored: only the points they looked at are kept.</p>

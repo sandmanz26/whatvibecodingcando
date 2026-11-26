@@ -30,7 +30,13 @@ export const GAZE_ENDED = 'market:gaze-ended'
 export const GAZE_STOP = 'market:gaze-stop'
 export const timeOf = (p: GazePoint) => p.ms ?? Date.parse(p.t)
 
-export interface GazeSession { sid: string; start: string; vw: number; accuracy: number | null }
+export interface GazeSession {
+  sid: string; start: string; vw: number
+  /** validation accuracy, px (mean error on 5 dots the model never saw) */
+  accuracy: number | null
+  /** v2 quality numbers (absent on older sessions): degrees, precision RMS-S2S px, distance cm, % data lost, % head too far, ms per frame */
+  accuracyDeg?: number; precision?: number; distance?: number; loss?: number; head?: number; msPerFrame?: number
+}
 
 const POINTS_KEY = `${APP}.gaze.points`
 const SESSIONS_KEY = `${APP}.gaze.sessions`

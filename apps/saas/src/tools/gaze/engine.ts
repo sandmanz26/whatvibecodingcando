@@ -19,8 +19,8 @@ import wasmBinaryPath from '@mediapipe/tasks-vision/vision_wasm_internal.wasm?ur
 
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
 
-export type { Features, Model } from '../../core/gaze-model'
-export { startCamera, stopCamera, features, fit, predict, CALIBRATION, VALIDATION, isBlink } from '../../core/gaze-model'
+export type { Features, Model, Quality, CalSample } from '../../core/gaze-model'
+export { startCamera, stopCamera, features, fit, predict, CALIBRATION, VALIDATION, QUICK, isBlink, headDrift, headWeight, stableFrames, calibrationOrder, validate, qualityOf, clickTeaches, CLICK_WEIGHT, SETTLE_MS, COLLECT_MS, RunMeter } from '../../core/gaze-model'
 
 let landmarker: Promise<FaceLandmarker> | null = null
 

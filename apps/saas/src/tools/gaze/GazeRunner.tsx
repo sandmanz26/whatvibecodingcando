@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Square, Video } from 'lucide-react'
 import { APP, currentPath, isConsole, isEmbedded } from '../shared'
-import { CALIBRATION, VALIDATION, features, fit, isBlink, loadLandmarker, predict, startCamera, stopCamera, type Features, type Model } from './engine'
-import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP, appendGaze, gazeFrame, saveGazeSession, setGazeClickHook, type GazePoint } from './store'
+import { CLICK_WEIGHT, COLLECT_MS, QUICK, RunMeter, SETTLE_MS, VALIDATION, calibrationOrder, clickTeaches, features, fit, headDrift, headWeight, isBlink, loadLandmarker, predict, qualityOf, stableFrames, startCamera, stopCamera, validate, type CalSample, type Features, type Model, type Quality } from './engine'
+import { GAZE_ENDED, GAZE_READY, GAZE_START, GAZE_STOP, appendGaze, gazeFrame, loadGazeSessions, saveGazeSession, setGazeClickHook, type GazePoint } from './store'
 import { OneEuro } from '../../core/gaze-analysis'
 import { runningTask } from '../tests/store'
 import { TOOL_DOM } from '../shared'
@@ -12,12 +12,13 @@ import { TOOL_DOM } from '../shared'
 type Phase = 'off' | 'consent' | 'loading' | 'calibrate' | 'validate' | 'checked' | 'recording' | 'error'
 
 const RUN_KEY = `${APP}.gaze.run`
-interface Saved { sid: string; model: Model; accuracy: number; forTest?: boolean; calib?: { f: Features; x: number; y: number }[] }
+interface Saved { sid: string; model: Model; accuracy: number; quality?: Quality; forTest?: boolean; calib?: CalSample[] }
 const readSaved = (): Saved | null => { try { return JSON.parse(sessionStorage.getItem(RUN_KEY) ?? 'null') } catch { return null } }
 const writeSaved = (s: Saved | null) => { try { s ? sessionStorage.setItem(RUN_KEY, JSON.stringify(s)) : sessionStorage.removeItem(RUN_KEY) } catch { /* ignore */ } }
 
 const SAMPLE_MS = 33
-const COLLECT_MS = 900
+/** Head too far from the calibration pose for this long: ask the participant to move back. */
+const DRIFT_PROMPT_MS = 2000
 
 /**
  * Participant side of eye tracking. Starts from any URL with ?gaze, asks before turning
@@ -33,15 +34,21 @@ export function GazeRunner() {
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState('')
   const [accuracy, setAccuracy] = useState<number | null>(() => readSaved()?.accuracy ?? null)
+  const [quality, setQuality] = useState<Quality | null>(() => readSaved()?.quality ?? null)
+  /** Calibration dots in this run's random order; a quick recalibration uses QUICK instead. */
+  const [calDots, setCalDots] = useState(() => calibrationOrder())
+  const [quickUsed, setQuickUsed] = useState(false)
+  const [drifted, setDrifted] = useState(false)
+  const meter = useRef(new RunMeter())
   const [showDot, setShowDot] = useState(false)
   const [dot, setDot] = useState<{ x: number; y: number } | null>(null)
 
   const video = useRef<HTMLVideoElement | null>(null)
   const preview = useRef<HTMLVideoElement>(null)
   const stream = useRef<MediaStream | null>(null)
-  const collector = useRef<((f: Features) => void) | null>(null)
-  const samples = useRef<{ f: Features; x: number; y: number }[]>([])
-  const checks = useRef<{ px: number; py: number; x: number; y: number }[]>([])
+  const collector = useRef<((f: Features, ms?: number) => void) | null>(null)
+  const samples = useRef<CalSample[]>([])
+  const checks = useRef<{ x: number; y: number; frames: Features[] }[]>([])
   const model = useRef<Model | null>(readSaved()?.model ?? null)
   if (!samples.current.length && readSaved()?.calib) samples.current = readSaved()!.calib!
   const sid = useRef<string>(readSaved()?.sid ?? '')
@@ -52,7 +59,7 @@ export function GazeRunner() {
   forTestRef.current = forTest
   /** The latest frame's features, and clicks used to keep the calibration accurate while recording. */
   const lastF = useRef<{ f: Features; at: number } | null>(null)
-  const clickSamples = useRef<{ f: Features; x: number; y: number }[]>([])
+  const clickSamples = useRef<CalSample[]>([])
   const buffer = useRef<GazePoint[]>([])
 
   // ?gaze starts it; the parameter is then removed from the address.
@@ -69,6 +76,9 @@ export function GazeRunner() {
     if (notify && forTestRef.current) window.dispatchEvent(new Event(GAZE_ENDED))
     setForTest(false)
     appendGaze(buffer.current.splice(0))
+    const run = loadGazeSessions().find((g) => g.sid === sid.current)
+    if (run && meter.current.frames) saveGazeSession({ ...run, ...meter.current.summary() })
+    meter.current = new RunMeter()
     stopCamera(stream.current)
     stream.current = null
     collector.current = null
@@ -110,21 +120,29 @@ export function GazeRunner() {
   // One loop reads the camera while it is on, and hands each frame to whoever needs it.
   useEffect(() => {
     if (!['calibrate', 'validate', 'checked', 'recording'].includes(phase)) return
-    let raf = 0, last = 0, live = true
+    // requestVideoFrameCallback runs once per new camera frame (no wasted work between frames);
+    // requestAnimationFrame with a 33 ms gate where it doesn't exist.
+    let raf = 0, vfc = 0, last = 0, live = true
+    const v = video.current
+    const rvfc = !!v && 'requestVideoFrameCallback' in v
     void loadLandmarker().then((lm) => {
+      const next = () => { if (!live) return; if (rvfc && v) vfc = v.requestVideoFrameCallback((t) => tick(t)); else raf = requestAnimationFrame(tick) }
       const tick = (now: number) => {
         if (!live) return
-        if (now - last >= 33 && video.current && video.current.readyState >= 2) {
+        if ((rvfc || now - last >= 33) && video.current && video.current.readyState >= 2) {
           last = now
+          const a = performance.now()
           const f = features(lm, video.current, now)
+          const ms = performance.now() - a
           setFace(!!f)
-          if (f) { lastF.current = { f, at: now }; collector.current?.(f) }
+          if (f) { lastF.current = { f, at: now }; collector.current?.(f, ms) }
+          else if (phase === 'recording') meter.current.frame('lost', ms)
         }
-        raf = requestAnimationFrame(tick)
+        next()
       }
-      raf = requestAnimationFrame(tick)
+      next()
     })
-    return () => { live = false; cancelAnimationFrame(raf) }
+    return () => { live = false; cancelAnimationFrame(raf); if (rvfc && v) v.cancelVideoFrameCallback(vfc) }
   }, [phase])
 
   // Recording: about 30 samples a second, blinks dropped, smoothed with a One-Euro filter (steady
@@ -132,12 +150,18 @@ export function GazeRunner() {
   // sample is tagged with the task and the time since it started, so fixations can be read per task.
   useEffect(() => {
     if (phase !== 'recording' || !model.current) return
-    let lastSample = 0
+    let lastSample = 0, farSince = 0
     filt.current.x.reset(); filt.current.y.reset()
-    collector.current = (f) => {
+    collector.current = (f, fms) => {
       const m = model.current!
-      if (isBlink(m, f)) return
       const now = performance.now()
+      if (isBlink(m, f)) { meter.current.frame('blink', fms); return }
+      // Head far from where it was during calibration: the estimate can't be trusted. Drop those
+      // samples, and after a couple of seconds ask the participant to move back.
+      const w = headWeight(headDrift(m, f))
+      if (w < 1) { farSince ||= now; if (now - farSince > DRIFT_PROMPT_MS) setDrifted(true) } else if (farSince) { farSince = 0; setDrifted(false) }
+      if (w === 0) { meter.current.frame('moved', fms); return }
+      meter.current.frame('ok', fms)
       const p = predict(m, f)
       const sx = filt.current.x.filter(p.x, now), sy = filt.current.y.filter(p.y, now)
       const x = Math.min(window.innerWidth, Math.max(0, sx)), y = Math.min(window.innerHeight, Math.max(0, sy))
@@ -163,12 +187,15 @@ export function GazeRunner() {
     }
     // Every click is a free calibration point: people look at what they click. The model is refitted
     // with the calibration plus the latest clicks, so it keeps up when the head moves.
+    // Clicks count half as much as a calibration dot, and only when the estimate is already near the
+    // click (people don't always look at what they click), so one odd click can't drag the model.
     const learn = (cx: number, cy: number) => {
       const lf = lastF.current
-      if (!lf || performance.now() - lf.at > 120 || isBlink(model.current!, lf.f)) return
-      clickSamples.current = [...clickSamples.current, { f: lf.f, x: cx, y: cy }].slice(-30)
-      const clicks = clickSamples.current.flatMap((c) => [c, c, c])
-      model.current = fit([...samples.current, ...clicks])
+      const m = model.current!
+      if (!lf || performance.now() - lf.at > 120 || isBlink(m, lf.f) || headDrift(m, lf.f) > 1 || !samples.current.length) return
+      if (!clickTeaches(predict(m, lf.f), { x: cx, y: cy }, accuracy ?? 150)) return
+      clickSamples.current = [...clickSamples.current, { f: lf.f, x: cx, y: cy, w: CLICK_WEIGHT }].slice(-30)
+      model.current = fit([...samples.current, ...clickSamples.current])
       writeSaved({ ...(readSaved() as Saved), model: model.current })
     }
     const onClick = (e: PointerEvent) => {
@@ -184,50 +211,57 @@ export function GazeRunner() {
   }, [phase])
 
   // Calibration and checking: look at the dot, click it, keep looking while frames are collected.
-  const targets = phase === 'validate' ? VALIDATION : CALIBRATION
+  const targets = phase === 'validate' ? VALIDATION : calDots
+  // Frames are collected for SETTLE_MS + COLLECT_MS after the click; the first SETTLE_MS (eyes still
+  // landing) are dropped, then blinks and glances away (stableFrames).
   const look = () => {
     if (busy) return
     setBusy(true)
     setHint('')
     const t = targets[step]
     const tx = t.x * window.innerWidth, ty = t.y * window.innerHeight
-    const got: Features[] = []
+    const got: { t: number; f: Features }[] = []
     const startAt = performance.now()
-    collector.current = (f) => { if (performance.now() - startAt > 150) got.push(f) }
+    collector.current = (f) => { got.push({ t: performance.now(), f }) }
     window.setTimeout(() => {
       collector.current = null
       setBusy(false)
-      if (got.length < 6) { setHint('Couldn’t see your eyes. Face the screen in good light, then click the dot again.'); return }
+      const kept = stableFrames(got, startAt)
+      if (!kept.length) { setHint('Couldn’t get a steady look. Face the screen in good light, keep looking at the dot, and click it again.'); return }
       if (phase === 'calibrate') {
-        got.forEach((f) => samples.current.push({ f, x: tx, y: ty }))
-        if (step + 1 < CALIBRATION.length) setStep(step + 1)
-        else { model.current = fit(samples.current); setStep(0); setPhase('validate') }
+        kept.forEach((f) => samples.current.push({ f, x: tx, y: ty }))
+        if (step + 1 < targets.length) setStep(step + 1)
+        else { model.current = fit(samples.current); checks.current = []; setStep(0); setPhase('validate') }
       } else {
-        const ps = got.map((f) => predict(model.current!, f))
-        checks.current.push({ px: ps.reduce((a, p) => a + p.x, 0) / ps.length, py: ps.reduce((a, p) => a + p.y, 0) / ps.length, x: tx, y: ty })
+        checks.current.push({ x: tx, y: ty, frames: kept })
         if (step + 1 < VALIDATION.length) setStep(step + 1)
         else {
-          const err = Math.round(checks.current.reduce((a, c) => a + Math.hypot(c.px - c.x, c.py - c.y), 0) / checks.current.length)
-          setAccuracy(err)
+          const q = validate(model.current!, checks.current)
+          setAccuracy(q.accuracy)
+          setQuality(q)
           setPhase('checked')
         }
       }
-    }, COLLECT_MS)
+    }, SETTLE_MS + COLLECT_MS)
   }
 
-  const recalibrate = () => { samples.current = []; checks.current = []; setStep(0); setHint(''); setPhase('calibrate') }
+  const recalibrate = () => { samples.current = []; checks.current = []; setCalDots(calibrationOrder()); setQuickUsed(false); setStep(0); setHint(''); setPhase('calibrate') }
+  /** Poor accuracy: five more dots are added to this calibration, then it is checked again (offered once). */
+  const quick = () => { checks.current = []; setCalDots(QUICK); setQuickUsed(true); setStep(0); setHint(''); setPhase('calibrate') }
   const record = () => {
     sid.current = Math.random().toString(36).slice(2, 10)
     clickSamples.current = []
-    writeSaved({ sid: sid.current, model: model.current!, accuracy: accuracy ?? 0, forTest, calib: samples.current })
-    saveGazeSession({ sid: sid.current, start: new Date().toISOString(), vw: window.innerWidth, accuracy })
+    meter.current = new RunMeter()
+    const q = quality
+    writeSaved({ sid: sid.current, model: model.current!, accuracy: accuracy ?? 0, quality: q ?? undefined, forTest, calib: samples.current })
+    saveGazeSession({ sid: sid.current, start: new Date().toISOString(), vw: window.innerWidth, accuracy, ...(q ? { accuracyDeg: q.accuracyDeg, precision: q.precision, distance: q.distance } : {}) })
     setPhase('recording')
-    if (forTest) window.dispatchEvent(new CustomEvent(GAZE_READY, { detail: { accuracy: accuracy ?? 0 } }))
+    if (forTest) window.dispatchEvent(new CustomEvent(GAZE_READY, { detail: { accuracy: accuracy ?? 0, accuracyDeg: q?.accuracyDeg, precision: q?.precision } }))
   }
 
   if (phase === 'off' || isEmbedded) return null
 
-  const quality = accuracy === null ? '' : accuracy <= 120 ? 'good' : accuracy <= 220 ? 'rough' : 'poor'
+  const grade = accuracy === null ? '' : qualityOf({ accuracy, accuracyDeg: quality?.accuracyDeg })
 
   return createPortal(
     <div data-insights-ignore data-gaze>
@@ -236,8 +270,8 @@ export function GazeRunner() {
           <div className="gz-head">
             <video ref={preview} className="gz-preview" autoPlay muted playsInline />
             <div>
-              <b>{phase === 'calibrate' ? `Calibrating · ${step + 1} of ${CALIBRATION.length}` : `Checking accuracy · ${step + 1} of ${VALIDATION.length}`}</b>
-              <p>Keep your head still. Look straight at the dot and click it, then keep looking until it moves.</p>
+              <b>{phase === 'calibrate' ? `Calibrating · ${step + 1} of ${calDots.length}` : `Checking accuracy · ${step + 1} of ${VALIDATION.length}`}</b>
+              <p>{phase === 'validate' ? 'Same again, on new dots: this measures how accurate the tracking is.' : 'Keep your head still. Look straight at the dot and click it, then keep looking until it moves.'}</p>
               <p className={face ? 'gz-ok' : 'gz-bad'}>{face ? 'Eyes found' : 'Looking for your face…'}</p>
               {hint && <p className="gz-bad">{hint}</p>}
             </div>
@@ -260,7 +294,7 @@ export function GazeRunner() {
                 <ul className="gz-list">
                   <li>The video stays in this browser. No video or pictures are saved or sent anywhere.</li>
                   <li>Only the estimated point you look at on each page is kept.</li>
-                  <li>First a short calibration: {CALIBRATION.length} dots, then {VALIDATION.length} to check accuracy. About a minute.</li>
+                  <li>First a short calibration: {calDots.length} dots in random order, then {VALIDATION.length} to check accuracy. About a minute.</li>
                   {forTest && <li>If you’d rather not, the test goes on without it.</li>}
                   <li>You can stop at any time with the Stop button.</li>
                 </ul>
@@ -269,8 +303,8 @@ export function GazeRunner() {
               {phase === 'error' && <p style={{ color: 'var(--critical-ink)' }}>{error}</p>}
               {phase === 'checked' && (
                 <>
-                  <p>Calibrated. On average the estimate was <b className="num">{accuracy} px</b> from where you looked.</p>
-                  <p className={`gz-quality ${quality}`}>{quality === 'good' ? 'Good enough for a heatmap of areas.' : quality === 'rough' ? 'Rough: fine for large areas, not for single buttons.' : 'Too far off. Calibrate again with your face well lit and your head still.'}</p>
+                  <p>Calibrated. On new dots the estimate was on average <b className="num">{accuracy} px</b>{quality ? <> (<span className="num">{quality.accuracyDeg}°</span>)</> : null} from where you looked{quality ? <>, jitter <span className="num">{quality.precision} px</span></> : null}.</p>
+                  <p className={`gz-quality ${grade}`}>{grade === 'good' ? 'Good enough for a heatmap of areas.' : grade === 'rough' ? 'Rough: fine for large areas, not for single buttons.' : quickUsed ? 'Still too far off. Calibrate again with your face well lit and your head still.' : 'Too far off. Five more dots usually help.'}</p>
                   <video ref={preview} className="gz-preview" autoPlay muted playsInline style={{ marginTop: 10 }} />
                 </>
               )}
@@ -279,9 +313,9 @@ export function GazeRunner() {
               {phase === 'consent' && <><button className="btn" onClick={() => shutdown()}>{forTest ? 'No, continue without' : 'Not now'}</button><button className="btn primary" onClick={() => void camera('calibrate')}>Turn on the camera</button></>}
               {phase === 'error' && <button className="btn" onClick={() => shutdown()}>{forTest ? 'Continue without eye tracking' : 'Close'}</button>}
               {phase === 'checked' && <>
-                <button className="btn" onClick={recalibrate}>Calibrate again</button>
-                {forTest && quality === 'poor' && <button className="btn" onClick={() => shutdown()}>Continue without eye tracking</button>}
-                <button className="btn primary" onClick={record} disabled={quality === 'poor'}>{forTest ? 'Continue to the test' : 'Start recording'}</button>
+                {grade === 'poor' && !quickUsed ? <button className="btn" onClick={quick}>Five more dots</button> : <button className="btn" onClick={recalibrate}>Calibrate again</button>}
+                {forTest && grade === 'poor' && <button className="btn" onClick={() => shutdown()}>Continue without eye tracking</button>}
+                <button className="btn primary" onClick={record} disabled={grade === 'poor'}>{forTest ? 'Continue to the test' : 'Start recording'}</button>
               </>}
             </div>
           </div>
@@ -292,7 +326,7 @@ export function GazeRunner() {
         <>
           {showDot && dot && <i className="gz-dot" style={{ left: dot.x, top: dot.y }} aria-hidden />}
           <div className="gz-pill" role="status">
-            <i className={face ? 'on' : ''} /> {face ? 'Eye tracking' : 'Can’t see your eyes'}
+            <i className={face && !drifted ? 'on' : ''} /> {!face ? 'Can’t see your eyes' : drifted ? 'Move back to where you sat for calibration' : 'Eye tracking'}
             <span className="muted num">±{accuracy} px</span>
             <button className="btn ghost sm icon" onClick={() => setShowDot((v) => !v)} aria-label={showDot ? 'Hide my gaze' : 'Show my gaze'} title={showDot ? 'Hide my gaze' : 'Show my gaze'}>{showDot ? <EyeOff size={14} /> : <Eye size={14} />}</button>
             <button className="btn sm" onClick={() => shutdown()}><Square size={12} /> Stop</button>
