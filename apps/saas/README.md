@@ -551,6 +551,12 @@ Everything else is the project's **published configuration**, built in the panel
 - **Inbox without a backend.** The inbox reads comments through the script's `Backend` interface, so it shows those saved on this domain. Open `embed-demo.html?project=<id>` (the panel links to it) to see comments arrive in the panel.
 - **Code and storage.** Data is in `vibe.saas` (localStorage) and the code in `src/saas/` and `src/pages/saas/`. The research dock and tools are not mounted on these pages.
 
+### Results in the panel, participation on the site
+
+- Sidebar (`src/pages/saas/Nav.tsx`): Overview · Setup · Feedback (Comments, Component reviews, Voice notes, Rounds, Report) · Research (All studies, Usability tests, 5-second tests, Heatmaps, Eye tracking, Participant paths) · Reviewers · Settings · guide. Exactly one item is active (`activeOf`: path plus `?kind`/`?tab`/`?module`, old `?kind=eyes|browse` included; a study's results page lights *All studies*). Tools that are off are left out (Products turns them on; the Research page lists them as Off). Groups remember open/closed (`saas:nav:open`).
+- Eye-tracking report (Labs): `src/saas/gaze-report.ts` (pure; uses `cleanGaze`, `smoothGaze`, `pairsOf`/`driftOf`, `fixationsOf`/`idtFor` as they are) and `src/pages/saas/GazeReport.tsx`, shown in a study's results when it has gaze. Demo: `#/app/research/sample-gaze` (labelled sample data).
+- "View heatmap" from the panel opens the site with `#vibe_tool=heatmap&vibe_heat=click|gaze&vibe_study=<id>&vibe_page=<path>` (+ review token); `takeReport()` in `src/core/embed/hints.ts` reads it once (also after a redirect) and the widget opens the report at once, for the team only. The dock's Heatmap button opens `HeatmapInfo` (recording switch, invite link, take part in eye tracking, Open results in your panel), never results.
+
 ## Reusable research modules
 
 The research tools are also packaged for other projects in `plugins/ux-research-kit/` at the repository root (outside this app): framework-agnostic TypeScript modules (tracking and sessions, heatmaps and replay, 5-second tests, fake doors, eye tracking, design tokens and UI-library palettes), specs per module, the privacy rules, and a verification checklist. That folder's README says how to add them to a project.

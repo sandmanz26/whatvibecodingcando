@@ -152,7 +152,7 @@ export function Guide() {
               <li><b>Eye-tracking heatmap (Labs):</b> where people’s eyes rested, from their webcam. Only people who join a study with eye tracking on, agree and calibrate (about 20 seconds). It is approximate (often 100–200 px), so read areas, not exact spots. Video never leaves their browser.</li>
             </ul>
             <p>The <i>Site heatmap</i> study shows in <i>Research</i>: you can rename it, close it (pause) or delete it. You don’t need it for other studies.</p>
-            <p>Open a heatmap from a study’s results, or with the <i>Heatmap</i> button on your site (reviewers). The heatmap is drawn over the real page, and is built to read true:</p>
+            <p>Results are read in your panel. In a study’s results, <i>View heatmap</i> (clicks) or <i>View gaze heatmap</i> opens your site with the heatmap <b>already showing</b>, for that study and page. The <i>Heatmap</i> button on your site is for taking part: whether your clicks are recorded, the invite link, <i>Take part in eye tracking</i> (calibrate) and <i>Open results in your panel</i>. Eye-tracking studies also get a report in the panel: participants, good-calibration share, median accuracy, drift correction, and per page what people looked at, first, for how long, how often they came back, and whether they clicked it. The heatmap is drawn over the real page, and is built to read true:</p>
             <ul>
               <li><b>One device at a time</b> (desktop, tablet, phone), because the same button sits in a different place on each.</li>
               <li><b>Each person counts the same</b> (on by default), so one person who clicked 200 times doesn’t outweigh everyone else.</li>

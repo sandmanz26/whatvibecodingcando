@@ -367,6 +367,14 @@ select indexname from pg_indexes where indexname in ('runs_project_started_idx',
 
 ---
 
+## 14b. Menu panel, laporan eye tracking, View heatmap (mode demo)
+
+1. Panel: buka beberapa halaman (Overview, Research → Heatmaps, Eye tracking, Comments). **Hanya satu** item menu yang tersorot. Grup Feedback/Research bisa dilipat dan diingat.
+2. Research → Eye tracking → **See a sample report**: ringkasan (peserta, kalibrasi baik, akurasi median, drift), daftar halaman dengan pratinjau, tabel elemen dengan rentang 95%, "What people looked at first", kolom Clicked. Label "Labs" dan "Sample data" terlihat. Cek juga di lebar HP.
+3. Klik **View gaze heatmap**: situs demo terbuka dengan panel heatmap **sudah terbuka** di "Where people looked". Reload: panel tidak terbuka lagi (hint sekali pakai).
+4. Di situs, klik tombol Heatmap di dock: yang muncul info partisipasi (rekam klik saya, Copy invite link, Take part in eye tracking, **Open results in your panel**), **bukan** hasil.
+5. Otomatis: `tests/e2e` belum punya skrip ini; pemeriksaan dilakukan dengan Playwright manual (lihat HANDOFF 30 Nov).
+
 ## 15. Tes otomatis (untuk developer)
 
 Di komputer dengan Node 22:

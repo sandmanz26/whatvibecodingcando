@@ -12,8 +12,8 @@ import * as server from './server'
 import { deviceOf, prepare, type Anchor, type Device, type RawPt } from './heatmath'
 import { binsToPoints, exposureWeight, fmtShare, place, rowOf, tagOfLabel, type Resolve } from '../heatstats'
 import { cleanSummary, compareViews, MIN_EXPOSURES, verName, versionsOf, viewOf, type Summary } from './heatsummary'
-import { defaultInvite, inviteUrl, labelOf, pageOf, reviewerClicksOff, setReviewerClicksOff, type Invite } from './research'
-import { takeHint } from './hints'
+import { defaultInvite, inviteUrl, labelOf, moduleInvite, pageOf, reviewerClicksOff, setReviewerClicksOff, type Invite } from './research'
+import type { ReportHint } from './hints'
 
 import { TOOL_IDS, type ToolId } from './decide'
 export { TOOL_IDS, type ToolId }
@@ -61,10 +61,11 @@ const ours = (e: Event) => e.composedPath().some((n) => n instanceof Element && 
 
 /* ---------- the tool shown ---------- */
 
-export function ToolView({ tool, project, onClose }: { tool: ToolId; project: string; onClose: () => void }) {
+export function ToolView({ tool, project, onClose, report }: { tool: ToolId; project: string; onClose: () => void; report?: ReportHint | null }) {
   if (tool === 'inspect') return <InspectTool project={project} onClose={onClose} />
   if (tool === 'dscheck') return <CheckTool project={project} onClose={onClose} />
-  if (tool === 'heatmap') return <HeatmapTool project={project} onClose={onClose} />
+  // Results open only from the panel's "View heatmap" link; the dock's button is about taking part.
+  if (tool === 'heatmap') return report ? <HeatmapTool project={project} report={report} onClose={onClose} /> : <HeatmapInfo project={project} onClose={onClose} />
   return <TokensTool project={project} onClose={onClose} />
 }
 
@@ -315,17 +316,50 @@ function samplePoints(): HeatPt[] {
   return out
 }
 
-function HeatmapTool({ project, onClose }: { project: string; onClose: () => void }) {
+/**
+ * The dock's Heatmap button, for the team: what is being recorded (their own clicks, with a switch),
+ * the invite link, taking part in eye tracking (calibrate), and a link to the results in the panel.
+ * Results are read in the panel; its "View heatmap" opens the overlay on this site, already showing.
+ */
+function HeatmapInfo({ project, onClose }: { project: string; onClose: () => void }) {
+  const [mine, setMine] = useState(() => !reviewerClicksOff(project))
+  const [invite, setInvite] = useState<Invite | null>(null)
+  const [eyes, setEyes] = useState<Invite | null>(null)
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    void defaultInvite(project).then(setInvite).catch(() => setInvite(null))
+    void moduleInvite(project, 'gaze').then(setEyes).catch(() => setEyes(null))
+  }, [project])
+  useEffect(() => { const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key) }, [onClose])
+  return (
+    <div className="vc-panel vc-heatpanel" role="dialog" aria-label="Heatmap" data-vc-heatinfo="">
+      <div className="vc-card-head"><b>Heatmap</b><span className="vc-grow" /><button className="vc-icon" onClick={onClose} aria-label="Close"><X size={14} /></button></div>
+      <p className="vc-muted">{mine ? 'Your clicks on this site are being recorded into the site heatmap, with your reviewers’ and the people you invite.' : 'Your own clicks are not being recorded. Reviewers’ and invited people’s clicks still are.'}</p>
+      <label className="vc-check"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setReviewerClicksOff(project, !e.target.checked) }} /> Record my clicks for this heatmap</label>
+      <div className="vc-invite">
+        <div className="vc-row">
+          <button type="button" className="vc-btn" disabled={!invite?.token} onClick={() => { if (invite?.token && navigator.clipboard) void navigator.clipboard.writeText(inviteUrl(invite.token)).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 2000) }) }}>{copied ? 'Copied' : 'Copy invite link'}</button>
+          {eyes?.token && eyes.open && <a className="vc-btn" data-vc-takepart="gaze" href={inviteUrl(eyes.token)} onClick={() => { window.setTimeout(() => window.location.reload(), 50) }}>Take part in eye tracking</a>}
+        </div>
+        <p className="vc-muted">{invite ? (invite.token ? `${invite.people} ${invite.people === 1 ? 'person' : 'people'} so far · people you invite agree first, then browse.` : 'The invite link is off (Research in your panel).') : 'Invite link not available here.'}{eyes?.token && eyes.open ? ' Eye tracking (Labs) asks for your webcam and a 20-second calibration; video stays in your browser.' : ''}</p>
+      </div>
+      <a className="vc-btn primary" href={panelUrl('/app/research?module=heatmap')} target="_blank" rel="noopener noreferrer" data-vc-openresults="">Open results in your panel</a>
+      <p className="vc-where">Results live in your panel. Its <b>View heatmap</b> opens this site with the heatmap already showing, for the study and page you pick. Visitors never see results.</p>
+    </div>
+  )
+}
+
+function HeatmapTool({ project, onClose, report }: { project: string; onClose: () => void; report: ReportHint }) {
   const [sample, setSample] = useState(false)
   const [data, setData] = useState<{ studies: { id: string; name: string }[]; points: HeatPt[]; anchors: Anchor[]; summary: Summary | null } | null>(null)
-  const [study, setStudy] = useState('')
+  const [study, setStudy] = useState(report.study ?? '')
   const [error, setError] = useState('')
   const [opacity, setOpacity] = useState(0.75)
-  const [kind, setKind] = useState<'click' | 'gaze'>(() => {
-    // The panel's "Gaze heatmap" opens it on where people looked (#vibe_heat=gaze); the hint leaves the address.
-    return takeHint('heat', 'gaze') ? 'gaze' : 'click'
-  })
-  const [page, setPage] = useState(pageOf(window.location.pathname))
+  // Opened from the panel's "View heatmap": on that kind, study and page (the link's page, even if the site redirected).
+  const [kind, setKind] = useState<'click' | 'gaze'>(report.kind)
+  const [page, setPage] = useState(report.page ?? pageOf(window.location.pathname))
+  // Follows the reviewer to other pages, but not merely because a redirect left them elsewhere on arrival.
+  const seenPath = useRef(window.location.pathname)
   const [device, setDevice] = useState<Device>(deviceOf(window.innerWidth))
   const [equal, setEqual] = useState(true)
   const [goodOnly, setGoodOnly] = useState(true)
@@ -432,7 +466,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
     draw()
     window.addEventListener('scroll', redraw, true)
     window.addEventListener('resize', resized)
-    const iv = window.setInterval(() => { if (pageOf(window.location.pathname) !== page) setPage(pageOf(window.location.pathname)) }, 500)
+    const iv = window.setInterval(() => { if (window.location.pathname !== seenPath.current) { seenPath.current = window.location.pathname; setPage(pageOf(window.location.pathname)) } }, 500)
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', key)
     return () => { cancelAnimationFrame(raf); window.clearTimeout(tm); window.removeEventListener('scroll', redraw, true); window.removeEventListener('resize', resized); window.clearInterval(iv); window.removeEventListener('keydown', key) }

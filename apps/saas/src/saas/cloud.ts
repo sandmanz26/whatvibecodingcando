@@ -238,7 +238,7 @@ async function eventsOf(ids: string[], max = 20000): Promise<EventRow[]> {
   const events: EventRow[] = []
   for (let i = 0; i < ids.length && events.length < max; i += 100) {
     const chunk = ids.slice(i, i + 100)
-    events.push(...await paged<EventRow>((from, to) => supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit').in('kind', ['click', 'page', 'gaze', 'door'])
+    events.push(...await paged<EventRow>((from, to) => supabase!.from('run_events').select('run_id, t, task, kind, page, label, sel, rage, dead, hit, x, y, vw').in('kind', ['click', 'page', 'gaze', 'door'])
       .in('run_id', chunk).order('run_id').order('t').order('id').range(from, to), max - events.length))
   }
   return events
@@ -423,7 +423,7 @@ export interface StudyRow { id: string; kind: StudyKind; name: string; config: R
 export type StudyModule = 'heatmap' | 'gaze' | 'fivesec' | 'usability'
 export const studyModule = (s: Pick<StudyRow, 'kind' | 'eye_tracking' | 'module'>): StudyModule => s.module ?? (s.kind === 'usability' ? 'usability' : s.kind === 'fivesec' ? 'fivesec' : s.eye_tracking ? 'gaze' : 'heatmap')
 export interface RunRow { id: string; started_at: string; finished_at: string | null; device: string | null; vw: number | null; gaze_accuracy: number | null; result: { tasks?: { id: string; outcome: string; ms: number; pages?: string[]; clicks?: number; firstClickHit?: boolean | null }[]; answers?: string[] }; events: number }
-export interface EventRow { run_id: string; t: number; task: string | null; kind: 'click' | 'page' | 'gaze' | 'door'; page: string; label: string | null; sel: string | null; rage: boolean | null; dead: boolean | null; hit: boolean | null }
+export interface EventRow { run_id: string; t: number; task: string | null; kind: 'click' | 'page' | 'gaze' | 'door'; page: string; label: string | null; sel: string | null; rage: boolean | null; dead: boolean | null; hit: boolean | null; /** page px, for the eye-tracking report's fixations and drift */ x?: number | null; y?: number | null; vw?: number | null }
 
 export async function listStudies(publicId: string): Promise<StudyRow[]> {
   const id = dbIds.get(publicId)

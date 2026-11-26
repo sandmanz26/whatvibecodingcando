@@ -11,7 +11,7 @@ export const TOOL_IDS: ToolId[] = ['inspect', 'dscheck', 'tokens', 'heatmap']
 export type ResearchModule = 'heatmap' | 'gaze' | 'fivesec' | 'usability'
 export const RESEARCH_MODULES: ResearchModule[] = ['heatmap', 'gaze', 'fivesec', 'usability']
 
-export type Decision = { show: true; config: WidgetConfig; preview: boolean; comments: boolean; tools: ToolId[]; research: ResearchModule[] } | { show: false; why: string }
+export type Decision = { show: true; config: WidgetConfig; preview: boolean; comments: boolean; tools: ToolId[]; research: ResearchModule[]; /** the team: let in by the panel or a review link (not a visitor); only they can open results */ team: boolean } | { show: false; why: string }
 /**
  * Whether the widget shows here, and with which settings. Order matters: the off switch first, then
  * where (environment), then what (modules), then who (audience).
@@ -31,11 +31,12 @@ export function decide(o: { project: string; config: WidgetConfig | null; draft:
   // in with a review link only, whatever the audience: they are the team's tools, not the visitors'.
   const comments = c.modules.comments && (c.audience === 'everyone' || o.reviewer)
   // With the widget for reviewers only, every reviewer came in through a link (or the panel's preview).
-  const tools = o.invited || (o.reviewer && c.audience === 'reviewers') ? TOOL_IDS.filter((id) => c.modules[id]) : []
+  const team = o.invited || (o.reviewer && c.audience === 'reviewers')
+  const tools = team ? TOOL_IDS.filter((id) => c.modules[id]) : []
   // Open to everyone: every research module that is on, each with a one-line consent first (people
   // who already record into the heatmap as reviewers don't get the heatmap's button again).
   const research = c.audience === 'everyone' && !preview ? RESEARCH_MODULES.filter((id) => c.modules[id] && !(id === 'heatmap' && tools.includes('heatmap'))) : []
   if (!comments && !tools.length && !research.length) return { show: false, why: 'Only reviewers see it; open the site through a review link.' }
-  return { show: true, config: c, preview, comments, tools, research }
+  return { show: true, config: c, preview, comments, tools, research, team }
 }
 

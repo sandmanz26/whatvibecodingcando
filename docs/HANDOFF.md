@@ -86,11 +86,22 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - "Collect clicks from all visitors" **tanpa persetujuan** tetap TIDAK dibuat; yang ada sekarang: Everyone + OK per modul.
 - Eye tracking dari widget: ada untuk mode Everyone (OK → izin kamera → kalibrasi singkat).
 - PostHog `visitor_consented` **tidak dibuat**: aturan proyek melarang PostHog di script yang berjalan di situs pelanggan. Yang dikirim dari panel: `study_added`, `study_default_changed` (id/modul saja).
+- **Hasil dibaca di dashboard**, bukan di situs: tombol Heatmap di widget = partisipasi (+ link ke panel); overlay hasil hanya terbuka lewat *View heatmap* di panel. Item menu untuk modul yang mati **disembunyikan** (bukan diredupkan) agar menu pendek; halaman Research tetap menunjukkan modul "Off".
 - Ditahan: "Fixed, please check", error konsol di komentar, MCP.
 
 ---
 
 ## 4. Log perubahan (terbaru di atas)
+
+### 30 Nov 2026 — menu panel, laporan eye tracking, hasil hanya dari dashboard
+- **Menu kiri** didesain ulang: Overview · Setup · **Feedback** (Comments, Component reviews, Voice notes, Rounds, Report) · **Research** (All studies, Usability tests, 5-second tests, Heatmaps, Eye tracking, Participant paths) · Reviewers · Settings · User guide. Bug lama: `?module=` diabaikan sehingga 5 item tersorot sekaligus; sekarang **tepat satu** item aktif (halaman hasil studi → "All studies"). Badge jumlah di grup dihapus (tidak berguna). Alamat lama tetap jalan (termasuk `?kind=eyes`).
+- **Laporan eye tracking (Labs)** di hasil studi: ringkasan (peserta, % kalibrasi baik ≤150 px dengan rentang 95%, akurasi median, % drift-corrected), daftar halaman dengan pratinjau titik fiksasi (skematik, tidak ada screenshot), per halaman: siapa melihat elemen (± 95%), waktu ke pandangan pertama, lama melihat, kembali lagi, dan berapa yang mengklik; "dilihat pertama" + urutan tiga pertama; catatan "dilihat tapi tidak diklik" hanya untuk tombol/link. Memakai fungsi algoritma yang ada (tidak menulis ulang). Mode demo: Research → Eye tracking → *See a sample report* (data contoh berlabel).
+- **View heatmap** (klik atau gaze) dari panel membuka situs dengan overlay **langsung terbuka** pada studi, jenis dan halaman itu (hint `vibe_tool/vibe_heat/vibe_study/vibe_page`, sekali pakai, tetap jalan setelah redirect). Juga berlaku untuk proyek yang hanya menyalakan Eye tracking (sebelumnya gagal karena butuh tool Heatmap).
+- **Tombol Heatmap di widget** (tim) tidak lagi menampilkan hasil: isinya status rekam klik, Copy invite link, **Take part in eye tracking**, dan **Open results in your panel**. Hasil hanya dari panel. Pengunjung tetap tidak pernah melihat hasil.
+- Tidak ada SQL baru (kolom x, y, vw di `run_events` sudah ada dan sudah bisa dibaca anggota).
+
+**Yang belum terverifikasi:** laporan eye tracking dengan data server asli (hanya diuji dengan data contoh di demo); overlay gaze di server (demo tidak punya data gaze, jadi menampilkan "No eye tracking here yet"); "Take part in eye tracking" di situs asli (butuh studi ★ Eye tracking terbuka). **Cache:** `vibe-app.js` disajikan dengan max-age 300 — setelah deploy, tunggu ±5 menit atau hard-reload sebelum menilai perilaku baru.
+
 
 ### 29 Nov 2026
 - **Satu studi default ★ per modul riset.** Heatmap, Eye tracking, 5-second test dan Usability test masing-masing otomatis punya satu studi default (badge **★ Default · Auto**) saat modul dinyalakan (onboarding atau Update site); proyek lama mendapatkannya lewat SQL untuk modul yang sudah aktif. Indeks unik per (proyek, modul), pembuatan idempoten.

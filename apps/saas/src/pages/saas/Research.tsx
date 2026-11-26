@@ -5,6 +5,9 @@ import { useStore } from '../../store/store'
 import { Modal } from '../../components/ui'
 import { copyText, demoUrl } from '../../saas/snippet'
 import { liveOf, openAsReviewer } from '../../saas/widget'
+import { reportHash } from '../../core/embed/hints'
+import { sampleGaze } from '../../saas/gaze-report'
+import { GazeReport } from './GazeReport'
 import { productOf } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
 import { clearStudyResults, deleteRun, deleteStudy, listStudies, makeDefaultStudy, projectSessions, revokeStudyLink, saveStudy, studyLink, studyModule, studyResults, type EventRow, type RunRow, type StudyKind, type StudyModule, type StudyRow } from '../../saas/cloud'
@@ -98,6 +101,11 @@ export function Research() {
   }
   const makeDefault = (s: StudyRow) => void makeDefaultStudy(s.id).then(() => { track('study_default_changed', { module: studyModule(s) }); toast(`“${s.name}” is now the default`); load() }).catch((e: Error) => toast(`Couldn’t change the default: ${e.message}`, 'error'))
   const shown = MODULES.filter((m) => (only ? m.id === only : true))
+  // Demo: the demo site, with the heatmap report already open (the same hint the study results use).
+  const viewDemoHeat = (kind: 'click' | 'gaze') => {
+    const u = new URL(demoUrl(project.id)); u.hash = reportHash({ kind })
+    void openAsReviewer(project.id, u.href).then((ok) => { if (!ok) toast('Couldn’t open the demo site as a reviewer.', 'error') })
+  }
   const studyCard = (s: StudyRow) => (
     <li key={s.id} className="up-card" data-study={s.name}>
       <div className="up-row">
@@ -148,7 +156,7 @@ export function Research() {
               <ul className="rs-list"><li className="up-card" data-study={demoRow.study.name}>
                 <div className="up-row"><span className="lp-grow"><b>{demoRow.study.name}</b><small className="up-muted"> · {demoRow.runs} {demoRow.runs === 1 ? 'person' : 'people'}{demoRow.visitors ? ` (${demoRow.visitors} visitor${demoRow.visitors === 1 ? '' : 's'})` : ''}</small></span>{STAR}<span className={`up-badge ${demoRow.study.open ? '' : 'pending'}`}>{demoRow.study.open ? 'Open' : 'Paused'}</span></div>
                 <p className="up-muted">{DEFAULT_HELP}{demoRow.study.open ? '' : ' Paused: nothing is recorded, and visitors don’t see this module.'}</p>
-                <div className="up-row wrap"><button className="lp-btn sm ghost" onClick={() => { setLocalStudyOpen(project.id, m.id, !demoRow.study.open); redraw((n) => n + 1) }}>{demoRow.study.open ? 'Pause' : 'Resume'}</button>{m.id === 'heatmap' && <span className="up-muted">See it on your site: <i>Open my site</i> → Heatmap.</span>}</div>
+                <div className="up-row wrap"><button className="lp-btn sm ghost" onClick={() => { setLocalStudyOpen(project.id, m.id, !demoRow.study.open); redraw((n) => n + 1) }}>{demoRow.study.open ? 'Pause' : 'Resume'}</button>{(m.id === 'heatmap' || m.id === 'gaze') && <button className="lp-btn sm" data-view-heat={m.id === 'gaze' ? 'gaze' : 'click'} onClick={() => viewDemoHeat(m.id === 'gaze' ? 'gaze' : 'click')}>View heatmap <ExternalLink size={12} /></button>}{m.id === 'gaze' && <Link className="lp-btn sm ghost" to="/app/research/sample-gaze" data-sample-gaze="">See a sample report</Link>}</div>
               </li></ul>
             )}
             {cloud && rows && on(m.id) && !mine.some((s) => s.is_default) && <p className="up-muted">The default study appears after you update your site from Widget (or run the 2026-11-29 SQL). {mine.length ? 'Or make one of the studies below the default.' : ''}</p>}
@@ -309,7 +317,22 @@ export function StudyResults() {
   useEffect(() => { if (got) track('study_results_viewed', { runs: data?.runs.length ?? 0 }) }, [got, id]) // eslint-disable-line react-hooks/exhaustive-deps
   const byRun = useMemo(() => { const m = new Map<string, EventRow[]>(); for (const e of data?.events ?? []) m.set(e.run_id, [...(m.get(e.run_id) ?? []), e]); return m }, [data])
   if (!project) return null
-  if (!cloud) return <div className="up-page"><p className="up-warn">Studies need the server.</p></div>
+  if (!cloud) {
+    if (id !== 'sample-gaze') return <div className="up-page"><p className="up-warn">Studies need the server.</p></div>
+    const s = sampleGaze()
+    const viewSample = (page: string, kind: 'click' | 'gaze') => {
+      // The sample's pages aren't the demo site's: the overlay shows the page it opens on.
+      void page; const u = new URL(demoUrl(project.id)); u.hash = reportHash({ kind })
+      void openAsReviewer(project.id, u.href).then((ok) => { if (!ok) toast('Couldn’t open the demo site as a reviewer.', 'error') })
+    }
+    return (
+      <div className="up-page">
+        <button className="lp-btn sm ghost" onClick={() => nav('/app/research?module=gaze')}><ArrowLeft size={14} /> Eye tracking</button>
+        <div className="up-head"><div><h1>Eye tracking · sample report</h1><p>Made-up data from 14 pretend people, so you can see what a study’s report looks like. Real studies need the server.</p></div></div>
+        <GazeReport runs={s.runs} events={s.events} sample onView={viewSample} />
+      </div>
+    )
+  }
   const runs = data?.runs ?? []
   const done = runs.filter((r) => r.finished_at)
   const tasks = ((study?.config as { tasks?: { id: string; prompt: string }[] } | undefined)?.tasks) ?? []
@@ -318,9 +341,12 @@ export function StudyResults() {
   const heatOn = !!liveOf(project)?.config.modules.heatmap
   const openHeat = (page: string, gaze = false) => {
     // A page kind (/product/:id) has no single address: any page of that kind shows its map.
-    if (page.includes(':id')) { toast(`Open any ${page.replace(/:id/g, '…')} page of your site as a reviewer, then press Heatmap in the dock: the map covers every page of that kind.`); return }
-    const base = project.siteUrl ? new URL(page, project.siteUrl).href : demoUrl(project.id)
-    const u = new URL(base); u.hash = gaze ? 'vibe_tool=heatmap&vibe_heat=gaze' : 'vibe_tool=heatmap'
+    // It opens on the site's home page with the report showing that page kind's map; the reviewer then goes to any page of that kind.
+    const real = !page.includes(':id')
+    const base = project.siteUrl ? new URL(real ? page : '/', project.siteUrl).href : demoUrl(project.id)
+    // The link carries the study, the kind and the page: the overlay opens at once, on exactly that (hints.ts).
+    const u = new URL(base); u.hash = reportHash({ kind: gaze ? 'gaze' : 'click', study: id ?? null, page })
+    if (!real) toast(`Pages like ${page.replace(/:id/g, '…')} share one map: go to any of them on your site and it follows.`)
     void openAsReviewer(project.id, u.href).then((ok) => { if (!ok) toast('Couldn’t open your site as a reviewer.', 'error') })
   }
   return (
@@ -374,28 +400,13 @@ export function StudyResults() {
               </section>
             )
           })()}
-          {(() => {
-            const gz = (data?.events ?? []).filter((e) => e.kind === 'gaze')
-            if (!gz.length) return null
-            // Each gaze point stands for about 200 ms of looking.
-            const rows = [...gz.reduce((m, e) => { const k = `${e.page}\u0000${e.label ?? e.sel ?? '?'}`; const v = m.get(k) ?? { page: e.page, what: e.label ?? e.sel ?? '?', n: 0, people: new Set<string>() }; v.n++; v.people.add(e.run_id); return m.set(k, v) }, new Map<string, { page: string; what: string; n: number; people: Set<string> }>()).values()].sort((a, b) => b.n - a.n).slice(0, 15)
-            const pagesG = [...new Set(gz.map((e) => e.page))]
-            return (
-              <section className="up-card">
-                <h2>Where people looked</h2>
-                <table className="db-table"><thead><tr><th>Page</th><th>Element</th><th>Looked at</th><th>People</th></tr></thead>
-                  <tbody>{rows.map((x) => <tr key={x.page + x.what}><td><code>{x.page}</code></td><td>{x.what}</td><td>{(x.n * 0.2).toFixed(1)} s</td><td>{x.people.size}</td></tr>)}</tbody></table>
-                <div className="up-row wrap">{pagesG.slice(0, 6).map((pg) => <button key={pg} className="lp-btn sm" onClick={() => openHeat(pg, true)}>Gaze heatmap of {pg} <ExternalLink size={12} /></button>)}</div>
-                <p className="up-muted">Webcam eye tracking is estimated (about 100–200 px), so read this as areas, not exact points. Only participants who agreed to it.</p>
-              </section>
-            )
-          })()}
+          {data.events.some((e) => e.kind === 'gaze') && <GazeReport runs={runs} events={data.events} onView={(pg, k) => openHeat(pg, k === 'gaze')} />}
           <section className="up-card">
             <h2><Flame size={16} /> Clicks by page</h2>
             {!heatOn && <p className="up-warn"><TriangleAlert size={13} /> To see the heatmap over your page, turn on Heatmaps in Products and update your site.</p>}
             <table className="db-table">
               <thead><tr><th>Page</th><th>Clicks</th><th>Rage clicks</th><th>On nothing clickable</th><th /></tr></thead>
-              <tbody>{pages.map(([p, [n, rage, dead]]) => <tr key={p}><td><code>{p}</code></td><td>{n}</td><td>{rage}</td><td>{dead}</td><td>{heatOn && <button className="lp-btn sm" onClick={() => openHeat(p)}>Heatmap <ExternalLink size={12} /></button>}</td></tr>)}</tbody>
+              <tbody>{pages.map(([p, [n, rage, dead]]) => <tr key={p}><td><code>{p}</code></td><td>{n}</td><td>{rage}</td><td>{dead}</td><td>{heatOn && <button className="lp-btn sm" onClick={() => openHeat(p)} data-view-heat="click">View heatmap <ExternalLink size={12} /></button>}</td></tr>)}</tbody>
             </table>
           </section>
           {pages.length > 0 && <PageAccuracy study={id!} pages={pages.map(([p]) => p)} />}

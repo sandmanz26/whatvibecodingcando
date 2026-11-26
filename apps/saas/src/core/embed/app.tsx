@@ -426,7 +426,7 @@ export async function boot(given?: HTMLScriptElement | null) {
     const config: Config = {
       project, position: c.launcher.position, shortcut: c.launcher.shortcut, launcher: c.launcher.kind, label: c.launcher.label,
       accent: c.theme.accent, mode: c.theme.mode,
-      comments: decision.comments, tools: decision.tools,
+      comments: decision.comments, tools: decision.tools, team: decision.team,
       compare: decision.comments && !!c.modules.compare, narration: decision.comments && !!c.modules.narration && m.sessions, version: c.version,
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
       research: researchEntries(decision.research, vms), onResearch: setAsking,

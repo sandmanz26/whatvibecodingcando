@@ -37,3 +37,25 @@ export function takeHint(name: string, value = '[^&]+'): string | null {
   }
   return v
 }
+
+/**
+ * The panel's "View heatmap" link: #vibe_tool=heatmap&vibe_heat=click|gaze&vibe_study=<id>&vibe_page=<path>.
+ * It opens the heatmap report straight away, on that study, kind and page (the page from the link,
+ * so it still shows the right map when the site redirected on load). Every part is taken once.
+ */
+export interface ReportHint { kind: 'click' | 'gaze'; study: string | null; page: string | null }
+export function takeReport(): ReportHint | null {
+  if (peekHint('tool', 'heatmap') === null) return null
+  takeHint('tool', 'heatmap')
+  const heat = takeHint('heat', 'gaze|click')
+  const study = takeHint('study', '[0-9a-f-]{36}')
+  const raw = takeHint('page')
+  let page: string | null = null
+  try { page = raw ? decodeURIComponent(raw) : null } catch { page = null }
+  if (page && (!/^\/(?!\/)/.test(page) || page.length > 300)) page = null
+  return { kind: heat === 'gaze' ? 'gaze' : 'click', study, page }
+}
+/** The hash the panel's "View heatmap" puts on the page's address (with the review token added later). */
+export function reportHash(o: { kind: 'click' | 'gaze'; study?: string | null; page?: string | null }): string {
+  return ['vibe_tool=heatmap', `vibe_heat=${o.kind}`, ...(o.study ? [`vibe_study=${o.study}`] : []), ...(o.page ? [`vibe_page=${encodeURIComponent(o.page)}`] : [])].join('&')
+}

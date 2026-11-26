@@ -4,7 +4,7 @@ import type { VisitorModule } from './research'
 import { audioUrl, uploadAudio } from './server'
 import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
 import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, canCommentNow, deviceNow, pageKey, pageUrl, place, relocate, statusOf, uid, type Anchor, type Backend, type Reply, type RoundState, type Status, type Thread } from './store'
-import { takeHint } from './hints'
+import { takeHint, takeReport, type ReportHint } from './hints'
 import { describe, findAll, isFp, stateOf, type PinState } from './anchor'
 
 export interface Config {
@@ -20,6 +20,8 @@ export interface Config {
   comments: boolean
   /** the reviewer tools turned on for the project */
   tools: ToolId[]
+  /** the team (let in by the panel or a review link): may open the panel's heatmap report link */
+  team?: boolean
   /** Component review: comments comparing two elements (A vs B) */
   compare?: boolean
   /** Narration: voice notes (needs the server) */
@@ -77,7 +79,11 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const [nudge, setNudge] = useState(0)
   const [openId, setOpenId] = useState<string | null>(null)
   const [panel, setPanel] = useState(false)
-  // The panel can open a tool on arrival (#vibe_tool=heatmap); the hint leaves the address at once.
+  // The panel's "View heatmap" (#vibe_tool=heatmap&vibe_heat=…&vibe_study=…&vibe_page=…) opens the
+  // heatmap report at once, for the team only; the hint leaves the address. Results never open from
+  // the dock: its Heatmap button says what is recorded and links to the panel.
+  const [heatReport, setHeatReport] = useState<ReportHint | null>(() => { const r = takeReport(); return r && (config.team || config.tools.length > 0) ? r : null })
+  // Other tools can be opened on arrival too (#vibe_tool=inspect).
   const [tool, setTool] = useState<ToolId | null>(() => {
     const t = takeHint('tool', '[a-z]+')
     return t && config.tools.includes(t as ToolId) ? (t as ToolId) : null
@@ -199,7 +205,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
   const pickTool = (id: ToolId) => {
     if (tool === id) { setTool(null); return }
     if (busy()) return
-    setDraft(null); setOpenId(null); setPanel(false); setPlacing(false); setTool(id)
+    setDraft(null); setOpenId(null); setPanel(false); setPlacing(false); setHeatReport(null); setTool(id)
   }
   const closeTool = useCallback(() => setTool(null), [])
   const drop = (e: React.MouseEvent) => {
@@ -438,7 +444,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
           onPick={go} onClose={() => setPanel(false)} number={(t) => threads.filter((x) => x.page === t.page).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).indexOf(t) + 1} />
       )}
 
-      {tool && <ToolView tool={tool} project={config.project} onClose={closeTool} />}
+      {heatReport ? <ToolView tool="heatmap" report={heatReport} project={config.project} onClose={() => setHeatReport(null)} /> : tool && <ToolView tool={tool} project={config.project} onClose={closeTool} />}
 
       {(config.launcher === 'floating' || config.tools.length > 0 || !!config.research?.length) && <div className="vc-dock" role="toolbar" aria-label="Collaboration">
         {config.comments && config.launcher === 'floating' && <><button className={`vc-btn primary ${placing ? 'on' : ''}`} onClick={() => (placing ? setPlacing(false) : start())} title={config.shortcut ? 'Comment (C)' : 'Comment'}>
