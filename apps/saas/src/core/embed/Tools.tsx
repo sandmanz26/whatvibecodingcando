@@ -15,8 +15,8 @@ import { cleanSummary, compareViews, MIN_EXPOSURES, verName, versionsOf, viewOf,
 import { defaultInvite, inviteUrl, labelOf, pageOf, reviewerClicksOff, setReviewerClicksOff, type Invite } from './research'
 import { takeHint } from './hints'
 
-export type ToolId = 'inspect' | 'dscheck' | 'tokens' | 'heatmap'
-export const TOOL_IDS: ToolId[] = ['inspect', 'dscheck', 'tokens', 'heatmap']
+import { TOOL_IDS, type ToolId } from './decide'
+export { TOOL_IDS, type ToolId }
 export const TOOL_META: Record<ToolId, { label: string; Icon: typeof Palette }> = {
   inspect: { label: 'Inspect', Icon: SquareDashedMousePointer },
   dscheck: { label: 'Design system check', Icon: ScanSearch },
@@ -453,7 +453,7 @@ function HeatmapTool({ project, onClose }: { project: string; onClose: () => voi
           <>
             {sample && <p className="vc-sample"><b>Sample data.</b> This is what a click heatmap looks like. Click around this page: your own clicks replace it within a few seconds.</p>}
             <div className="vc-seg"><button aria-pressed={kind === 'click'} onClick={() => setKind('click')}>Clicks</button><button aria-pressed={kind === 'gaze'} onClick={() => setKind('gaze')}>Where people looked</button></div>
-            <p className="vc-muted" data-vc-heatkind="">{kind === 'click' ? 'Where people clicked or tapped. Fills automatically from your team and reviewers.' : 'Where people’s eyes rested, using their webcam (Labs). Only people who turn on eye tracking and calibrate (about 20 s). Video never leaves their browser.'}</p>
+            <p className="vc-muted" data-vc-heatkind="">{kind === 'click' ? 'Where people clicked or tapped. Fills automatically from your team and reviewers, and from visitors who press OK when the widget is open to everyone.' : 'Where people’s eyes rested, using their webcam (Labs). Only people who turn on eye tracking and calibrate (about 20 s). Video never leaves their browser.'}</p>
             <button type="button" className="vc-linkbtn" aria-expanded={diff} onClick={() => setDiff(!diff)}>What’s the difference?</button>
             {diff && (
               <table className="vc-table"><thead><tr><th /><th>Clicks</th><th>Where people looked</th></tr></thead><tbody>

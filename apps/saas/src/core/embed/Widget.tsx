@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff, Columns2, Mic, Square, Play, ChevronDown, BadgeCheck } from 'lucide-react'
+import { MessageSquarePlus, MessagesSquare, X, Check, RotateCcw, Trash2, Pencil, CornerDownRight, MapPinOff, Columns2, Mic, Square, Play, ChevronDown, BadgeCheck, Flame, Eye, Timer, ListChecks } from 'lucide-react'
+import type { VisitorModule } from './research'
 import { audioUrl, uploadAudio } from './server'
 import { TOOL_META, ToolIcon, ToolView, type ToolId } from './Tools'
 import { NS, MAX_TEXT, STATUS_LABEL, anchorAt, canCommentNow, deviceNow, pageKey, pageUrl, place, relocate, statusOf, uid, type Anchor, type Backend, type Reply, type RoundState, type Status, type Thread } from './store'
@@ -25,6 +26,12 @@ export interface Config {
   narration?: boolean
   /** the site's version (Versions): new comments carry it, and the list can show only it */
   version?: string
+  /**
+   * Research modules this person can take part in (widget open to everyone): each records into its
+   * module's default study after a one-line consent. `reason`: why it can't run here (shown, not hidden).
+   */
+  research?: { m: VisitorModule; reason?: string }[]
+  onResearch?: (m: VisitorModule) => void
   /** showing the draft configuration (from the panel's preview), with a way out */
   preview?: { exit: () => void }
 }
@@ -32,6 +39,8 @@ export interface Config {
 export const OPEN_EVENT = 'vibe-collab:open'
 export type OpenWhat = 'comment' | 'list'
 
+const RESEARCH_ICON = { heatmap: Flame, gaze: Eye, fivesec: Timer, usability: ListChecks }
+const RESEARCH_TITLE = { heatmap: 'Help with the heatmap', gaze: 'Eye tracking', fivesec: '5-second test', usability: 'Usability test' }
 const NAME_KEY = `${NS}name`
 const OPEN_KEY = `${NS}open`
 const readName = () => { try { return localStorage.getItem(NAME_KEY) ?? '' } catch { return '' } }
@@ -431,7 +440,7 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
 
       {tool && <ToolView tool={tool} project={config.project} onClose={closeTool} />}
 
-      {(config.launcher === 'floating' || config.tools.length > 0) && <div className="vc-dock" role="toolbar" aria-label="Collaboration">
+      {(config.launcher === 'floating' || config.tools.length > 0 || !!config.research?.length) && <div className="vc-dock" role="toolbar" aria-label="Collaboration">
         {config.comments && config.launcher === 'floating' && <><button className={`vc-btn primary ${placing ? 'on' : ''}`} onClick={() => (placing ? setPlacing(false) : start())} title={config.shortcut ? 'Comment (C)' : 'Comment'}>
           <MessageSquarePlus size={15} /> {placing ? 'Cancel' : config.label}
         </button>
@@ -444,6 +453,12 @@ export function Widget({ backend, config, host }: { backend: Backend; config: Co
         {config.tools.map((id) => (
           <button key={id} className={`vc-icon dock ${tool === id ? 'on' : ''}`} onClick={() => pickTool(id)} aria-pressed={tool === id} aria-label={TOOL_META[id].label} title={TOOL_META[id].label}><ToolIcon id={id} /></button>
         ))}
+        {!!config.research?.length && (config.comments || config.tools.length > 0) && <span className="vc-sep" aria-hidden />}
+        {config.research?.map(({ m, reason }) => {
+          const I = RESEARCH_ICON[m.module]
+          const label = `${RESEARCH_TITLE[m.module]}${reason ? ` (${reason})` : ''}`
+          return <button key={m.module} data-vc-research={m.module} className={`vc-icon dock ${reason ? 'off' : ''}`} aria-disabled={!!reason} onClick={() => (reason ? say(`${RESEARCH_TITLE[m.module]}: ${reason}`) : config.onResearch?.(m))} aria-label={label} title={label}><I size={15} /></button>
+        })}
       </div>}
 
       {toast && <div className={`vc-toast ${toast.error ? 'error' : ''}`} role="status">{toast.text}</div>}

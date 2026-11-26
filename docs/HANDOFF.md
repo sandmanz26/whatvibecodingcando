@@ -2,7 +2,7 @@
 
 *Dokumen serah-terima utama. Setiap pekerjaan baru **wajib** menambah catatan di "Log perubahan" dan memperbarui bagian "Yang harus dilakukan pemilik". Ditulis untuk pemilik (Bahasa Indonesia) dan bisa dibaca AI/developer lain.*
 
-Terakhir diperbarui: 28 November 2026
+Terakhir diperbarui: 29 November 2026
 
 ---
 
@@ -43,6 +43,7 @@ Centang di sini setiap kali selesai. ✅ = sudah dikonfirmasi pemilik/tes, ⬜ =
 | `2026-11-27-install-flow.sql` | alur instalasi: banner alamat localhost baru (jalankan setelah security) | ⬜ |
 | `2026-11-28-default-heatmap.sql` | heatmap otomatis: studi "Site heatmap", klik reviewer/tim, link undangan (jalankan setelah install-flow) | ⬜ |
 | `2026-11-28-demo-origin.sql` | demo di ourhunch.com bisa dipakai link review | ⬜ |
+| `2026-11-29-default-studies.sql` | satu studi default ★ per modul riset, pengunjung di mode Everyone (persetujuan satu klik), pengunjung tidak bisa membaca hasil (jalankan setelah demo-origin) | ⬜ |
 
 Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into public.platform_admins (user_id) select id from auth.users where email = '<email>';` ✅
 
@@ -76,15 +77,32 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - Widget **bahasa Inggris** (tidak ada versi Indonesia).
 - Harga: Free 1 situs; Pro **$4.80/situs/bulan**; founding **$2** untuk 200 pelanggan pertama; Pro gratis selama beta.
 - Login email = **kode 6 digit** (password opsional); Google sekali klik. Admin login terpisah, email + password.
-- Widget **tersembunyi untuk pengunjung biasa**; hanya tim (lewat "Open my site") dan reviewer (link review) yang melihatnya.
-- Heatmap **otomatis**: tiap proyek dengan Heatmaps punya satu studi "Site heatmap" yang selalu terbuka. **Klik reviewer dan tim (Open my site) ikut tercatat secara default**, dengan pemberitahuan sekali dan tombol mati per orang. Orang lain hanya lewat link undangan + layar persetujuan. Pengunjung biasa tetap **tidak pernah** direkam. Eye tracking = Labs (perkiraan).
-- **"Collect clicks from all visitors" TIDAK dibuat** (mati, belum diputuskan): butuh notifikasi cookie/persetujuan situs pelanggan, perubahan di loader dan sesi untuk pengunjung anonim — terlalu besar/berisiko untuk sekarang. Kalau mau: pengaturan proyek, teks jujur di panel, dan loader hanya merekam bila situs memberi sinyal persetujuan.
-- Eye tracking satu klik (opt-in di widget) **belum dibuat**, menunggu keputusan pemilik.
+- Widget **tersembunyi untuk pengunjung biasa** selama audiens = *Reviewers only* (default, dan semua proyek lama tetap begitu); hanya tim (lewat "Open my site") dan reviewer (link review) yang melihatnya.
+- **Satu modul satu studi default ★**: Heatmap → "Site heatmap", Eye tracking → "Eye tracking", 5-second test → "First impression" (halaman yang sedang dibuka, pertanyaan "What is this page about?"), Usability test → "Usability test" (satu tugas "Explore the site and find what you came for", bisa diedit). Dibuat otomatis saat modul dinyalakan. Boleh banyak studi per modul, tapi **hanya ★ yang menerima lalu lintas widget**; studi lain hanya lewat link-nya sendiri. **Make default** memindahkan ★; data tetap di studi masing-masing. Pause pada ★ = modul berhenti mengumpulkan (pengunjung tidak melihat modulnya).
+- **Everyone = semua modul + persetujuan satu klik tanpa nama**: pengunjung melihat semua modul yang aktif; modul riset bertanya satu kalimat (OK / No thanks). Hanya yang menekan OK direkam, ke studi ★ modul itu. Modul yang tidak bisa jalan (mis. tanpa kamera) tetap tampil dengan alasan singkat.
+- **Pengunjung tidak bisa melihat hasil**: heatmap, tabel elemen, link undangan dan data orang lain hanya untuk tim dan reviewer undangan — dipaksa di server (`reviewers.visitor`).
+- **Instalasi lama tidak berubah**: snippet sama, audiens tidak diubah, studi/link/data lama tetap; studi non-default tetap hanya lewat link. Satu-satunya hal baru yang terlihat: studi ★ baru di Research untuk modul riset yang sudah aktif. (Catatan: proyek yang *sudah* memilih Everyone dan punya modul riset aktif kini memperlihatkan tombol riset ke pengunjung — tetap tidak merekam apa pun sebelum OK.)
+- Heatmap **otomatis**: tiap proyek dengan Heatmaps punya satu studi "Site heatmap" yang selalu terbuka. **Klik reviewer dan tim (Open my site) ikut tercatat secara default**, dengan pemberitahuan sekali dan tombol mati per orang. Orang lain hanya lewat link undangan + layar persetujuan. Pengunjung biasa tidak direkam kecuali audiens = Everyone **dan** mereka menekan OK (lihat di bawah). Eye tracking = Labs (perkiraan).
+- "Collect clicks from all visitors" **tanpa persetujuan** tetap TIDAK dibuat; yang ada sekarang: Everyone + OK per modul.
+- Eye tracking dari widget: ada untuk mode Everyone (OK → izin kamera → kalibrasi singkat).
+- PostHog `visitor_consented` **tidak dibuat**: aturan proyek melarang PostHog di script yang berjalan di situs pelanggan. Yang dikirim dari panel: `study_added`, `study_default_changed` (id/modul saja).
 - Ditahan: "Fixed, please check", error konsol di komentar, MCP.
 
 ---
 
 ## 4. Log perubahan (terbaru di atas)
+
+### 29 Nov 2026
+- **Satu studi default ★ per modul riset.** Heatmap, Eye tracking, 5-second test dan Usability test masing-masing otomatis punya satu studi default (badge **★ Default · Auto**) saat modul dinyalakan (onboarding atau Update site); proyek lama mendapatkannya lewat SQL untuk modul yang sudah aktif. Indeks unik per (proyek, modul), pembuatan idempoten.
+- **Halaman Research disusun per modul**: tiap bagian menampilkan ★ di atas, link, Results, Pause/Resume, Edit (Edit tasks untuk usability), **★ Make default** pada studi lain, dan satu tombol **Add another study** per modul. Link sidebar `?module=…` (link lama `?kind=…` tetap jalan).
+- **Tombol "New study" dihapus/dialihkan**: (1) header Research, (2) kartu kosong "No studies yet" di Research, (3) teks kosong filter ("Make one with New study…"), (4) Dashboard "No studies yet. Make one" → "Open Research", (5) Guide "press New study" → Add another study. Tidak ada tempat lain yang membuat studi (widget, Products, onboarding, konsol tidak membuat studi di panel hosted).
+- **Audiens Everyone**: pengunjung melihat **semua** modul yang aktif (bukan hanya Comment). Modul riset bertanya satu kalimat, mis. *"Your clicks on this site will be recorded for the site owner's heatmap. [OK] [No thanks]"*; eye tracking: izin kamera + kalibrasi; 5-second: tesnya; usability: tugas dari studi ★. Tanpa kolom nama. Rekaman baru mulai setelah OK, masuk ke studi ★ modul itu. Pengunjung **tidak pernah** melihat hasil (dipaksa di server). Modul yang dipause disembunyikan untuk pengunjung; modul yang tidak bisa jalan tampil dengan alasan singkat.
+- **Server** (`migrations/20261129000000_default_studies.sql`): kolom `studies.module`, `make_default_study`, `visitor_modules` (boleh anon, hanya nama/status), `start_visitor_run` (origin, modul aktif, ★ terbuka, rate limit per sesi / alamat / proyek, maks 2.000 run pengunjung per studi per hari), `module_study_invite`, `reviewers.visitor` (pengunjung yang hanya bergabung ke widget terbuka tidak bisa membaca heatmap/link undangan), `runs.source = 'visitor'`, indeks per proyek/modul.
+- **Tanpa dampak ke instalasi lama**: snippet sama, audiens tidak diubah, studi/link/data lama tetap; config lama tetap terbaca. Tes: `supabase/tests/default_studies_test.sql` (36 cek, termasuk instalasi lama, link studi lama, audiens tetap), `npm run test:compat` di `apps/saas` (10 cek config lama + keputusan widget), semua tes SQL lama tetap ALL PASS; catch-up dites pada DB dari semua migrasi lama (termasuk 2026-11-28) dengan data, dijalankan dua kali.
+- **Demo (tanpa server)** tetap jalan: studi ★ per modul di penyimpanan browser (`localheat.ts`), Pause dari panel demo, contoh heatmap berlabel tetap sampai ada data asli. Playwright: `apps/saas/tests/e2e/default-studies.mjs` (onboarding Heatmap+5-second+Usability → Everyone → pengunjung melihat semua modul → OK → klik tercatat → tanpa hasil; tim melihat klik pengunjung; pause menyembunyikan modul; proyek "lama" sama seperti sebelumnya; tidak ada "New study").
+- Privacy (Legal.tsx), Guide, teks Widget (Everyone) dan README diperbarui. PostHog: `study_added`, `study_default_changed`.
+- **Perlu SQL** `2026-11-29-default-studies.sql` (setelah `2026-11-28-demo-origin.sql`). Sebelum SQL dijalankan: panel tetap jalan (membaca tanpa kolom baru), tombol riset pengunjung tampil "unavailable right now".
+- **Belum diverifikasi**: di Supabase live; tampilan HP; eye tracking pengunjung dengan kamera asli; beban/rate limit dengan lalu lintas nyata (header `x-forwarded-for` di Supabase dianggap ada; tanpa itu batas per alamat dilewati dan batas per proyek berlaku); pengunjung yang bergabung ke widget Everyone **sebelum** SQL ini tetap tercatat sebagai reviewer biasa (bisa membaca heatmap) sampai dihapus dari Reviewers.
 
 ### 28 Nov 2026
 - **Bug demo di ourhunch.com**: link review di `ourhunch.com/embed-demo.html` ditolak ("This review link doesn't work on this address") karena daftar situs demo masih berisi alamat lama `whatvibecodingcando.vercel.app`. Perbaikan: `catch-up/2026-11-28-demo-origin.sql` (menambah `https://ourhunch.com` dan `www`).

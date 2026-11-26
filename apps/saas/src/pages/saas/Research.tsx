@@ -7,7 +7,8 @@ import { copyText, demoUrl } from '../../saas/snippet'
 import { liveOf, openAsReviewer } from '../../saas/widget'
 import { productOf } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
-import { clearStudyResults, deleteRun, deleteStudy, listStudies, projectSessions, revokeStudyLink, saveStudy, studyLink, studyResults, type EventRow, type RunRow, type StudyKind, type StudyRow } from '../../saas/cloud'
+import { clearStudyResults, deleteRun, deleteStudy, listStudies, makeDefaultStudy, projectSessions, revokeStudyLink, saveStudy, studyLink, studyModule, studyResults, type EventRow, type RunRow, type StudyKind, type StudyModule, type StudyRow } from '../../saas/cloud'
+import { localStudies, setLocalStudyOpen } from '../../core/embed/localheat'
 import { ago, usePanel } from './Panel'
 import { download, toCsv } from '../../saas/stats'
 import { track } from '../../lib/analytics'
@@ -42,13 +43,6 @@ const KIND: Record<StudyKind, { label: string; product: string; help: string }> 
   fivesec: { label: '5-second test', product: 'fivesec', help: 'Show a page for a few seconds, then ask what people remember.' },
   browse: { label: 'Heatmap visit', product: 'heatmap', help: 'People use your site freely for a few minutes; their clicks build the heatmap.' },
 }
-/** Filters for the sidebar's Results links. */
-const FILTERS: { id: string; title: string; help: string; empty: string; has: (s: StudyRow) => boolean }[] = [
-  { id: 'usability', title: 'Usability tests', help: 'Tasks on your site: who succeeds, how long it takes, where people click.', empty: 'No usability tests yet. Make one with New study.', has: (s) => s.kind === 'usability' },
-  { id: 'fivesec', title: '5-second tests', help: 'What people remember after seeing a page for a few seconds.', empty: 'No 5-second tests yet. Make one with New study.', has: (s) => s.kind === 'fivesec' },
-  { id: 'browse', title: 'Heatmaps', help: 'Studies whose clicks build a heatmap. Open a study’s Results, then its heatmap buttons.', empty: 'No heatmap visits yet. Make one with New study → Heatmap visit.', has: (s) => s.kind === 'browse' || s.kind === 'usability' },
-  { id: 'eyes', title: 'Eye tracking', help: 'Studies that ask participants to turn on their webcam for eye tracking.', empty: 'No study uses eye tracking yet. Edit a usability test and turn on eye tracking.', has: (s) => s.eye_tracking },
-]
 interface TaskDraft { id: string; prompt: string; startPage: string; rule: 'none' | 'page' | 'element'; target: string; limitSec: number }
 const newTask = (n: number): TaskDraft => ({ id: `t${n}`, prompt: '', startPage: '/', rule: 'none', target: '', limitSec: 180 })
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '–')
@@ -56,28 +50,40 @@ const median = (xs: number[]) => { if (!xs.length) return 0; const s = [...xs].s
 const secs = (ms: number) => (ms >= 60_000 ? `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s` : `${Math.round(ms / 1000)} s`)
 const cleanPath = (p: string) => { const t = p.trim().replace(/^https?:\/\/[^/]+/, '') || '/'; return t.startsWith('/') ? t.split(/[?#]/)[0].slice(0, 300) : `/${t.split(/[?#]/)[0]}`.slice(0, 300) }
 
-/** The product a study needs, and whether it is in the published settings. */
-function useModuleOn() {
-  const { project } = usePanel()
-  return (kind: StudyKind) => !!project && !!liveOf(project)?.config.modules[KIND[kind].product as 'heatmap']
-}
+/**
+ * Research is organised by module: each research module that is on has one default (★) study, made
+ * automatically, that gets the widget's traffic (the team's and reviewers' clicks, and visitors who
+ * press OK when the widget is open to everyone). More studies per module are allowed; they are
+ * reached only through their own link. "Make default" moves the ★; data stays with each study.
+ */
+const MODULES: { id: StudyModule; title: string; help: string; product: string; kind: StudyKind; eyes: boolean }[] = [
+  { id: 'heatmap', title: 'Heatmap', product: 'heatmap', kind: 'browse', eyes: false, help: 'Where people click on your site.' },
+  { id: 'gaze', title: 'Eye tracking', product: 'gaze', kind: 'browse', eyes: true, help: 'Where people look, with their webcam (they agree first; video stays in their browser).' },
+  { id: 'fivesec', title: '5-second test', product: 'fivesec', kind: 'fivesec', eyes: false, help: 'What people remember after seeing a page for 5 seconds.' },
+  { id: 'usability', title: 'Usability test', product: 'usability', kind: 'usability', eyes: false, help: 'Tasks on your site: who succeeds, how long it takes, where people click.' },
+]
+/** The sidebar's links (?kind=…) and others (?module=…) open one module's section. */
+const MODULE_PARAM: Record<string, StudyModule> = { heatmap: 'heatmap', browse: 'heatmap', gaze: 'gaze', eyes: 'gaze', fivesec: 'fivesec', usability: 'usability' }
+const STAR = <span className="up-badge st-open" data-default-badge="">★ Default · Auto</span>
+const DEFAULT_HELP = 'Gets the widget’s traffic: your team’s and reviewers’ clicks, and visitors who press OK when the widget is open to everyone.'
 
 export function Research() {
   const { project } = usePanel()
   const { toast } = useStore()
   const [rows, setRows] = useState<StudyRow[] | null>(null)
-  const [editing, setEditing] = useState<StudyRow | 'new' | null>(null)
+  const [editing, setEditing] = useState<StudyRow | { add: StudyModule } | null>(null)
   const [link, setLink] = useState<{ id: string; url: string } | null>(null)
   const [confirm, setConfirm] = useState<StudyRow | null>(null)
   const [clearing, setClearing] = useState<StudyRow | null>(null)
   const [params, setParams] = useSearchParams()
-  // The sidebar's Results links: ?kind=usability|fivesec|browse|eyes filters the studies, ?tab=sessions opens Sessions.
   const tab: 'studies' | 'sessions' = params.get('tab') === 'sessions' ? 'sessions' : 'studies'
   const setTab = (t: 'studies' | 'sessions') => setParams(t === 'sessions' ? { tab: 'sessions' } : {}, { replace: true })
-  const filter = FILTERS.find((f) => f.id === params.get('kind')) ?? null
-  const moduleOn = useModuleOn()
+  const only = MODULE_PARAM[params.get('module') ?? params.get('kind') ?? ''] ?? null
+  const live = project ? liveOf(project)?.config ?? null : null
+  const on = (m: StudyModule) => !!live?.modules[m]
   const load = () => { if (project && cloud) void listStudies(project.id).then(setRows).catch((e: Error) => { setRows([]); toast(`Couldn’t load studies: ${e.message}`, 'error') }) }
   useEffect(load, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [, redraw] = useState(0)
   if (!project) return null
   const siteBase = project.siteUrl || ''
   const linkFor = async (s: StudyRow) => {
@@ -90,78 +96,86 @@ export function Research() {
       setLink({ id: s.id, url: u.href }); load()
     } catch (e) { toast(`Couldn’t make the link: ${(e as Error).message}`, 'error') }
   }
+  const makeDefault = (s: StudyRow) => void makeDefaultStudy(s.id).then(() => { track('study_default_changed', { module: studyModule(s) }); toast(`“${s.name}” is now the default`); load() }).catch((e: Error) => toast(`Couldn’t change the default: ${e.message}`, 'error'))
+  const shown = MODULES.filter((m) => (only ? m.id === only : true))
+  const studyCard = (s: StudyRow) => (
+    <li key={s.id} className="up-card" data-study={s.name}>
+      <div className="up-row">
+        <span className="lp-grow"><b>{s.name}</b><small className="up-muted"> · {KIND[s.kind].label} · {s.runs} {s.runs === 1 ? 'person' : 'people'} · {ago(s.created_at)}{s.is_default ? '' : ' · reached only through its link'}</small></span>
+        {s.is_default && STAR}
+        <span className={`up-badge ${s.status === 'open' ? '' : 'pending'}`}>{s.status === 'open' ? 'Open' : 'Paused'}</span>
+      </div>
+      {s.is_default && <p className="up-muted">{DEFAULT_HELP}{s.status !== 'open' ? ' Paused: nothing is recorded, and visitors don’t see this module.' : ''}</p>}
+      <div className="up-row wrap">
+        <Link className="lp-btn sm primary" to={`/app/research/${s.id}`}>Results</Link>
+        {!s.is_default && <button className="lp-btn sm" onClick={() => makeDefault(s)} data-make-default="">★ Make default</button>}
+        <button className="lp-btn sm" onClick={() => void linkFor(s)}><Link2 size={13} /> {s.has_link ? 'New link' : 'Get link'}</button>
+        {s.has_link && <button className="lp-btn sm ghost" onClick={() => void revokeStudyLink(s.id).then(() => { toast('Link revoked: it no longer opens the study'); load() })}>Revoke link</button>}
+        <button className="lp-btn sm ghost" onClick={() => setEditing(s)}>Edit{s.kind === 'usability' ? ' tasks' : ''}</button>
+        {s.runs > 0 && <button className="lp-btn sm ghost" onClick={() => setClearing(s)}><Eraser size={13} /> Clear results</button>}
+        <button className="lp-btn sm ghost" onClick={() => void saveStudy(project.id, { ...s, status: s.status === 'open' ? 'closed' : 'open' }).then(load)}>{s.status === 'open' ? 'Pause' : 'Resume'}</button>
+        <span className="lp-grow" />
+        <button className="lp-btn sm ghost" onClick={() => setConfirm(s)} aria-label={`Delete ${s.name}`}><Trash2 size={13} /></button>
+      </div>
+      {link?.id === s.id && (
+        <div className="up-linkbox">
+          <p>{s.is_default ? 'Send this to people. It replaces the study’s earlier link (and the widget’s Copy invite link) and doesn’t expire.' : `Send this to participants. It works for 30 days, for up to ${s.max_runs} people; a new link replaces it.`}</p>
+          <pre className="up-code">{link.url}</pre>
+          <button className="lp-btn sm" onClick={() => void copyText(link.url).then((ok) => toast(ok ? 'Link copied' : 'Copy failed', ok ? undefined : 'error'))}><Copy size={13} /> Copy link</button>
+          {!siteBase && <p className="up-hint">No website set yet, so the link opens the demo site. Set it in Widget → Website.</p>}
+        </div>
+      )}
+    </li>
+  )
   return (
     <div className="up-page">
       <div className="up-head">
-        <div><h1>{tab === 'sessions' ? 'Participant paths' : filter?.title ?? 'Research'}</h1><p>{filter ? <>{filter.help} <Link to="/app/research">All studies</Link></> : 'Studies on your own site, with people who agree to take part. Visitors who didn’t open a study’s link are never recorded.'}</p></div>
-        {cloud && <button className="lp-btn primary" onClick={() => setEditing('new')}><Plus size={14} /> New study</button>}
+        <div><h1>{tab === 'sessions' ? 'Participant paths' : only ? MODULES.find((m) => m.id === only)!.title : 'Research'}</h1><p>{only ? <>{MODULES.find((m) => m.id === only)!.help} <Link to="/app/research">All modules</Link></> : 'One default study (★) per module collects automatically. Add more studies for separate rounds; they are reached only through their own link. Nobody is recorded without agreeing first.'}</p></div>
       </div>
       {cloud && <div className="seg rs-tabs" role="tablist"><button role="tab" aria-selected={tab === 'studies'} aria-pressed={tab === 'studies'} onClick={() => setTab('studies')}>Studies</button><button role="tab" aria-selected={tab === 'sessions'} aria-pressed={tab === 'sessions'} onClick={() => setTab('sessions')}>Participant paths</button></div>}
       {tab === 'sessions' ? <Sessions studies={rows ?? []} /> : <>
-      {!cloud && <p className="up-warn"><TriangleAlert size={13} /> Studies on your site need the server: this demo panel has none. Try the research tools in the demo console instead.</p>}
-      {!cloud && moduleOn('browse') && (
-        <section className="up-card" data-default-study="">
-          <div className="up-row"><span className="lp-grow"><b>Site heatmap</b><small className="up-muted"> · Heatmap visit · default</small></span><span className="up-badge">Open</span></div>
-          <p className="up-muted">Made automatically because Heatmaps is on. Your clicks and your reviewers’ build it as you use the site (<i>Open my site</i>); invite more people from the widget’s Heatmap panel (<i>Copy invite link</i>). In this demo it is kept in the site’s own browser storage.</p>
-        </section>
-      )}
-      {cloud && rows && !rows.length && (
-        <section className="up-card rs-empty">
-          <FlaskConical size={22} />
-          <h2>No studies yet</h2>
-          <p className="up-muted">Start with a usability test (tasks on your site), a 5-second test, or a heatmap visit. You get a link to send to participants (email, WhatsApp, a recruiting tool).</p>
-          <button className="lp-btn primary" onClick={() => setEditing('new')}><Plus size={14} /> New study</button>
-        </section>
-      )}
-      <ul className="rs-list">
-        {cloud && rows && rows.length > 0 && filter && !rows.some(filter.has) && <section className="up-card up-muted">{filter.empty}</section>}
-        {(rows ?? []).filter((s) => !filter || filter.has(s)).map((s) => (
-          <li key={s.id} className="up-card">
-            <div className="up-row">
-              <span className="lp-grow"><b>{s.name}</b><small className="up-muted"> · {KIND[s.kind].label}{s.is_default ? ' · default: fills from your team, reviewers and the widget’s invite link' : ''} · {s.runs} participant{s.runs === 1 ? '' : 's'} · {ago(s.created_at)}</small></span>
-              <span className={`up-badge ${s.status === 'open' ? '' : 'pending'}`}>{s.status === 'open' ? 'Open' : 'Closed'}</span>
-            </div>
-            {!moduleOn(s.kind) && <p className="up-warn"><TriangleAlert size={13} /> Participants’ links won’t open yet: turn on {productOf(KIND[s.kind].product)?.name ?? KIND[s.kind].label} in <Link to="/app/products">Products</Link>, then update your site from Widget.</p>}
-            <div className="up-row wrap">
-              <Link className="lp-btn sm primary" to={`/app/research/${s.id}`}>Results</Link>
-              <button className="lp-btn sm" onClick={() => void linkFor(s)}><Link2 size={13} /> {s.has_link ? 'New participant link' : 'Participant link'}</button>
-              {s.has_link && <button className="lp-btn sm ghost" onClick={() => void revokeStudyLink(s.id).then(() => { toast('Link revoked: it no longer opens the study'); load() })}>Revoke link</button>}
-              <button className="lp-btn sm ghost" onClick={() => setEditing(s)}>Edit</button>
-              {s.runs > 0 && <button className="lp-btn sm ghost" onClick={() => setClearing(s)}><Eraser size={13} /> Clear results</button>}
-              <button className="lp-btn sm ghost" onClick={() => void saveStudy(project.id, { ...s, status: s.status === 'open' ? 'closed' : 'open' }).then(load)}>{s.status === 'open' ? 'Close' : 'Reopen'}</button>
-              <span className="lp-grow" />
-              <button className="lp-btn sm ghost" onClick={() => setConfirm(s)} aria-label={`Delete ${s.name}`}><Trash2 size={13} /></button>
-            </div>
-            {link?.id === s.id && (
-              <div className="up-linkbox">
-                <p>Send this to participants. It works for 30 days, for up to {s.max_runs} people; a new link replaces it.</p>
-                <pre className="up-code">{link.url}</pre>
-                <button className="lp-btn sm" onClick={() => void copyText(link.url).then((ok) => toast(ok ? 'Link copied' : 'Copy failed', ok ? undefined : 'error'))}><Copy size={13} /> Copy link</button>
-                {!siteBase && <p className="up-hint">No website set yet, so the link opens the demo site. Set it in Widget → Website.</p>}
-              </div>
+      {!cloud && <p className="up-warn"><TriangleAlert size={13} /> Demo: studies live in your site’s own browser storage. Adding more studies, links and full results need the server.</p>}
+      {!shown.some((m) => on(m.id)) && !only && <section className="up-card rs-empty"><FlaskConical size={22} /><h2>No research module is on</h2><p className="up-muted">Turn on Heatmap, Eye tracking, 5-second test or Usability test in <Link to="/app/products">Products</Link>; each gets its default study automatically.</p></section>}
+      {shown.filter((m) => on(m.id) || only === m.id || (rows ?? []).some((s) => studyModule(s) === m.id)).map((m) => {
+        const mine = (rows ?? []).filter((s) => studyModule(s) === m.id).sort((a, b) => Number(!!b.is_default) - Number(!!a.is_default))
+        const demoRow = !cloud && on(m.id) ? localStudies(project.id, (x) => x === m.id)[0] : null
+        return (
+          <section key={m.id} id={`module-${m.id}`} className="up-card" data-module-section={m.id}>
+            <div className="up-row"><h2 className="lp-grow">{m.title}</h2>{!on(m.id) && <span className="up-badge pending">Off</span>}</div>
+            <p className="up-muted">{m.help}</p>
+            {!on(m.id) && <p className="up-warn"><TriangleAlert size={13} /> Off: turn on {productOf(m.product)?.name ?? m.title} in <Link to="/app/products">Products</Link>, then update your site from Widget. Its default study is made then.</p>}
+            {demoRow && (
+              <ul className="rs-list"><li className="up-card" data-study={demoRow.study.name}>
+                <div className="up-row"><span className="lp-grow"><b>{demoRow.study.name}</b><small className="up-muted"> · {demoRow.runs} {demoRow.runs === 1 ? 'person' : 'people'}{demoRow.visitors ? ` (${demoRow.visitors} visitor${demoRow.visitors === 1 ? '' : 's'})` : ''}</small></span>{STAR}<span className={`up-badge ${demoRow.study.open ? '' : 'pending'}`}>{demoRow.study.open ? 'Open' : 'Paused'}</span></div>
+                <p className="up-muted">{DEFAULT_HELP}{demoRow.study.open ? '' : ' Paused: nothing is recorded, and visitors don’t see this module.'}</p>
+                <div className="up-row wrap"><button className="lp-btn sm ghost" onClick={() => { setLocalStudyOpen(project.id, m.id, !demoRow.study.open); redraw((n) => n + 1) }}>{demoRow.study.open ? 'Pause' : 'Resume'}</button>{m.id === 'heatmap' && <span className="up-muted">See it on your site: <i>Open my site</i> → Heatmap.</span>}</div>
+              </li></ul>
             )}
-          </li>
-        ))}
-      </ul>
+            {cloud && rows && on(m.id) && !mine.some((s) => s.is_default) && <p className="up-muted">The default study appears after you update your site from Widget (or run the 2026-11-29 SQL). {mine.length ? 'Or make one of the studies below the default.' : ''}</p>}
+            {cloud && <ul className="rs-list">{mine.map(studyCard)}</ul>}
+            {cloud && <div className="up-row"><button className="lp-btn sm" onClick={() => setEditing({ add: m.id })} data-add-study={m.id}><Plus size={13} /> Add another study</button></div>}
+          </section>
+        )
+      })}
       </>}
-      {editing && <StudyEditor study={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
+      {editing && <StudyEditor study={'add' in editing ? null : editing} preset={'add' in editing ? MODULES.find((m) => m.id === editing.add) : undefined} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />}
       {clearing && (
-        <Modal title={`Clear the results of “${clearing.name}”?`} description={`${clearing.runs} participant${clearing.runs === 1 ? '’s' : 's’'} runs are deleted: tasks, answers, clicks and gaze, so its heatmap starts empty. The study and its link stay. This can’t be undone.`} onClose={() => setClearing(null)}
+        <Modal title={`Clear the results of “${clearing.name}”?`} description={`${clearing.runs} ${clearing.runs === 1 ? 'person’s run is' : 'people’s runs are'} deleted: tasks, answers, clicks and gaze, so its heatmap starts empty. The study and its link stay. This can’t be undone.`} onClose={() => setClearing(null)}
           footer={<><button className="btn" onClick={() => setClearing(null)}>Keep them</button><button className="btn primary" onClick={() => void clearStudyResults(clearing.id).then(() => { toast('Results cleared'); setClearing(null); load() }).catch((e: Error) => toast(`Couldn’t clear: ${e.message}`, 'error'))}>Clear results</button></>} />
       )}
       {confirm && (
-        <Modal title={`Delete “${confirm.name}”?`} description="Its participant link, every participant’s run and their clicks are deleted. This can’t be undone." onClose={() => setConfirm(null)}
+        <Modal title={`Delete “${confirm.name}”?`} description={`Its link, every participant’s run and their clicks are deleted. This can’t be undone.${confirm.is_default ? ' It is the default: until you make another study the default (or update your site again), this module collects nothing from the widget.' : ''}`} onClose={() => setConfirm(null)}
           footer={<><button className="btn" onClick={() => setConfirm(null)}>Keep it</button><button className="btn primary" onClick={() => void deleteStudy(confirm.id).then(() => { toast('Study deleted'); setConfirm(null); load() })}>Delete</button></>} />
       )}
     </div>
   )
 }
 
-function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onClose: () => void; onSaved: () => void }) {
+function StudyEditor({ study, preset, onClose, onSaved }: { study: StudyRow | null; preset?: { id: StudyModule; title: string; kind: StudyKind; eyes: boolean }; onClose: () => void; onSaved: () => void }) {
   const { project } = usePanel()
   const { toast } = useStore()
   const c = (study?.config ?? {}) as Record<string, unknown>
-  const [kind, setKind] = useState<StudyKind>(study?.kind ?? 'usability')
+  const [kind, setKind] = useState<StudyKind>(study?.kind ?? preset?.kind ?? 'usability')
   const [name, setName] = useState(study?.name ?? '')
   const [intro, setIntro] = useState(String(c.intro ?? ''))
   const [tasks, setTasks] = useState<TaskDraft[]>(() => ((c.tasks as Record<string, unknown>[] | undefined) ?? [{}]).map((t, i) => {
@@ -174,7 +188,7 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
   const [minutes, setMinutes] = useState(Number(c.minutes ?? 3))
   const [questions, setQuestions] = useState<string[]>(((c.questions as string[] | undefined) ?? ['What was this page about?', 'What would you click first?']).concat(['', '', '']).slice(0, 3))
   const [maxRuns, setMaxRuns] = useState(study?.max_runs ?? 200)
-  const [eyes, setEyes] = useState(study?.eye_tracking ?? false)
+  const [eyes, setEyes] = useState(study?.eye_tracking ?? preset?.eyes ?? false)
   const gazeOn = !!project && !!liveOf(project)?.config.modules.gaze
   const [doors, setDoors] = useState<{ page: string; sel: string; mode: 'add' | 'existing'; label: string; message: string }[]>(() => ((c.doors as Record<string, string>[] | undefined) ?? []).map((d) => ({ page: d.page ?? '', sel: d.sel ?? '', mode: d.mode === 'existing' ? 'existing' : 'add', label: d.label ?? '', message: d.message ?? '' })))
   const doorsOn = !!project && !!liveOf(project)?.config.modules.doors
@@ -188,17 +202,17 @@ function StudyEditor({ study, onClose, onSaved }: { study: StudyRow | null; onCl
         : { intro: intro.trim(), page: cleanPath(page), prompt: prompt.trim(), minutes: Math.min(30, Math.max(1, minutes)) }
     config.doors = doors.filter((d) => d.sel.trim()).slice(0, 5).map((d, i) => ({ id: `d${i + 1}`, page: d.page.trim() ? cleanPath(d.page) : '', sel: d.sel.trim().slice(0, 400), mode: d.mode, label: d.label.trim().slice(0, 60) || 'New', message: d.message.trim().slice(0, 300) }))
     setBusy(true)
-    if (!study?.id) track('study_created', { kind, eye_tracking: kind !== 'fivesec' && eyes })
+    if (!study?.id) { track('study_created', { kind, eye_tracking: kind !== 'fivesec' && eyes }); track('study_added', { module: preset?.id ?? (kind === 'browse' ? (eyes ? 'gaze' : 'heatmap') : kind) }) }
     try { await saveStudy(project.id, { id: study?.id, kind, name, config, status: study?.status, eye_tracking: kind !== 'fivesec' && eyes, max_runs: Math.min(1000, Math.max(1, maxRuns)) }); toast(study ? 'Study saved' : 'Study created'); onSaved() }
     catch (e) { toast(`Not saved: ${(e as Error).message}`, 'error') }
     finally { setBusy(false) }
   }
   const setTask = (i: number, p: Partial<TaskDraft>) => setTasks(tasks.map((t, j) => (j === i ? { ...t, ...p } : t)))
   return (
-    <Modal title={study ? 'Edit study' : 'New study'} onClose={onClose} wide
+    <Modal title={study ? 'Edit study' : `Add another ${preset?.title ?? ''} study`.replace('  ', ' ')} onClose={onClose} wide
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={!!problem || busy} onClick={() => void save()}>{study ? 'Save' : 'Create study'}</button></>}>
       <div className="rs-form">
-        {!study && (
+        {!study && !preset && (
           <div className="rs-kinds" role="radiogroup" aria-label="Kind of study">
             {(Object.keys(KIND) as StudyKind[]).map((k) => <button key={k} role="radio" aria-checked={kind === k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}><b>{KIND[k].label}</b><small>{KIND[k].help}</small></button>)}
           </div>

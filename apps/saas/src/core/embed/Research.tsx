@@ -1,3 +1,48 @@
+/** What a visitor is told before anything is recorded, per module (one line, no name asked). */
+export const VISITOR_ASK: Record<VisitorModule['module'], (m: VisitorModule) => string> = {
+  heatmap: () => 'Your clicks on this site will be recorded for the site owner’s heatmap.',
+  gaze: () => 'Your camera will estimate where you look on this site, for the site owner’s research. You’ll allow the camera and follow a short calibration first. Video stays in your browser; only where you look is saved.',
+  fivesec: () => 'You’ll see this page for 5 seconds, then answer a short question. Your answer goes to the site owner.',
+  usability: (m) => `You’ll get ${m.tasks} short task${m.tasks === 1 ? '' : 's'} on this site. Your clicks and the pages you open are recorded for the site owner.`,
+}
+export const VISITOR_LABEL: Record<VisitorModule['module'], string> = { heatmap: 'Heatmap', gaze: 'Eye tracking', fivesec: '5-second test', usability: 'Usability test' }
+
+/**
+ * A visitor (widget open to everyone) opened a research module: one line saying what is recorded,
+ * OK or No thanks. Nothing is recorded before OK; then a run starts in the module's default study.
+ */
+export function VisitorConsent({ project, m, accent, gazeUrl, onStart, onCancel }: { project: string; m: VisitorModule; accent: string; gazeUrl: string; onStart: (s: RunState) => void; onCancel: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const ok = async () => {
+    setBusy(true); setError('')
+    try {
+      const r = await startVisitorRun(project, m.module)
+      const browse = r.kind === 'browse'
+      const eyes = r.eye && !!gazeUrl
+      onStart({ token: '', module: m.module, phase: eyes ? 'eyes' : browse ? 'task' : 'intro', run: r.run, kind: r.kind, name: r.name, config: cleanConfig(r.kind, r.config), t0: Date.now(), index: 0,
+        taskStart: !eyes && browse ? Date.now() : undefined, pages: [], clicks: 0, firstClickHit: null, results: [], answers: [] })
+    } catch (e) {
+      const why = (e as Error).message
+      setError(why === 'study_closed' ? 'This is paused right now. Thank you anyway!' : why === 'study_full' || why === 'rate_limited' ? 'Too many people right now. Try again later.' : 'It couldn’t start. Try again in a moment.')
+    } finally { setBusy(false) }
+  }
+  return (
+    <div className="vc vc-scrim" style={{ ['--vc-accent' as string]: accent }}>
+      <div className="vc-modal" role="dialog" aria-label={VISITOR_LABEL[m.module]} data-vc-consent={m.module}>
+        <span className="vc-kicker">{VISITOR_LABEL[m.module]}</span>
+        <p>{VISITOR_ASK[m.module](m)}</p>
+        {error && <p className="vc-bad">{error}</p>}
+        <div className="vc-row"><span className="vc-grow" />
+          <button className="vc-btn" onClick={onCancel}>No thanks</button>
+          <button className="vc-btn primary" disabled={busy || !!error} onClick={() => void ok()}>{busy ? 'Starting…' : 'OK'}</button>
+        </div>
+        <p className="vc-where">You won’t see other people’s data. Run with ourhunch for the site’s owner.</p>
+      </div>
+    </div>
+  )
+}
+
 /**
  * What a study's participant sees on the customer's site: the consent screen, then the study
  * (usability tasks, a 5-second test, or a free browse for a heatmap), then a thank-you. See
@@ -6,12 +51,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Eye, Flag, Timer, X } from 'lucide-react'
 import { OneEuro } from '../gaze-analysis'
-import { Recorder, pageOf, cleanConfig, finishRun, pageMatches, saveRun, startRun, type Door, type Outcome, type RunState } from './research'
+import { Recorder, pageOf, cleanConfig, finishRun, pageMatches, saveRun, startRun, startVisitorRun, type Door, type Outcome, type RunState, type VisitorModule } from './research'
 
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
 const KIND_LABEL = { usability: 'tasks on this site', fivesec: 'a 5-second test', browse: 'a short visit' } as const
 
-export function Participant({ project, initial, accent, doorsOn = false, gazeUrl = '', version = '' }: { project: string; initial: RunState; accent: string; doorsOn?: boolean; gazeUrl?: string; version?: string }) {
+export function Participant({ project, initial, accent, doorsOn = false, gazeUrl = '', version = '', onEnd }: { project: string; initial: RunState; accent: string; doorsOn?: boolean; gazeUrl?: string; version?: string; onEnd?: () => void }) {
   const recRef = useRef<Recorder | null>(null)
   // Hooks first, before any return below: React needs the same hooks in the same order every render.
   const [faceLost, setFaceLost] = useState(false)
@@ -21,7 +66,7 @@ export function Participant({ project, initial, accent, doorsOn = false, gazeUrl
   const [, tick] = useState(0)
   const stRef = useRef(st)
   stRef.current = st
-  const update = (next: RunState) => { setSt(next); saveRun(project, next.phase === 'declined' ? null : next) }
+  const update = (next: RunState) => { setSt(next); saveRun(project, next.phase === 'declined' ? null : next); if (next.phase === 'declined') onEnd?.() }
 
   const tasks = st.config?.tasks ?? []
   const task = st.kind === 'usability' ? tasks[st.index] : undefined

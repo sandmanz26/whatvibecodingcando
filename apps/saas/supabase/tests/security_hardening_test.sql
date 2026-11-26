@@ -1,6 +1,6 @@
 -- Audit 2026-11: API roles have no TRUNCATE/TRIGGER/REFERENCES, anon has no table grants,
 -- trigger functions are not callable, every security definer function pins its search path,
--- every table has row level security, and only the three public functions are open to anon.
+-- every table has row level security, and only the public functions (get_share, report_seen, study_info, visitor_modules) are open to anon.
 do $$ declare n int; begin
   select count(*) into n from information_schema.role_table_grants
    where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type in ('TRUNCATE', 'TRIGGER', 'REFERENCES');
@@ -22,7 +22,7 @@ do $$ declare n int; begin
   select count(*) into n from pg_proc p join pg_namespace s on s.oid = p.pronamespace
    where s.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
      and p.prolang <> (select oid from pg_language where lanname = 'c')
-     and p.proname not in ('get_share', 'report_seen', 'study_info', 'gen_random_uuid');
+     and p.proname not in ('get_share', 'report_seen', 'study_info', 'visitor_modules', 'gen_random_uuid');
   if n > 0 then raise exception 'FAIL: % unexpected functions open to anon', n; end if;
 end $$;
 select 'security hardening ok' as result;

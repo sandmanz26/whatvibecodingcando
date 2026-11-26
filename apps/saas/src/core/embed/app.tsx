@@ -22,15 +22,15 @@
 import { Component, useEffect, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Widget, OPEN_EVENT, type Config, type OpenWhat } from './Widget'
-import { TOOL_IDS, type ToolId } from './Tools'
+import { decide, type Decision } from './decide'
 import { LocalBackend, NS, type Backend } from './store'
 import { CSS } from './styles'
-import { acceptHandoff, serveRaw, LocalConfigSource, anyModule, envFor, modulesOf, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
+import { acceptHandoff, serveRaw, LocalConfigSource, anyModule, modulesOf, parseConfig, reportSeen, type ConfigSource, type ReviewerSession, type WidgetConfig } from './config'
 import * as server from './server'
 import { frameMain } from './frame'
 import { bridgeMain, openBridge, type Bridge } from './demo-bridge'
-import { Participant } from './Research'
-import { heatNoteSeen, loadRun, markHeatNoteSeen, reviewerClicksOff, saveRun, setReviewerClicksOff, startReviewerClicks, studyInfo, takeStudyToken, type RunState } from './research'
+import { Participant, VisitorConsent } from './Research'
+import { heatNoteSeen, loadRun, markHeatNoteSeen, reviewerClicksOff, saveRun, setReviewerClicksOff, startReviewerClicks, studyInfo, takeStudyToken, visitorModules, type ResearchModule, type RunState, type VisitorModule } from './research'
 
 /** The public API: window.OurHunch.open('comment' | 'list') (also window.VibeCollab, the original name). Calls made before the script loaded are queued in q. */
 interface Api { version: string; project: string; open: (what?: OpenWhat) => void; q?: unknown[][] }
@@ -77,31 +77,6 @@ function readSession(project: string): ReviewerSession | null {
 /** Is this the hosted demo site, served from where the script itself comes from? It runs whatever the environments say. */
 function isHostedDemo(script: HTMLScriptElement | null) {
   try { return !!script && new URL(script.src).origin === window.location.origin && /\/embed-demo\.html$/.test(window.location.pathname) } catch { return false }
-}
-
-type Decision = { show: true; config: WidgetConfig; preview: boolean; comments: boolean; tools: ToolId[] } | { show: false; why: string }
-/**
- * Whether the widget shows here, and with which settings. Order matters: the off switch first, then
- * where (environment), then what (modules), then who (audience).
- */
-function decide(o: { project: string; config: WidgetConfig | null; draft: WidgetConfig | null; preview: boolean; host: string; hostname: string; demo: boolean; reviewer: boolean; invited: boolean }): Decision {
-  const preview = o.preview && o.reviewer && !!o.draft
-  const c = preview ? o.draft : o.config
-  if (!c) return { show: false, why: 'This project has no published widget settings yet.' }
-  if (!c.on) return { show: false, why: 'The widget is switched off for this project.' }
-  if (!o.demo) {
-    const env = envFor(c, o.host, o.project) ?? envFor(c, o.hostname, o.project)
-    if (!env) return { show: false, why: `${o.hostname} isn’t one of this project’s environments (Widget → Where).` }
-    if (!env.on) return { show: false, why: env.name ? `The widget is off in the ${env.name} environment.` : `The widget is off for ${o.hostname} (Widget → Where).` }
-  }
-  if (!anyModule(c.modules)) return { show: false, why: 'No module is turned on.' }
-  // Who sees what: "Who sees it" (audience) is for Comments. The design tools are for people opened
-  // in with a review link only, whatever the audience: they are the team's tools, not the visitors'.
-  const comments = c.modules.comments && (c.audience === 'everyone' || o.reviewer)
-  // With the widget for reviewers only, every reviewer came in through a link (or the panel's preview).
-  const tools = o.invited || (o.reviewer && c.audience === 'reviewers') ? TOOL_IDS.filter((id) => c.modules[id]) : []
-  if (!comments && !tools.length) return { show: false, why: 'Only reviewers see it; open the site through a review link.' }
-  return { show: true, config: c, preview, comments, tools }
 }
 
 /**
@@ -296,6 +271,23 @@ function PanelTip({ onClose }: { onClose: () => void }) {
   )
 }
 
+/**
+ * The research buttons a visitor sees: every module that is on. A paused one (its default study
+ * closed) is hidden; one that can't run here shows with a short reason instead of disappearing.
+ */
+function researchEntries(ids: ResearchModule[], vms: VisitorModule[] | 'error' | null): { m: VisitorModule; reason?: string }[] {
+  const noCamera = typeof navigator === 'undefined' || !window.isSecureContext || !navigator.mediaDevices?.getUserMedia
+  const out: { m: VisitorModule; reason?: string }[] = []
+  for (const id of ids) {
+    const vm = Array.isArray(vms) ? vms.find((x) => x.module === id) : undefined
+    if (vm?.state === 'paused') continue
+    const m: VisitorModule = vm ?? { module: id, state: 'none', eye: id === 'gaze', tasks: 1 }
+    const reason = vms === null ? 'loading…' : vms === 'error' ? 'unavailable right now' : !vm || vm.state === 'none' ? 'not set up yet' : id === 'gaze' && noCamera ? 'needs a camera, which this page or browser can’t use' : undefined
+    out.push({ m, reason })
+  }
+  return out
+}
+
 /** Starts the widget (or the session frame) for the script tag `given`: called by the loader (main.ts). */
 export async function boot(given?: HTMLScriptElement | null) {
   const me = given ?? (document.currentScript as HTMLScriptElement | null) ?? document.querySelector<HTMLScriptElement>('script[src*="vibe.js"]')
@@ -310,6 +302,7 @@ export async function boot(given?: HTMLScriptElement | null) {
   const project = /^[\w-]{1,64}$/.test(d.project ?? '') ? d.project! : (window.location.hostname || 'local').replace(/[^\w-]/g, '-')
   window.__vibeCollab = { version: VERSION, project }
   const demo = isHostedDemo(script)
+  const gazeUrl = script?.src ? new URL('gaze.js', script.src).href : ''
   const SESSION_EVENT = 'vibe-collab:session'
 
   // The review link's token, taken off the address at once (so it isn't left in history or shared on).
@@ -419,8 +412,15 @@ export async function boot(given?: HTMLScriptElement | null) {
       return () => host.removeEventListener(SESSION_EVENT, on)
     }, []) // eslint-disable-line react-hooks/exhaustive-deps
     const [tip, setTip] = useState(() => fromPanel && !tipSeen(project))
+    // Research modules for visitors: which are open (a paused one is hidden), and a run once they press OK.
+    const wantsResearch = decision.show && decision.research.length > 0
+    const [vms, setVms] = useState<VisitorModule[] | 'error' | null>(null)
+    useEffect(() => { if (wantsResearch && vms === null) void visitorModules(project).then(setVms, () => setVms('error')) }, [wantsResearch]) // eslint-disable-line react-hooks/exhaustive-deps
+    const [asking, setAsking] = useState<VisitorModule | null>(null)
+    const [run, setRun] = useState<RunState | null>(null)
     const notice = problem ? <LinkNotice why={problem} onClose={() => setProblem(null)} /> : null
     if (!decision.show || needsJoin) return notice
+    if (run) return <Participant project={project} initial={run} accent={decision.config.theme.accent} doorsOn={!!decision.config.modules.doors} version={decision.config.version ?? ''} gazeUrl={gazeUrl} onEnd={() => setRun(null)} />
     const tipBox = tip && !problem && decision.config.audience === 'reviewers' ? <PanelTip onClose={() => { markTipSeen(project); setTip(false) }} /> : null
     const c = decision.config
     const config: Config = {
@@ -429,10 +429,12 @@ export async function boot(given?: HTMLScriptElement | null) {
       comments: decision.comments, tools: decision.tools,
       compare: decision.comments && !!c.modules.compare, narration: decision.comments && !!c.modules.narration && m.sessions, version: c.version,
       ...(decision.preview ? { preview: { exit: () => m.exitPreview() } } : {}),
+      research: researchEntries(decision.research, vms), onResearch: setAsking,
     }
     // Reviewers and the team (let in by the owner) build the heatmap as they click, unless they turned it off.
     const heat = decision.tools.includes('heatmap')
-    return <>{notice}{tipBox}{heat && <ReviewerClicks project={project} version={c.version ?? ''} />}<Widget backend={backend} config={config} host={host} /></>
+    const consent = asking ? <VisitorConsent project={project} m={asking} accent={c.theme.accent} gazeUrl={gazeUrl} onCancel={() => setAsking(null)} onStart={(s) => { saveRun(project, s); setAsking(null); setRun(s) }} /> : null
+    return <>{notice}{tipBox}{heat && <ReviewerClicks project={project} version={c.version ?? ''} />}<Widget backend={backend} config={config} host={host} />{consent}</>
   }
 
   const open = (what: OpenWhat = 'comment') => host.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: what === 'list' ? 'list' : 'comment' }))

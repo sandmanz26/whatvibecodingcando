@@ -16,10 +16,10 @@ const RESULTS: { product: string; label: string; to: string }[] = [
   { product: 'comments', label: 'Comments', to: '/app/comments' },
   { product: 'compare', label: 'Component reviews', to: '/app/comments?kind=compare' },
   { product: 'narration', label: 'Voice notes', to: '/app/comments?kind=voice' },
-  { product: 'usability', label: 'Usability tests', to: '/app/research?kind=usability' },
-  { product: 'fivesec', label: '5-second tests', to: '/app/research?kind=fivesec' },
-  { product: 'heatmap', label: 'Heatmaps', to: '/app/research?kind=browse' },
-  { product: 'gaze', label: 'Eye tracking', to: '/app/research?kind=eyes' },
+  { product: 'usability', label: 'Usability tests', to: '/app/research?module=usability' },
+  { product: 'fivesec', label: '5-second tests', to: '/app/research?module=fivesec' },
+  { product: 'heatmap', label: 'Heatmaps', to: '/app/research?module=heatmap' },
+  { product: 'gaze', label: 'Eye tracking', to: '/app/research?module=gaze' },
   { product: 'insights', label: 'Participant paths', to: '/app/research?tab=sessions' },
   { product: 'report', label: 'Report', to: '/app/report' },
 ]
@@ -28,7 +28,7 @@ const STUDY_TOOLS = ['usability', 'fivesec', 'heatmap', 'gaze', 'insights']
 export function groupsFor(project: Project | null): Group[] {
   const on = (id: string) => !!project?.products.includes(id)
   const results: Item[] = [
-    ...(STUDY_TOOLS.some(on) ? [{ to: '/app/research', label: 'All studies' }] : []),
+    ...(STUDY_TOOLS.some(on) ? [{ to: '/app/research', label: 'All research' }] : []),
     ...RESULTS.filter((r) => on(r.product)).map(({ to, label }) => ({ to, label })),
     // Review rounds: a project setting (Settings → Review rounds), not a tool.
     ...(project?.rounds?.on ? [{ to: '/app/rounds', label: 'Rounds' }] : []),

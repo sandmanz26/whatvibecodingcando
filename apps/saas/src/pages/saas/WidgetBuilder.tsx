@@ -34,7 +34,7 @@ export function WidgetBuilder() {
   if (!draft.envs.some((e) => e.on)) warnings.push('No environment is on, so it shows only on the hosted demo site.')
   if (!anyModule(out.modules)) warnings.push('No module is on, so there is nothing to show.')
   if (draft.launcher.kind === 'hidden' && !draft.launcher.shortcut) warnings.push('No launcher and no C key: people can open it only with your own data-vibe buttons.')
-  if (draft.audience === 'everyone') warnings.push(cloud ? 'Every visitor can post comments. Each person is rate limited, but there is no CAPTCHA yet: watch for spam.' : 'Every visitor can post comments. Until the server is live there is no spam protection.')
+  if (draft.audience === 'everyone') warnings.push(cloud ? 'Every visitor sees the widget. Research modules ask each visitor first (OK / No thanks); visitors never see results. Every visitor can post comments. Each person is rate limited, but there is no CAPTCHA yet: watch for spam.' : 'Every visitor can post comments. Until the server is live there is no spam protection.')
 
   return (
     <div className="up-page">
@@ -66,7 +66,7 @@ export function WidgetBuilder() {
                 <Lock size={16} /><span><span><b>Reviewers only</b> <em>Recommended</em></span><small>People you open the site for with a review link (your team, your client). Visitors never see it or load it.</small></span>
               </button>
               <button role="radio" aria-checked={draft.audience === 'everyone'} className={draft.audience === 'everyone' ? 'on' : ''} onClick={() => edit((c) => ({ ...c, audience: 'everyone' }))}>
-                <Users size={16} /><span><b>Everyone visiting</b><small>For open betas. Every visitor can comment; the design tools stay with reviewers.</small></span>
+                <Users size={16} /><span><b>Everyone visiting</b><small>For open betas. Every visitor sees the modules you turned on: Comments, and research modules after a one-click OK (nothing recorded before). Results and the design tools stay with your team and reviewers.</small></span>
               </button>
             </div>
           </section>

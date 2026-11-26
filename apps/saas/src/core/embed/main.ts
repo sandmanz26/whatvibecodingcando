@@ -7,7 +7,7 @@
  * (vibe-app.js: React, comments, tools, studies). It needs the app when:
  * - the address carries a review link, a study link or a tool hint (#vibe_t, #vibe_r, #vibe_tool);
  * - this browser is a reviewer of the project, or is taking part in one of its studies;
- * - the widget is open to everyone (Comments for every visitor);
+ * - the widget is open to everyone (Comments or a research module, each research module asking first);
  * - the project has no published settings yet (older installs: options in the snippet);
  * - the build has no server (the browser-only demo);
  * - it is our own session frame (session.html).
@@ -65,7 +65,8 @@ async function main() {
   if (file.gone) { console.info('[ourhunch] this project was deleted; nothing to show.'); return }
   if (!file.live) return app()
   const c = file.live.config
-  if (c.on && c.audience === 'everyone' && c.modules.comments) return app()
+  const m = c.modules
+  if (c.on && c.audience === 'everyone' && (m.comments || m.heatmap || m.gaze || m.fivesec || m.usability)) return app()
   // A plain visitor: nothing shows. Why, for the console and the installation check (sampled).
   const env = envFor(c, window.location.host, project) ?? envFor(c, window.location.hostname, project)
   const why = !c.on ? 'The widget is switched off for this project.'

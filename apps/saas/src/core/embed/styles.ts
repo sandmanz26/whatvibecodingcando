@@ -32,6 +32,7 @@ export const CSS = `
 .vc-icon.sm { width: 20px; height: 20px; margin-left: auto; }
 .vc-icon.dock { width: 34px; height: 34px; border-radius: 999px; color: #fff; }
 .vc-icon.dock:hover { background: rgba(255,255,255,.12); color: #fff; }
+.vc-icon.dock.off { opacity: .45; }
 .vc-count { position: absolute; top: -2px; right: -2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--vc-accent); color: #fff; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; }
 
 .vc-pin { position: fixed; z-index: 2147482990; transform: translate(-50%, -50%); width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid #fff; background: var(--vc-accent); color: #fff; font-size: 11.5px; font-weight: 700; line-height: 1; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.3); }

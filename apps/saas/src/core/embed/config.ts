@@ -193,7 +193,7 @@ const ls = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); return true } catch { return false } },
   del: (k: string) => { try { localStorage.removeItem(k) } catch { /* ignore */ } },
 }
-const parseRelease = (v: unknown): Release | null => {
+export const parseRelease = (v: unknown): Release | null => {
   if (!isObj(v) || typeof v.version !== 'number' || typeof v.at !== 'string') return null
   const config = parseConfig(v.config)
   return config ? { version: v.version, config, at: v.at, by: typeof v.by === 'string' ? v.by.slice(0, 80) : '' } : null

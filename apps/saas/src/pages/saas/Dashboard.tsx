@@ -144,7 +144,7 @@ export function Dashboard() {
           <div className="up-row"><h2 className="lp-grow"><FlaskConical size={15} /> Research</h2><Link to="/app/research" className="lp-btn sm">{cloud ? 'Studies' : 'Open'}</Link></div>
           {!cloud ? <p className="up-muted">Studies with participants on your site need the server; this demo panel has none.</p>
             : !studies ? <p className="up-muted">Loading…</p>
-              : !studies.length ? <p className="up-muted">No studies yet. <Link to="/app/research">Make one</Link> and send its link to participants.</p>
+              : !studies.length ? <p className="up-muted">No studies yet. Turn on a research module: its default study is made automatically. <Link to="/app/research">Open Research</Link>.</p>
                 : <div className="db-kpis">
                   <div className="db-kpi"><span>Open studies</span><b>{studies.filter((x) => x.status === 'open').length}</b></div>
                   <div className="db-kpi"><span>Participants</span><b>{studies.reduce((n, x) => n + x.runs, 0)}</b></div>

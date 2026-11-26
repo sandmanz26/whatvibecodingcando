@@ -71,7 +71,7 @@ export function Guide() {
             <dl className="up-dl">
               <dt>Snippet</dt><dd>One script tag with your project id. It holds no settings, so you never have to change it on your site.</dd>
               <dt>Widget settings</dt><dd>Everything else (tools, look, who sees it, on which sites) is set in <i>Widget</i>. Your edits only reach your site when you press <i>Update site</i>. Every update is kept in <i>History</i>, so you can restore earlier settings.</dd>
-              <dt>Who sees it</dt><dd>By default <b>reviewers only</b>: visitors don’t see anything. You can open Comments to everyone visiting; the design tools always stay reviewers-only.</dd>
+              <dt>Who sees it</dt><dd>By default <b>reviewers only</b>: visitors don’t see anything. You can open it to <b>everyone visiting</b>: every visitor then sees all the modules you turned on. Research modules (Heatmap, Eye tracking, 5-second test, Usability test) ask first with one line and OK / No thanks, no name; only people who press OK are recorded, into that module’s default (★) study. Visitors never see results; the heatmap, the design tools and the data stay with your team and reviewers.</dd>
               <dt>Where (environments)</dt><dd>The addresses the widget may show on: production, staging, preview links, <code>localhost</code>. Each can be switched off on its own.</dd>
               <dt>The off switch</dt><dd>The switch on <i>Overview</i> hides the widget on every site at once. Comments are kept.</dd>
               <dt>Products</dt><dd>Turning a tool on in <i>Products</i> shows an <i>Update site</i> button; your site gets the tool once you press it.</dd>
@@ -129,7 +129,7 @@ export function Guide() {
             <h2>Research studies</h2>
             <p>Studies run on your real site with people who agree to take part. {cloud ? '' : 'They need the server, which this browser-only beta doesn’t have.'}</p>
             <ol className="gd-steps">
-              <li>Go to <i>Results → All studies</i> and press <i>New study</i>.</li>
+              <li>Go to <i>Research</i>. Each module that is on already has its default study (★ Default · Auto) collecting. For a separate round, press <i>Add another study</i> in that module; it is reached only through its own link. <i>Make default</i> moves the ★ (the study that gets the widget’s traffic); data stays with each study.</li>
               <li>Pick a kind:
                 <ul>
                   <li><b>Usability test:</b> tasks such as “find a gift under $20”, each with an optional success rule (reaching a page or clicking an element) and a time limit.</li>

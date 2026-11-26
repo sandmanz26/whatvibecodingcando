@@ -15,6 +15,8 @@ import { NS, selectorFor } from './store'
 import { takeHint } from './hints'
 
 export type StudyKind = 'usability' | 'fivesec' | 'browse'
+import { RESEARCH_MODULES, type ResearchModule } from './decide'
+export { RESEARCH_MODULES, type ResearchModule }
 export type Rule = { kind: 'page'; page: string } | { kind: 'element'; sel: string; label?: string } | { kind: 'none' }
 export interface Task { id: string; prompt: string; startPage: string; success: Rule; limitSec: number }
 export interface Door { id: string; page: string; sel: string; mode: 'add' | 'existing'; label: string; message: string }
@@ -29,6 +31,8 @@ export type Outcome = 'success' | 'timeout' | 'gave_up' | 'done'
 export interface TaskResult { id: string; outcome: Outcome; ms: number; pages: string[]; clicks: number; firstClickHit: boolean | null }
 export interface RunState {
   token: string
+  /** a visitor's run under "Everyone": the module whose default (★) study it records into (no link) */
+  module?: ResearchModule
   phase: 'consent' | 'eyes' | 'intro' | 'task' | 'showing' | 'questions' | 'done' | 'declined'
   /** eye tracking, when the study asks for it and the participant agreed and calibrated */
   eye?: { on: boolean; model?: import('../gaze-model').Model; accuracy?: number; calib?: { f: number[]; x: number; y: number }[] }
@@ -79,7 +83,8 @@ export function cleanConfig(kind: StudyKind, c: unknown): StudyConfig {
       return { id: str(x.id, 40) || `t${i + 1}`, prompt: str(x.prompt, 300) || `Task ${i + 1}`, startPage: x.startPage ? path(x.startPage) : '', success, limitSec: Math.min(1800, Math.max(15, Number(x.limitSec) || 180)) }
     })
   } else if (kind === 'fivesec') {
-    out.page = path(o.page); out.prompt = str(o.prompt, 300)
+    // No page: the page the person is on (the default "First impression" study).
+    out.page = o.page ? path(o.page) : ''; out.prompt = str(o.prompt, 300)
     out.seconds = Math.min(30, Math.max(3, Number(o.seconds) || 5))
     out.questions = (Array.isArray(o.questions) ? o.questions : []).slice(0, 3).map((q) => str(q, 200)).filter(Boolean)
   } else {
@@ -342,3 +347,19 @@ export interface Invite { token: string | null; open: boolean; people: number; n
 export const defaultInvite = (project: string) => server.rpc<Invite>('default_study_invite', { p_public_id: project })
 /** The participant link: this page's address with the study token in the hash. */
 export const inviteUrl = (token: string) => `${window.location.origin}${window.location.pathname}#vibe_r=${token}`
+
+/* ---------- visitors under "Everyone" (no link): the module's default (★) study, after they press OK ---------- */
+
+export interface VisitorModule { module: ResearchModule; state: 'open' | 'paused' | 'none'; kind?: StudyKind; name?: string; eye: boolean; tasks: number }
+const vmKey = (p: string) => `${NS}vmods:${p}`
+/** Which research modules are open to visitors (cached in this tab for 5 minutes). Never results. */
+export async function visitorModules(project: string): Promise<VisitorModule[]> {
+  try { const c = JSON.parse(sessionStorage.getItem(vmKey(project)) ?? 'null') as { at: number; list: VisitorModule[] } | null; if (c && Date.now() - c.at < 300_000) return c.list } catch { /* ask */ }
+  const list = (await server.rpc<VisitorModule[]>('visitor_modules', { p_public_id: project }, { anon: true })) ?? []
+  try { sessionStorage.setItem(vmKey(project), JSON.stringify({ at: Date.now(), list })) } catch { /* ask again next page */ }
+  return list
+}
+export const startVisitorRun = (project: string, module: ResearchModule) =>
+  server.rpc<{ run: string; kind: StudyKind; name: string; config: unknown; eye: boolean }>('start_visitor_run', { p_public_id: project, p_module: module, p_vw: window.innerWidth, p_vh: window.innerHeight }, { signIn: true })
+/** The invite link of a module's ★ study, for the team and reviewers. */
+export const moduleInvite = (project: string, module: ResearchModule) => server.rpc<Invite>('module_study_invite', { p_public_id: project, p_module: module })

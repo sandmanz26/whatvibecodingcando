@@ -24,7 +24,7 @@ export const analyticsOn = /^phc_[A-Za-z0-9]{20,}$/.test(KEY)
 export type FunnelEvent =
   | 'signup_started' | 'signup_completed' | 'login_completed' | 'onboarding_completed' | 'snippet_copied'
   | 'widget_published' | 'open_my_site' | 'install_detected' | 'review_link_created' | 'first_comment_received'
-  | 'comment_resolved' | 'fix_prompt_copied' | 'csv_exported' | 'study_created' | 'study_results_viewed'
+  | 'comment_resolved' | 'fix_prompt_copied' | 'csv_exported' | 'study_created' | 'study_results_viewed' | 'study_added' | 'study_default_changed'
   | 'rounds_turned_on' | 'rounds_turned_off' | 'round_started' | 'round_approved_seen' | 'settings_notify_changed'
   | 'checkout_started' | 'subscription_activated' | 'install_help_viewed' | 'address_added'
 export type Props = Record<string, string | number | boolean | string[]>

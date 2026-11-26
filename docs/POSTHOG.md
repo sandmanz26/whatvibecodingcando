@@ -24,7 +24,9 @@ Analytics hanya ada di website (`/`, `apps/landing/src/analytics.ts`) dan aplika
 | `comment_resolved` | app | — | Apakah feedback ditindaklanjuti? |
 | `fix_prompt_copied` | app | `count` | Fitur "AI prompt" dipakai? |
 | `csv_exported` | app | — | Ekspor dipakai? |
-| `study_created` | app | `kind`, `eye_tracking` | Riset dipakai? |
+| `study_created` | app | `kind`, `eye_tracking` | Riset dipakai? (sekarang lewat "Add another study" per modul) |
+| `study_added` | app | `module` | Studi tambahan (selain ★ default) dibuat di satu modul |
+| `study_default_changed` | app | `module` | Pemilik memindahkan ★ default ke studi lain |
 | `study_results_viewed` | app | `runs` | Hasil studi dibaca? |
 | `rounds_turned_on/off`, `round_started` | app | `n` | Review rounds dipakai? |
 | `round_approved_seen` | app | `n` | Klien menyetujui (sekali per ronde) |
@@ -79,7 +81,7 @@ Tambahan: funnel website `$pageview` (url = `/`) → `cta_clicked` (target = sig
 | Undangan reviewer | `review_link_created` total |
 | Komentar pertama | `first_comment_received` total |
 | Feedback ditindaklanjuti | `comment_resolved` + `fix_prompt_copied` |
-| Riset | `study_created`, `study_results_viewed` |
+| Riset | `study_created`, `study_added`, `study_default_changed`, `study_results_viewed` |
 | Ronde | `round_started`, `round_approved_seen` |
 | Workspace aktif | `$pageview` *unique groups (workspace)*, interval Week |
 | Website → signup | `cta_clicked` breakdown `location` |

@@ -194,18 +194,18 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 
 ---
 
-## 9. Riset — **Results → All studies**
+## 9. Riset — **Research** (per modul)
 
 | # | Langkah | Hasil yang diharapkan | ✔ |
 |---|---|---|---|
-| 9.1 | **New study** → Usability test: 2 tugas (mis. "buka keranjang" dengan aturan halaman `/cart`) | Studi tersimpan | [ ] |
-| 9.2 | **Participant link** → salin → buka di Browser B | Layar persetujuan (consent) muncul | [ ] |
+| 9.1 | Bagian **Usability test** → **Add another study**: 2 tugas (mis. "buka keranjang" dengan aturan halaman `/cart`) | Studi tersimpan | [ ] |
+| 9.2 | **Get link** → salin → buka di Browser B | Layar persetujuan (consent) muncul | [ ] |
 | 9.3 | Tolak (No) | Tidak ada yang direkam | [ ] |
 | 9.4 | Buka lagi, **I agree** → kerjakan tugas → **Done** | Bar tugas tampil; "Thank you" di akhir | [ ] |
 | 9.5 | Panel → **Results** studi | Tabel tugas (Success, waktu), Clicks by page, peserta & **Path** | [ ] |
 | 9.6 | **Participants (CSV)** dan **Clicks, pages and gaze (CSV)** | Dua file terunduh, kolom "task 1 outcome", dst. | [ ] |
 | 9.7 | Tombol heatmap pada halaman | Situs terbuka dengan heatmap di atas halaman (reviewer) | [ ] |
-| 9.8 | 5-second test: buat, buka link peserta | Halaman tampil 5 detik lalu tertutup; pertanyaan muncul; jawaban tersimpan | [ ] |
+| 9.8 | 5-second test: **Add another study**, buka link peserta | Halaman tampil 5 detik lalu tertutup; pertanyaan muncul; jawaban tersimpan | [ ] |
 | 9.9 | (Labs) Usability test dengan eye tracking: peserta izinkan kamera, kalibrasi | Kalibrasi selesai; video **tidak** disimpan; heatmap gaze tersedia (akurasi tergantung cahaya) | [ ] |
 | 9.10 | **Results → Participant paths** | Daftar peserta + langkah mereka; tombol CSV | [ ] |
 | 9.11 | **Clear results** pada studi | Peserta & heatmap kosong; studi & link tetap ada | [ ] |
@@ -226,9 +226,19 @@ Pakai **Browser B**. Buat review link dulu: panel → **Reviewers** → isi nama
 | 9.11o | **Share on WhatsApp** | WhatsApp terbuka dengan teks + link undangan | [ ] |
 | 9.11p | Buka situs biasa (tanpa link review/undangan) di Browser C, klik-klik | Tidak ada yang tercatat (pengunjung biasa tidak pernah direkam) | [ ] |
 | 9.11q | Tab **Clicks** / **Where people looked** → **What's the difference?** | Satu kalimat penjelasan per tab; tabel perbandingan 4 baris | [ ] |
-| 9.11r | Research → studi **Site heatmap** → Close | Reviewer tidak lagi merekam; tombol undangan berkata "paused" | [ ] |
+| 9.11r | Research → studi **Site heatmap** → Pause | Reviewer tidak lagi merekam; tombol undangan berkata "paused" | [ ] |
 | 9.11s | Demo (tanpa server): `apps/saas/tests/e2e/` (`node serve.mjs &` lalu `node default-heatmap.mjs`) | Klik tampil di heatmap, link undangan membuka layar persetujuan | [ ] |
 | 9.12 | Hapus studi | Hilang beserta datanya | [ ] |
+| 9.13 | Onboarding pilih **Heatmaps + Usability tests + 5-second tests** → **Research** | Tiga bagian modul, masing-masing satu studi **★ Default · Auto** (Site heatmap, Usability test, First impression); tidak ada tombol "New study" di mana pun | [ ] |
+| 9.14 | Widget → **Everyone visiting** → Update site; buka situs di Browser B (bukan reviewer) | Widget tampil dengan Comment + tombol riset untuk **semua** modul aktif (Help with the heatmap, 5-second test, Usability test) | [ ] |
+| 9.15 | Browser B: tombol heatmap → **No thanks** | Tidak ada yang direkam | [ ] |
+| 9.16 | Browser B: tombol heatmap → **OK** → klik-klik → Finish | Bar "Visit … Finish"; klik tercatat di studi ★; Browser B **tidak** melihat heatmap/hasil | [ ] |
+| 9.17 | Tim (Open my site) → Heatmap | Klik pengunjung terlihat | [ ] |
+| 9.18 | Research → ★ 5-second → **Pause**; muat ulang Browser B | Tombol 5-second hilang untuk pengunjung; panel menulis "Paused" | [ ] |
+| 9.19 | Usability → **Add another study** → **★ Make default** | ★ pindah; data lama tetap di studi lama; lalu lintas baru masuk ke ★ baru; link studi lama tetap membuka studinya sendiri | [ ] |
+| 9.20 | Proyek lama dengan audiens **Reviewers only** | Tidak berubah: pengunjung tidak melihat apa pun; tim/reviewer sama seperti sebelumnya; hanya ada studi ★ baru di Research untuk modul riset yang sudah aktif | [ ] |
+| 9.21 | Eye tracking aktif, buka situs di http (bukan https) atau tanpa kamera | Tombol Eye tracking tetap tampil, redup, dengan alasan "needs a camera…" | [ ] |
+| 9.22 | Otomatis: `bash apps/saas/supabase/tests/run.sh`, `npm run test:compat` (di `apps/saas`), `tests/e2e/default-studies.mjs` | `default_studies_test.sql` ALL PASS (36 cek); compat ALL PASS; e2e semua baris sesuai | [ ] |
 
 ---
 
@@ -368,6 +378,8 @@ npm run preview                         # buka http://localhost:4173/ (website) 
 ```
 
 Tes pin (tanpa browser): `node apps/saas/tests/anchor.test.ts` → semua "ok".
+
+Tes kompatibilitas instalasi lama (config lama, keputusan widget): `npm run test:compat --prefix apps/saas` → "ALL PASS".
 
 Tes database (butuh PostgreSQL 16 lokal): `cd apps/saas/supabase && bash tests/run.sh` → semua file harus "ALL PASS".
 

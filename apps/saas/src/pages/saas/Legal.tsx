@@ -12,7 +12,7 @@ import { BrandMark } from '../../components/BrandMark'
  * anyone is charged.
  */
 
-const UPDATED = '25 November 2026'
+const UPDATED = '26 November 2026'
 const CONTACT = 'hello@ourhunch.com'
 const Mail = () => <a href={`mailto:${CONTACT}`}>{CONTACT}</a>
 /** An owner placeholder: visible on purpose until filled. */
@@ -44,7 +44,7 @@ export function Privacy() {
     <Page title="Privacy policy" short={
       <ul>
         <li>We keep what it takes to run {BRAND}: your account, your projects and the feedback on them.</li>
-        <li>On your site, the script records nobody unless they opened a review link (or your panel’s “Open my site”) or agreed to a study. Reviewers’ and your team’s clicks build your heatmap by default; each of them can turn that off in the widget.</li>
+        <li>On your site, the script records nobody unless they opened a review link (or your panel’s “Open my site”), agreed to a study, or pressed OK on a research module when you open the widget to everyone. Visitors never see results. Reviewers’ and your team’s clicks build your heatmap by default; each of them can turn that off in the widget.</li>
         <li>We never record typed text or field values. Webcam video never leaves the participant’s browser.</li>
         <li>No ads, no selling data, no session recordings of you.</li>
         <li>For your reviewers’ and participants’ data, you are in charge; we handle it for you.</li>
@@ -72,7 +72,8 @@ export function Privacy() {
 
       <h2>4. If you take part in a study</h2>
       <ul>
-        <li>Nothing is recorded until you press <b>I agree</b> on the study’s consent screen.</li>
+        <li>Nothing is recorded until you press <b>I agree</b> on the study’s consent screen, or <b>OK</b> on the one-line question a site’s widget shows when it is open to everyone (for example “Your clicks on this site will be recorded for the site owner’s heatmap”). No name is asked. What you agree to covers that one module (heatmap, eye tracking, 5-second test or usability test) only; No thanks records nothing.</li>
+        <li>You never see other people’s data: heatmaps and results are only for the site owner’s team and the reviewers they invite.</li>
         <li><b>What is kept:</b> where you click (page address without its query, position, which element and a short label of it), the pages you open, task times and results, and your answers to the study’s own questions.</li>
         <li><b>Never kept:</b> what you type into the site, field values, video of your screen, or cookies of yours. Emails, phone numbers and long numbers in labels are removed before anything is sent. Parts of a page marked private stay private.</li>
         <li><b>Eye tracking</b> is asked for separately and can be refused. The camera picture is turned into estimated gaze points inside your browser and then dropped. Video never leaves your browser and is never stored. Only gaze points and the calibration accuracy are kept.</li>
@@ -80,7 +81,7 @@ export function Privacy() {
       </ul>
 
       <h2>5. If you visit a site that uses {BRAND}</h2>
-      <p>The script loads on the page, but it records nothing about you unless you open a review link or agree to a study. (Reviewers’ clicks build the site’s heatmap, see section 3.) It never reads what you type into the site, and it stays in its own sealed box on the page.</p>
+      <p>The script loads on the page, but it records nothing about you unless you open a review link or agree to a study. (Reviewers’ clicks build the site’s heatmap, see section 3.) If the site owner opens the widget to everyone, you can see its buttons; a research button records you only after you press OK (section 4). It never reads what you type into the site, and it stays in its own sealed box on the page.</p>
 
       <h2>6. Analytics on our own site</h2>
       {analyticsOn
