@@ -42,6 +42,7 @@ Centang di sini setiap kali selesai. ✅ = sudah dikonfirmasi pemilik/tes, ⬜ =
 | `2026-11-26-security.sql` | pengerasan keamanan (setelah billing) | ❓ |
 | `2026-11-27-install-flow.sql` | alur instalasi: banner alamat localhost baru (jalankan setelah security) | ⬜ |
 | `2026-11-28-default-heatmap.sql` | heatmap otomatis: studi "Site heatmap", klik reviewer/tim, link undangan (jalankan setelah install-flow) | ⬜ |
+| `2026-11-28-demo-origin.sql` | demo di ourhunch.com bisa dipakai link review | ⬜ |
 
 Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into public.platform_admins (user_id) select id from auth.users where email = '<email>';` ✅
 
@@ -86,6 +87,7 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 ## 4. Log perubahan (terbaru di atas)
 
 ### 28 Nov 2026
+- **Bug demo di ourhunch.com**: link review di `ourhunch.com/embed-demo.html` ditolak ("This review link doesn't work on this address") karena daftar situs demo masih berisi alamat lama `whatvibecodingcando.vercel.app`. Perbaikan: `catch-up/2026-11-28-demo-origin.sql` (menambah `https://ourhunch.com` dan `www`).
 - **Perbaikan email hari ke-7**: studi otomatis "Site heatmap" tidak lagi dihitung sebagai studi buatan pengguna, jadi email *"Test with real users"* tetap terkirim. Sudah termasuk di `2026-11-28-default-heatmap.sql` (diuji dua kali di database lokal, semua tes SQL lulus).
 - **Heatmap langsung jalan tanpa membuat studi.** Saat Heatmaps dinyalakan (onboarding atau Products → Update site), server otomatis membuat satu studi **Site heatmap** (Heatmap visit, tanpa tanggal akhir, semua halaman) — tidak pernah dobel; proyek lama yang Heatmaps-nya aktif ikut dibuatkan oleh SQL. Tampil di Research dengan label "default"; bisa diganti nama, ditutup (pause), atau dihapus.
 - **Klik reviewer & tim tercatat otomatis** (lewat link review atau Open my site) ke studi itu, satu "run" per sesi reviewer, dengan aturan rekaman yang sama (hanya klik asli, batas jumlah, tanpa isi field/ketikan). Widget menampilkan sekali: "Your clicks on this site help build its heatmap…" + tombol mati; di panel Heatmap ada centang **Record my clicks for this heatmap**. Server memeriksa origin, status reviewer dan rate limit.
