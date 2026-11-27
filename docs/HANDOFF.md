@@ -45,6 +45,7 @@ Centang di sini setiap kali selesai. ✅ = sudah dikonfirmasi pemilik/tes, ⬜ =
 | `2026-11-28-demo-origin.sql` | demo di ourhunch.com bisa dipakai link review | ⬜ |
 | `2026-11-29-default-studies.sql` | satu studi default ★ per modul riset, pengunjung di mode Everyone (persetujuan satu klik), pengunjung tidak bisa membaca hasil (jalankan setelah demo-origin) | ⬜ |
 | `2026-12-01-snapshots-layouts.sql` | eye tracking wajib kamera (run tanpa gaze dikecualikan, `discard_run`), versi layout per halaman, snapshot halaman + bucket privat `snapshots` + policy (jalankan setelah default-studies). Kalau baris `insert into storage.buckets` ditolak: buat bucket manual (lihat README Supabase "Page snapshots") lalu jalankan ulang | ⬜ |
+| `2026-12-02-studies-guard.sql` | setiap modul riset yang aktif selalu punya minimal satu studi: ★ terakhir tidak bisa dihapus (`last_study`), menghapus ★ memindahkan ★ (pilihan pemilik atau yang terbaru), fungsi `delete_study` untuk panel (jalankan setelah snapshots-layouts). Sebelum dijalankan, panel memakai hapus biasa (tanpa penjaga) | ⬜ |
 
 Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into public.platform_admins (user_id) select id from auth.users where email = '<email>';` ✅
 
@@ -93,6 +94,8 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - **Eye tracking wajib kamera di modul Eye tracking**: menolak kamera / tanpa kamera / kalibrasi dihentikan = partisipasi selesai, run dihapus, pesan "Eye tracking needs your camera. Nothing was recorded.". Di server run modul gaze tanpa titik gaze ditandai `excluded` dan tidak dihitung. Hanya di studi lain (usability/5-detik dengan eye tracking tambahan) boleh lanjut: "Continue the test without eye tracking".
 - **Snapshot halaman**: ON untuk proyek baru, **OFF untuk proyek lama** (instalasi lama tidak berubah). Hanya dari tim/reviewer/peserta lewat link (diberi tahu di layar persetujuan), tidak pernah dari pengunjung biasa. Selalu disamarkan. Mematikan setting menghapus snapshot tersimpan.
 - **Versi layout otomatis**: hasil tidak pernah dicampur antar layout; data lama = "unknown layout". Di laporan eye tracking satu halaman = satu baris (orang unik), layout = tab.
+- **Satu modul aktif = minimal satu studi**: ★ terakhir hanya bisa di-Pause, tidak dihapus (dipaksa di server). Hapus ★ saat ada studi lain → pemilik memilih ★ baru (default terbaru).
+- **Cek Get ready hanya menyarankan, tidak pernah mengunci**: *Start anyway* selalu ada; toleran (wajah agak di pinggir, 40–80 cm, cahaya dari jendela belakang).
 - **Kalibrasi eye tracking**: layar Get ready + titik otomatis (tanpa klik); label good ≤150 px / okay ≤250 px / poor; satu kali saran ulang. Diagnostik hanya lewat `?vibe_gaze_debug=1` (tim), lokal, tanpa video/gambar.
 
 ---
@@ -103,6 +106,34 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - Build sekarang juga menulis `dist/_headers` dan `dist/_redirects` (format Cloudflare Pages) dari `vercel.json` lewat `scripts/cloudflare-config.mjs`. `vercel.json` tetap satu-satunya tempat mengedit header/CSP/redirect; Vercel tetap berjalan seperti biasa.
 - Panduan migrasi: lihat pesan di chat 27 Nov (ringkas: buat project Pages dari GitHub, build `npm run install:all && npm run build`, output `dist`, env `NODE_VERSION=22` + semua `VITE_*`, preview branch = none, tes di `*.pages.dev`, lalu pindah DNS).
 - **Belum diverifikasi di Cloudflare**: header `/embed/*` (CSP harus hilang) dan `/embed/session.html` (CSP khususnya). Cek dengan `curl -I` setelah deploy pertama.
+
+### 2 Des 2026 (b) — tombol "Start calibration" mati, laporan per peserta, skala, satu studi per modul, tab Participant paths
+**Akar masalah tombol mati (bug #1)**
+1. **Versi `gaze.js` tidak cocok dengan widget.** `gaze.js` dimuat dari alamat tetap (`/embed/gaze.js`) dengan cache `max-age=300, stale-while-revalidate=86400`, sedangkan `vibe-app.js` di-cache terpisah. Setelah deploy 2 Des, browser bisa memakai widget baru dengan `gaze.js` lama yang **belum punya** `precheck()`/`detect()`. Akibatnya setiap tick pre-check melempar error sebelum `setIssues` → `issues` tetap `null`.
+2. **Tampilan menunjukkan ✓ padahal belum ada hasil.** Saat `issues === null`, ketiga baris tetap merender ikon ✓ + teks "Face in the middle / About an arm’s length / Enough light" (hanya warnanya netral), sementara tombol `disabled={!issues || …}` dan *Start anyway* hanya muncul kalau ada masalah. Jadi persis yang Anda lihat: ✓✓✓, tombol pudar, tidak ada jalan keluar. (Kode lama, `Research.tsx`: `has()` mengembalikan `undefined` → cabang ✓.)
+3. **Timer 600 ms direset oleh satu frame jelek** (wajah hilang satu frame, kecerahan/jarak di dekat batas) — dengan webcam asli ini sering. Ditambah batas sempit: jarak dari ukuran iris mengasumsikan kamera 60°, sehingga kamera laptop lebar (±78°) di 60 cm terbaca "terlalu jauh"; kecerahan rata-rata seluruh gambar → jendela di belakang = "bright".
+
+**Perbaikan**
+- `gaze.js?v=<build>`: widget selalu memuat `gaze.js` dari build yang sama (`VITE_BUILD_ID`, `app.tsx` `gazeHref`).
+- Logika cek pindah ke widget sendiri (`PrecheckGate` di `gaze-model.ts`, murni, dites): baris dan tombol membaca **daftar yang sama**; masalah baru tampil kalau ada di 3 dari 5 frame terakhir (satu frame jelek tidak mereset); tombol aktif setelah 300 ms hijau. Belum diketahui → "… Checking", bukan ✓. Setiap bagian tick dibungkus try/catch; `gaze.js` lama tanpa `detect()` tetap jalan.
+- Batas toleran: wajah 0,28–0,72 (x) / 0,18–0,80 (y); terlalu dekat hanya ≤35 cm (kamera 60°), terlalu jauh hanya ≥90 cm (kamera 78°); cahaya dari bagian tengah gambar (wajah), gelap <30, silau >248.
+- **Start anyway** selalu tampil (link).
+- Titik: stabil diukur terhadap noise titik itu sendiri (MAD), batas waktu 2,5 dtk tetap mengambil frame yang ada; klik titik = langsung selesai; titik tanpa wajah diulang sekali lalu dilewati; 3 titik berturut-turut tanpa wajah atau <6 titik terlihat → layar hasil "We couldn’t see your eyes well enough" (Try again / keluar). Tidak ada layar tanpa jalan maju dan keluar.
+- **Laporan per peserta**: menu **Show** (All participants / satu peserta) berlaku untuk seluruh laporan; **Participants list** (Participant 1, 2… urut mulai, tanggal, perangkat, kalibrasi + grade, halaman, durasi; nama reviewer kalau reviewer, tanpa email; maks 200 baris di daftar, semua di menu); per peserta: urutan halaman + waktu, "Look, then click" (gaze di elemen yang sama atau ≤120 px dalam 5 dtk sebelum klik), gaze per halaman di snapshot. Hanya di panel. Bandingkan dua peserta: **belum dibuat** (tidak murah dengan tata letak sekarang).
+- **Skala**: tabel halaman dengan pencarian, sortir, 25 baris per halaman (`pageTable`); detail tetap di samping/bawah; ringkasan satu baris. Data tetap dibatasi: 1.000 run, 20.000 event (`paged()`), nama reviewer maks 300.
+- **Satu studi per modul**: migrasi `20261202000000_studies_guard.sql` (trigger `study_delete_guard` + `study_after_delete`, fungsi `delete_study(p_study, p_new_default)`); panel: tombol hapus redup + tooltip, dialog memilih ★ baru. Hapus proyek/workspace tidak pernah diblokir. Modul yang dinyalakan lagi mendapat ★ lewat jalur idempoten yang sudah ada.
+- **Tab Participant paths**: dulu `setTab` membuang `?module=` → halaman semua modul. Sekarang `?module=gaze&tab=sessions` (tab hanya sesi modul itu), `activeOf` (dipindah ke `src/saas/nav-active.ts`) tetap menyalakan link modul.
+- Tes: `tests/gaze-precheck.test.ts` (7, landmark sintetis bernoise), `tests/nav.test.ts` (3, semua tab modul), `gaze-report.test.ts` +2, `supabase/tests/studies_guard_test.sql` (16 cek; seluruh `run.sh` lulus; file catch-up diuji 2× di DB dari semua migrasi sebelumnya), e2e `tests/e2e/gaze-precheck-flow.mjs` (kamera palsu Chromium + fitur mata sintetis lewat route: Get ready → 13 titik → 5 validasi → hasil tanpa klik selain Start, ±20 dtk; jalur tanpa wajah ±16 dtk), `gaze-calib-report.mjs` (+5 cek per peserta/cari), `camera-runs.mjs` ALL PASS.
+
+**Yang harus dilakukan pemilik**
+1. Jalankan `apps/saas/supabase/catch-up/2026-12-02-studies-guard.sql` (setelah `2026-12-01-snapshots-layouts.sql`). Sebelum dijalankan, panel kembali ke hapus biasa (tanpa penjaga di server, tanpa memilih ★ baru).
+2. Tes ulang di laptop Anda: `docs/TESTING.md` 9.23–9.29. Setelah deploy, muat ulang halaman situs dengan cache dikosongkan sekali (Ctrl+Shift+R) agar widget baru terpakai.
+
+**Belum terverifikasi**
+- Webcam asli Anda (penyebab #1 dibuktikan dari kode + cache header, tidak dari perangkat Anda); e2e memakai fitur mata sintetis, bukan model wajah.
+- Batas jarak memakai asumsi sudut kamera (60°/78°); kamera sangat lebar/sempit bisa sedikit meleset (hanya saran, tidak mengunci).
+- Nama reviewer di laporan membutuhkan kolom `runs.source` & `reviewers.visitor` (sudah ada sejak SQL 2026-11-29); kalau gagal dibaca, laporan tetap jalan tanpa nama.
+- Dengan >20.000 event per studi, laporan hanya memakai 20.000 event pertama per urutan run (batas lama).
 
 ### 2 Des 2026 — eye tracking: akurasi kalibrasi, layar persiapan, cek kepala, laporan ringkas
 **Penyebab yang ditemukan (dengan bukti, `apps/saas/tests/gaze-calib.test.ts`, simulator webcam realistis `tests/gaze-sim.ts`)**

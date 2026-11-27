@@ -56,30 +56,8 @@ export function groupsFor(project: Project | null): Group[] {
   ]
 }
 
-/** The params that make a different page of the same path (others, like ?status, are filters). */
-const PAGE_KEYS = ['kind', 'tab', 'module'] as const
-const OLD_MODULE: Record<string, string> = { browse: 'heatmap', eyes: 'gaze', heatmap: 'heatmap', gaze: 'gaze', fivesec: 'fivesec', usability: 'usability' }
-/** The page params of an address; Research's older ?kind=… spelling counts as its ?module=…. */
-function pageParams(pathname: string, search: string) {
-  const q = new URLSearchParams(search)
-  const out: Record<string, string> = {}
-  for (const k of PAGE_KEYS) out[k] = q.get(k) ?? ''
-  if (pathname === '/app/research' && !out.module && out.kind) { out.module = OLD_MODULE[out.kind] ?? ''; out.kind = '' }
-  return out
-}
-/** The one active link: an exact match (path and page params), else the closest parent path (a study's results → Research overview). */
-export function activeOf(all: string[], pathname: string, search: string): string | null {
-  const have = pageParams(pathname, search)
-  const exact = all.find((to) => {
-    const [path, q = ''] = to.split('?')
-    if (path !== pathname) return false
-    const want = pageParams(path, q)
-    return PAGE_KEYS.every((k) => want[k] === have[k])
-  })
-  if (exact) return exact
-  const parents = all.filter((to) => !to.includes('?') && to !== '/app' && pathname.startsWith(`${to}/`)).sort((a, b) => b.length - a.length)
-  return parents[0] ?? null
-}
+export { activeOf } from '../../saas/nav-active'
+import { activeOf } from '../../saas/nav-active'
 
 const OPEN_KEY = 'saas:nav:open'
 function readOpen(): Record<string, boolean> { try { return JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, boolean> } catch { return {} } }

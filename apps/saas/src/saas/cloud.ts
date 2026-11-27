@@ -431,7 +431,7 @@ export interface StudyRow { id: string; kind: StudyKind; name: string; config: R
 /** A study's research module (one default ★ study each): from the server, or worked out the same way. */
 export type StudyModule = 'heatmap' | 'gaze' | 'fivesec' | 'usability'
 export const studyModule = (s: Pick<StudyRow, 'kind' | 'eye_tracking' | 'module'>): StudyModule => s.module ?? (s.kind === 'usability' ? 'usability' : s.kind === 'fivesec' ? 'fivesec' : s.eye_tracking ? 'gaze' : 'heatmap')
-export interface RunRow { id: string; started_at: string; finished_at: string | null; device: string | null; vw: number | null; gaze_accuracy: number | null; result: { tasks?: { id: string; outcome: string; ms: number; pages?: string[]; clicks?: number; firstClickHit?: boolean | null }[]; answers?: string[] }; events: number }
+export interface RunRow { id: string; /** a reviewer's name, for reviewer runs (panel only) */ name?: string | null; started_at: string; finished_at: string | null; device: string | null; vw: number | null; gaze_accuracy: number | null; result: { tasks?: { id: string; outcome: string; ms: number; pages?: string[]; clicks?: number; firstClickHit?: boolean | null }[]; answers?: string[] }; events: number }
 export interface EventRow { run_id: string; t: number; task: string | null; kind: 'click' | 'page' | 'gaze' | 'door'; page: string; label: string | null; sel: string | null; rage: boolean | null; dead: boolean | null; hit: boolean | null; /** page px, for the eye-tracking report's fixations and drift */ x?: number | null; y?: number | null; vw?: number | null; ex?: number | null; ey?: number | null; /** the page's layout fingerprint hash (absent: unknown layout) */ layout_hash?: string | null }
 
 export async function listStudies(publicId: string): Promise<StudyRow[]> {
@@ -457,7 +457,13 @@ export async function saveStudy(publicId: string, s: { id?: string; kind: StudyK
 }
 /** Moves the ★ (the study that gets the widget's traffic) of the study's module to this study. */
 export async function makeDefaultStudy(id: string) { const { error } = await supabase!.rpc('make_default_study', { p_study: id }); if (error) throw error }
-export async function deleteStudy(id: string) { const { error } = await supabase!.from('studies').delete().eq('id', id); if (error) throw error }
+/** Deletes a study (delete_study: a module that is on keeps one study; deleting the ★ moves it to `nextDefault`, else the newest). */
+export async function deleteStudy(id: string, nextDefault?: string) {
+  let { error } = await supabase!.rpc('delete_study', { p_study: id, p_new_default: nextDefault ?? null })
+  // Before 2026-12-02-studies-guard.sql is run: the plain delete, as before.
+  if (error && /delete_study|PGRST202|schema cache/i.test(`${error.message} ${(error as { code?: string }).code ?? ''}`)) ({ error } = await supabase!.from('studies').delete().eq('id', id))
+  if (error) throw new Error(/last_study/.test(error.message) ? 'Each module keeps one study. Pause it instead.' : error.message)
+}
 export async function studyLink(id: string, days = 30): Promise<string> {
   const { data, error } = await supabase!.rpc('create_study_link', { p_study: id, p_days: days })
   if (error) throw error
@@ -472,8 +478,19 @@ export async function studyResults(id: string): Promise<{ runs: RunRow[]; events
   if (error) throw error
   // Runs that can't count (an eye-tracking run without gaze) are left out of results.
   const kept = ((runs ?? []) as unknown as (RunRow & { excluded?: boolean })[]).filter((r) => !r.excluded)
-  const events = await eventsOf(kept.map((r) => r.id))
-  return { runs: kept, events }
+  const [events, names] = await Promise.all([eventsOf(kept.map((r) => r.id)), reviewerNames(id).catch(() => new Map<string, string>())])
+  return { runs: kept.map((r) => (names.has(r.id) ? { ...r, name: names.get(r.id) } : r)), events }
+}
+/** Reviewers' names for a study's reviewer runs (run id → name; never emails), for the per-participant report. Bounded. */
+async function reviewerNames(study: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  const { data: rr, error } = await supabase!.from('runs').select('id, user_id, project_id').eq('study_id', study).eq('source', 'reviewer').limit(1000)
+  if (error || !rr?.length) return out
+  const rows = rr as { id: string; user_id: string; project_id: string }[]
+  const { data: rv } = await supabase!.from('reviewers').select('user_id, name').eq('project_id', rows[0].project_id).eq('visitor', false).in('user_id', [...new Set(rows.map((r) => r.user_id))].slice(0, 300))
+  const byUser = new Map(((rv ?? []) as { user_id: string; name: string }[]).map((x) => [x.user_id, x.name]))
+  for (const r of rows) { const n = byUser.get(r.user_id); if (n && n !== 'Guest') out.set(r.id, n) }
+  return out
 }
 /** A page's heatmap pre-aggregated on the server over every event of the study (bounded: bins, elements, depth). */
 export async function studyHeatmap(id: string, page: string): Promise<unknown> {

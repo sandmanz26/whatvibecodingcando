@@ -51,6 +51,8 @@ export function VisitorConsent({ project, m, accent, gazeUrl, onStart, onCancel 
 import { useEffect, useRef, useState } from 'react'
 import { Check, Eye, Flag, Timer, X } from 'lucide-react'
 import { OneEuro } from '../gaze-analysis'
+// The pre-check's logic is in the widget itself (tiny, pure), so it never depends on which gaze.js loaded.
+import { PrecheckGate, PRECHECK_ROWS, PRECHECK_TEXT, precheck, type PrecheckIssue } from '../gaze-model'
 import { Recorder, pageOf, cleanConfig, discardRun, eyeIsRequired, finishRun, pageMatches, saveRun, startRun, startVisitorRun, type Door, type Outcome, type RunState, type VisitorModule } from './research'
 
 const mmss = (ms: number) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
@@ -377,13 +379,15 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
   const [q, setQ] = useState<import('../gaze-model').Quality | null>(null)
   const [retried, setRetried] = useState(false)
   const [order, setOrder] = useState<{ x: number; y: number }[]>([])
-  const [issues, setIssues] = useState<import('./gaze-entry').PrecheckIssue[] | null>(null)
-  const [steadyFor, setSteadyFor] = useState(0)
+  const [issues, setIssues] = useState<PrecheckIssue[] | null>(null)
+  const [ready, setReady] = useState(false)
+  const [unseen, setUnseen] = useState(0)
   const box = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const dotEl = useRef<HTMLButtonElement>(null)
   const ref = useRef<{ g: Gaze; lm: Awaited<ReturnType<Gaze['loadLandmarker']>>; video: HTMLVideoElement; samples: import('../gaze-model').CalSample[]; model?: import('../gaze-model').Model; cal: Dot[]; checks: Dot[] } | null>(null)
   const clickNow = useRef(false)
+  const inARow = useRef(0)
   const ok = useRef(false)
   // Leaving the setup without finishing it lets the camera go.
   useEffect(() => () => { if (!ok.current) stopEyes() }, [])
@@ -406,31 +410,36 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
   useEffect(() => {
     if (phase !== 'precheck') return
     const r = ref.current!
-    let goodSince = 0
+    const gate = new PrecheckGate()
+    setIssues(null); setReady(false)
     const iv = window.setInterval(() => {
-      const c = canvas.current
+      // Never let one bad frame (or a missing function) stop the checks: each part is guarded.
       const now = performance.now()
       let brightness: number | null = null
-      if (c && r.video.readyState >= 2) {
-        const ctx = c.getContext('2d', { willReadFrequently: true })
-        if (ctx) {
-          ctx.save(); ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(r.video, 0, 0, c.width, c.height); ctx.restore()
-          const px = ctx.getImageData(0, 0, c.width, c.height).data
-          let sum = 0, n = 0
-          for (let i = 0; i < px.length; i += 16) { sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; n++ }
-          brightness = n ? sum / n : null
+      try {
+        const c = canvas.current
+        if (c && r.video.readyState >= 2) {
+          const ctx = c.getContext('2d', { willReadFrequently: true })
+          if (ctx) {
+            ctx.save(); ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(r.video, 0, 0, c.width, c.height); ctx.restore()
+            // Brightness of the middle of the picture (where the face is), so a bright window behind doesn't count.
+            const px = ctx.getImageData(c.width * 0.25, c.height * 0.15, c.width * 0.5, c.height * 0.7).data
+            let sum = 0, n = 0
+            for (let i = 0; i < px.length; i += 16) { sum += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; n++ }
+            brightness = n ? sum / n : null
+          }
         }
-      }
-      let d: ReturnType<Gaze['detect']> = { f: null, face: null }
-      try { d = r.g.detect(r.lm, r.video, now) } catch { /* next frame */ }
-      const list = r.g.precheck({ face: d.face, irisW: d.f ? d.f[15] : null, brightness })
-      setIssues(list)
-      if (list.length) goodSince = 0; else if (!goodSince) goodSince = now
-      setSteadyFor(goodSince ? now - goodSince : 0)
+      } catch { /* no preview this frame */ }
+      let d: { f: number[] | null; face: { cx: number; cy: number } | null } = { f: null, face: null }
+      try { d = r.g.detect ? r.g.detect(r.lm, r.video, now) : { f: r.g.features(r.lm, r.video, now), face: null } } catch { /* next frame */ }
+      // An older face module without detect(): features only, so the face row can't be judged; let it pass.
+      const face = d.face ?? (d.f ? { cx: 0.5, cy: 0.5 } : null)
+      const st = gate.push(precheck({ face, irisW: d.f ? d.f[15] : null, brightness }), now)
+      setIssues(st.issues); setReady(st.ready)
     }, 120)
     return () => window.clearInterval(iv)
   }, [phase])
-  const beginCalibration = () => { const r = ref.current!; r.samples = []; r.cal = []; r.checks = []; setOrder(r.g.calibrationOrder()); setStep(0); setHint(''); setPhase('calibrate') }
+  const beginCalibration = () => { const r = ref.current!; r.samples = []; r.cal = []; r.checks = []; setUnseen(0); inARow.current = 0; setOrder(r.g.calibrationOrder()); setStep(0); setHint(''); setPhase('calibrate') }
 
   /* ---- 2–3. dots: collected automatically once the eyes are steady on the shrinking dot ---- */
   const dots = phase === 'validate' ? ref.current?.g.VALIDATION ?? [] : order
@@ -440,38 +449,51 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
     const r = ref.current!
     const frames: { t: number; f: number[] }[] = []
     let t0 = performance.now()
-    let alive = true, misses = 0
+    let alive = true, misses = 0, tries = 0
     clickNow.current = false
+    const minFrames = r.g.DOT_MIN_FRAMES ?? 3
     const tick = () => {
       if (!alive) return
       const now = performance.now()
       let f: number[] | null = null
       try { f = r.g.features(r.lm, r.video, now) } catch { /* next frame */ }
       if (f) frames.push({ t: now, f }); else misses++
-      let fs = r.g.dotDone(frames, t0, now)
-      // A click on the dot finishes it early, once enough steady frames are in.
-      if (!fs && clickNow.current && now - t0 > 750) { const k = r.g.stableFrames(frames, t0, 8, 450); if (k.length) fs = k }
+      // Done when steady (judged against this dot's own noise), at the 2.5 s timeout, or on a click.
+      let fs: number[][] | null = null
+      try { fs = clickNow.current && r.g.dotClicked ? r.g.dotClicked(frames, t0, now) : r.g.dotDone(frames, t0, now) } catch { fs = null }
+      if (!fs && now - t0 > 3000) fs = frames.map((x) => x.f)
       if (!fs) { window.setTimeout(tick, 33); return }
       alive = false
-      if (fs.length < 5) {
+      const seen = fs.length >= minFrames
+      if (!seen && tries === 0 && !clickNow.current) {
+        // Unseen: the same dot once more, with a hint. The second time it moves on regardless.
+        tries++
         setHint(misses > frames.length ? 'We can’t see your face. Face the camera, with some light on you.' : 'Keep looking at the dot until it moves on. Move only your eyes, not your head.')
-        // The same dot again, from the start.
-        window.setTimeout(() => { alive = true; frames.length = 0; misses = 0; clickNow.current = false; t0 = performance.now(); tick() }, 400)
+        window.setTimeout(() => { alive = true; frames.length = 0; misses = 0; clickNow.current = false; t0 = performance.now(); tick() }, 300)
         return
       }
-      setHint('')
+      setHint(seen ? '' : 'We can’t see your face well. Face the camera, with some light on you.')
+      if (!seen) setUnseen((n) => n + 1)
+      // Three dots in a row without a face: stop wasting the person's time; the result says why and offers Try again.
+      inARow.current = seen ? 0 : inARow.current + 1
+      if (inARow.current >= 3) { inARow.current = 0; r.model = undefined; r.checks = []; setQ(null); setPhase('result'); return }
       const rect = dotEl.current?.getBoundingClientRect()
       const x = rect ? rect.left + rect.width / 2 : dot.x * window.innerWidth
       const y = rect ? rect.top + rect.height / 2 : dot.y * window.innerHeight
       if (phase === 'calibrate') {
-        r.cal.push({ x, y, frames: fs })
-        for (const f2 of fs) r.samples.push({ f: f2, x, y })
+        if (seen) { r.cal.push({ x, y, frames: fs }); for (const f2 of fs) r.samples.push({ f: f2, x, y }) }
         if (step + 1 < dots.length) setStep(step + 1)
-        else { r.model = r.g.fit(r.samples); r.checks = []; setStep(0); setPhase('validate') }
+        else {
+          // Too few dots seen to fit a model: straight to the result, which says so and offers a way on.
+          let model: typeof r.model
+          try { model = r.cal.length >= 6 ? r.g.fit(r.samples) : undefined } catch { model = undefined }
+          r.model = model; r.checks = []
+          if (!model) { setQ(null); setPhase('result') } else { setStep(0); setPhase('validate') }
+        }
       } else {
-        r.checks.push({ x, y, frames: fs })
+        if (seen) r.checks.push({ x, y, frames: fs })
         if (step + 1 < r.g.VALIDATION.length) setStep(step + 1)
-        else { setQ(r.g.validate(r.model!, r.checks)); setPhase('result') }
+        else { const v = r.checks.length ? r.g.validate(r.model!, r.checks) : null; setQ(v && Number.isFinite(v.accuracy) ? v : null); setPhase('result') }
       }
     }
     // A short pause between dots, so the eyes have somewhere to go.
@@ -479,7 +501,8 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
     return () => { alive = false; window.clearTimeout(first) }
   }, [phase, step, order]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const grade = q ? ref.current?.g.qualityOf(q) ?? 'rough' : 'rough'
+  const grade = q ? ref.current?.g.qualityOf(q) ?? 'rough' : 'poor'
+  const failed = phase === 'result' && !q
   const skip = () => { stopEyes(); onDone({ on: false }) }
   const download = () => {
     const r = ref.current
@@ -500,17 +523,16 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
     a.click()
     window.setTimeout(() => URL.revokeObjectURL(a.href), 2000)
   }
-  const T = ref.current?.g.PRECHECK_TEXT
-  const has = (k: import('./gaze-entry').PrecheckIssue[]) => issues?.some((i) => k.includes(i))
-  const continueOn = () => { ok.current = true; onDone({ on: true, model: ref.current!.model, accuracy: q?.accuracy, accuracyDeg: q?.accuracyDeg, precision: q?.precision, distance: q?.distance, calib: ref.current!.samples.map((x) => ({ f: x.f.map((v) => Math.round(v * 1e5) / 1e5), x: Math.round(x.x), y: Math.round(x.y) })) }) }
+  const rowOf = (k: PrecheckIssue[]) => issues?.find((i) => k.includes(i))
+  const continueOn = () => { if (!ref.current?.model) { skip(); return } ok.current = true; onDone({ on: true, model: ref.current!.model, accuracy: q?.accuracy, accuracyDeg: q?.accuracyDeg, precision: q?.precision, distance: q?.distance, calib: ref.current!.samples.map((x) => ({ f: x.f.map((v) => Math.round(v * 1e5) / 1e5), x: Math.round(x.x), y: Math.round(x.y) })) }) }
   return (
     <>
       <div ref={box} className="vc-cambox" aria-hidden />
       {(phase === 'calibrate' || phase === 'validate') && dot ? (
         <div className="vc-calib" data-vc-calib={phase}>
-          <div className="vc-taskbar" role="status"><span className="vc-kicker">{phase === 'calibrate' ? 'Calibrating' : 'Checking'} · {step + 1} of {dots.length}</span><span className="vc-taskprompt">Follow the dot with your eyes. Keep your head still. It moves on by itself.</span><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Skip eye tracking'}</button></div>
+          <div className="vc-taskbar" role="status"><span className="vc-kicker">{phase === 'calibrate' ? 'Calibrating' : 'Checking'} · {step + 1} of {dots.length}</span><span className="vc-taskprompt">Follow the dot with your eyes. Keep your head still. It moves on by itself (or click it).</span><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Skip eye tracking'}</button></div>
           {hint && <div className="vc-toast error" role="alert">{hint}</div>}
-          <button ref={dotEl} key={`${phase}-${step}`} className="vc-dot auto" style={{ left: `${dot.x * 100}%`, top: `${dot.y * 100}%` }} onClick={() => { clickNow.current = true }} aria-label={`Dot ${step + 1} of ${dots.length}`} />
+           <button ref={dotEl} key={`${phase}-${step}`} className="vc-dot auto" data-vc-dot={step} style={{ left: `${dot.x * 100}%`, top: `${dot.y * 100}%` }} onClick={() => { clickNow.current = true }} aria-label={`Dot ${step + 1} of ${dots.length}`} />
         </div>
       ) : (
         <div className="vc-scrim">
@@ -518,18 +540,29 @@ function EyeSetup({ gazeUrl, required = false, onDone }: { gazeUrl: string; requ
             <span className="vc-kicker">{required ? 'Needed for this study' : 'Optional'}</span>
             {phase === 'precheck' ? <>
               <h2>Get ready</h2>
-              <div className="vc-pre"><canvas ref={canvas} width={240} height={180} /><span className={`vc-oval ${issues && !issues.length ? 'ok' : ''}`} /></div>
+              <div className="vc-pre"><canvas ref={canvas} width={240} height={180} /><span className={`vc-oval ${ready ? 'ok' : ''}`} /></div>
               <p className="vc-muted">Only you see this preview. It isn’t saved or sent.</p>
               <ul className="vc-checks" data-vc-checks="">
-                <li className={!issues ? '' : has(['noface', 'left', 'right', 'up', 'down']) ? 'no' : 'yes'}>{has(['noface', 'left', 'right', 'up', 'down']) ? T?.[issues!.find((i) => ['noface', 'left', 'right', 'up', 'down'].includes(i))!] : <><Check size={14} /> Face in the middle</>}</li>
-                <li className={!issues || has(['noface']) ? '' : has(['close', 'far']) ? 'no' : 'yes'}>{has(['close', 'far']) ? T?.[issues!.find((i) => i === 'close' || i === 'far')!] : <><Check size={14} /> About an arm’s length away</>}</li>
-                <li className={!issues ? '' : has(['dark', 'bright']) ? 'no' : 'yes'}>{has(['dark', 'bright']) ? T?.[issues!.find((i) => i === 'dark' || i === 'bright')!] : <><Check size={14} /> Enough light on your face</>}</li>
+                {PRECHECK_ROWS.map((row) => {
+                  // Unknown (first frames) shows "Checking…", never a ✓. Distance and light can't be judged without a face.
+                  const bad = rowOf(row.issues)
+                  const unknown = !issues || (row.key !== 'face' && issues.includes('noface'))
+                  return <li key={row.key} data-vc-check={row.key} className={unknown ? '' : bad ? 'no' : 'yes'}>{unknown ? <>… {row.ok}</> : bad ? PRECHECK_TEXT[bad] : <><Check size={14} /> {row.ok}</>}</li>
+                })}
               </ul>
               <p className="vc-muted">Glasses: if the lenses reflect the screen, tilt the screen a little or dim it. During calibration, <b>keep your head still and move only your eyes</b>.</p>
               <div className="vc-row"><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Skip eye tracking'}</button><span className="vc-grow" />
-                {issues && issues.length > 0 && <button className="vc-btn" onClick={beginCalibration}>Start anyway</button>}
-                <button className="vc-btn primary" disabled={!issues || issues.length > 0 || steadyFor < 600} onClick={beginCalibration}>Start calibration</button></div>
+                {/* Always there: the checks advise, they never lock anyone out. */}
+                <button className="vc-linkbtn" style={{ alignSelf: "center", marginRight: 8 }} onClick={beginCalibration} data-vc-start-anyway="">Start anyway</button>
+                <button className="vc-btn primary" disabled={!ready} onClick={beginCalibration} data-vc-start="">Start calibration</button></div>
+            </> : phase === 'result' && failed ? <>
+              <h2>We couldn’t see your eyes well enough</h2>
+              <p data-vc-grade="none">Most dots passed without a clear view of your face, so there’s nothing to measure yet.</p>
+              <p className="vc-muted">Sit facing a light (not a window behind you), with your whole face in the camera, and try again.</p>
+              <div className="vc-row"><button className="vc-btn" onClick={skip}>{required ? 'Stop' : 'Continue without eye tracking'}</button><span className="vc-grow" />
+                <button className="vc-btn primary" onClick={() => { setRetried(true); setPhase('precheck') }} data-vc-retry="">Try again</button></div>
             </> : phase === 'result' ? <>
+              {unseen > 0 && <p className="vc-muted">{unseen} dot{unseen === 1 ? '' : 's'} passed without a clear view of your face.</p>}
               <h2>{grade === 'good' ? 'Eye tracking is ready' : grade === 'rough' ? 'Eye tracking is okay' : 'Eye tracking is rough'}</h2>
               <p data-vc-grade={grade}>On dots it hadn’t seen, the estimate was on average <b>{q?.accuracy} px</b>{q ? ` (${q.accuracyDeg}°)` : ''} from the dot: <span className={`vc-grade ${grade}`}>{grade === 'good' ? 'good' : grade === 'rough' ? 'okay' : 'poor'}</span>.</p>
               <p className="vc-muted">{grade === 'good' ? 'Good enough to see which parts of the page you look at.' : grade === 'rough' ? 'Good enough to see which areas of the page you look at, not small details. You can continue.' : retried ? 'Still rough. The results will only show broad areas. You can continue, or stop.' : 'Usually better after another try: sit facing a light (not a window behind you), keep your face in the middle, and keep your head still while your eyes follow the dot.'}</p>

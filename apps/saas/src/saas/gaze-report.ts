@@ -14,7 +14,7 @@ import { fixationsOf, idtFor, type Sample } from '../core/gaze-analysis'
 import { cleanGaze, driftOf, pairsOf, smoothGaze, wilson, type Interval } from '../core/heatstats'
 import { pageOf } from '../core/embed/pages'
 
-export interface GazeRun { id: string; gaze_accuracy: number | null; vw?: number | null }
+export interface GazeRun { id: string; gaze_accuracy: number | null; vw?: number | null; started_at?: string; finished_at?: string | null; device?: string | null; /** a reviewer's name (never an email); absent for participants and visitors */ name?: string | null }
 export interface GazeEvent { run_id: string; t: number; kind: string; page: string; label: string | null; sel?: string | null; x?: number | null; y?: number | null; vw?: number | null }
 
 /** Calibration at or under this (px) counts as good. */
@@ -186,6 +186,78 @@ export function gazeReport(runs: GazeRun[], events: GazeEvent[]): GazeReport {
   return { participants: withEyes.length, good, goodShare: wilson(good, accs.length), medianAcc: median(accs), corrected: correctedRuns.size, pages }
 }
 
+/* ---------- per participant ---------- */
+
+export interface Participant {
+  id: string
+  /** 1, 2, … in the order they started */
+  n: number
+  label: string
+  started: string | null
+  device: string | null
+  accuracy: number | null
+  grade: 'good' | 'okay' | 'poor' | null
+  pages: number
+  /** first to last event, ms */
+  ms: number
+}
+/** The people with eye tracking, numbered in start order ("Participant 1"…; a reviewer's name when they are one). */
+export function participantsOf(runs: GazeRun[], events: GazeEvent[]): Participant[] {
+  const per = new Map<string, { pages: Set<string>; t0: number; t1: number; gaze: boolean }>()
+  for (const e of events) {
+    const x = per.get(e.run_id) ?? { pages: new Set<string>(), t0: e.t, t1: e.t, gaze: false }
+    if (e.kind === 'page' || e.kind === 'gaze') x.pages.add(pageOf(e.page.split(' · ')[0]))
+    if (e.kind === 'gaze') x.gaze = true
+    x.t0 = Math.min(x.t0, e.t); x.t1 = Math.max(x.t1, e.t); per.set(e.run_id, x)
+  }
+  return runs.filter((r) => per.get(r.id)?.gaze || num(r.gaze_accuracy))
+    .sort((a, b) => (a.started_at ?? '').localeCompare(b.started_at ?? '') || a.id.localeCompare(b.id))
+    .map((r, i) => {
+      const x = per.get(r.id)
+      const acc = num(r.gaze_accuracy) ? r.gaze_accuracy : null
+      return { id: r.id, n: i + 1, label: r.name ? `${r.name} (reviewer)` : `Participant ${i + 1}`, started: r.started_at ?? null, device: r.device ?? null,
+        accuracy: acc, grade: acc == null ? null : acc <= GOOD_ACC ? 'good' : acc <= 250 ? 'okay' : 'poor', pages: x?.pages.size ?? 0, ms: x ? x.t1 - x.t0 : 0 }
+    })
+}
+
+export interface PathStep { page: string; at: number; ms: number }
+export interface LookClick { page: string; label: string; at: number; /** from the first look at it (within the 5 s before) to the click, ms; null = clicked without being seen looking */ lookMs: number | null }
+/**
+ * One person's visit: the pages in order with when they arrived and how long they stayed, and each
+ * click with whether they looked at it first ("look then click": a gaze sample on the same element,
+ * or within 120 px, in the 5 s before the click).
+ */
+export function participantPath(events: GazeEvent[], runId: string): { steps: PathStep[]; looks: LookClick[] } {
+  const ev = events.filter((e) => e.run_id === runId).sort((a, b) => a.t - b.t)
+  if (!ev.length) return { steps: [], looks: [] }
+  const t0 = ev[0].t, end = ev[ev.length - 1].t
+  const steps: PathStep[] = []
+  for (const e of ev) {
+    if (e.kind !== 'page' && e.kind !== 'gaze' && e.kind !== 'click') continue
+    const pg = pageOf(e.page.split(' · ')[0])
+    if (steps[steps.length - 1]?.page !== pg) steps.push({ page: pg, at: e.t - t0, ms: 0 })
+  }
+  steps.forEach((s, i) => { s.ms = (i + 1 < steps.length ? steps[i + 1].at : end - t0) - s.at })
+  const looks: LookClick[] = []
+  for (const c of ev.filter((e) => e.kind === 'click')) {
+    const before = ev.filter((g) => g.kind === 'gaze' && g.page === c.page && g.t <= c.t && g.t >= c.t - 5000 &&
+      ((c.label && g.label === c.label) || (num(c.x) && num(c.y) && num(g.x) && num(g.y) && Math.hypot(g.x - c.x, g.y - c.y) <= 120)))
+    looks.push({ page: pageOf(c.page.split(' · ')[0]), label: c.label ?? 'something', at: c.t - t0, lookMs: before.length ? c.t - before[0].t : null })
+  }
+  return { steps: steps.slice(0, 200), looks: looks.slice(0, 200) }
+}
+
+/** The page table's rows for one view: search, sort, and one page of results (the table never grows past `per`). */
+export function pageTable(rows: PageRow[], o: { q?: string; sort?: 'people' | 'fixations' | 'page'; desc?: boolean; page?: number; per?: number }) {
+  const q = (o.q ?? '').trim().toLowerCase()
+  const k = o.sort ?? 'people', desc = o.desc ?? k !== 'page', per = o.per ?? 25
+  const hit = q ? rows.filter((r) => r.page.toLowerCase().includes(q) || (r.top ?? '').toLowerCase().includes(q)) : rows
+  const sorted = [...hit].sort((a, b) => { const d = k === 'page' ? a.page.localeCompare(b.page) : k === 'people' ? a.people - b.people || a.fixations - b.fixations : a.fixations - b.fixations; return desc ? -d : d })
+  const pages = Math.max(1, Math.ceil(sorted.length / per))
+  const at = Math.min(Math.max(0, o.page ?? 0), pages - 1)
+  return { rows: sorted.slice(at * per, at * per + per), total: sorted.length, pages, page: at }
+}
+
 /** One row of the page table: a page with all its layouts (people counted once across them). */
 export interface PageRow { page: string; people: number; fixations: number; top: string | null; layouts: PageReport[] }
 export function pageRows(pages: PageReport[]): PageRow[] {
@@ -227,7 +299,7 @@ export function sampleGaze(): { runs: GazeRun[]; events: GazeEvent[] } {
   for (let i = 0; i < 14; i++) {
     const id = `sample-${i}`
     const acc = Math.round(70 + rnd() * 160)
-    runs.push({ id, gaze_accuracy: acc, vw: 1280 })
+    runs.push({ id, gaze_accuracy: acc, vw: 1280, started_at: new Date(Date.UTC(2026, 10, 20, 9) + i * 5_400_000).toISOString(), device: i % 5 === 3 ? 'tablet' : 'desktop', name: i === 2 ? 'Sam (sample)' : null })
     let t = 0
     for (const [page, els] of Object.entries(layouts)) {
       if (page !== '/' && rnd() < 0.3) continue

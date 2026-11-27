@@ -11,6 +11,7 @@ import { GazeReport } from './GazeReport'
 import { LayoutSplit, LocalPageHeat, groupByLayout, type Snap } from './SnapshotHeat'
 import { productOf } from '../../saas/products'
 import { cloud } from '../../saas/supabase'
+import { researchTabParams } from '../../saas/nav-active'
 import { getSnapshotsOn, setSnapshotsOn, pageLayouts, pageSnapshots, type LayoutRow, type SnapshotRow, clearStudyResults, deleteRun, deleteStudy, listStudies, makeDefaultStudy, projectSessions, revokeStudyLink, saveStudy, studyLink, studyModule, studyResults, type EventRow, type RunRow, type StudyKind, type StudyModule, type StudyRow } from '../../saas/cloud'
 import { localStudies, setLocalStudyOpen } from '../../core/embed/localheat'
 import { ago, usePanel } from './Panel'
@@ -78,11 +79,13 @@ export function Research() {
   const [editing, setEditing] = useState<StudyRow | { add: StudyModule } | null>(null)
   const [link, setLink] = useState<{ id: string; url: string } | null>(null)
   const [confirm, setConfirm] = useState<StudyRow | null>(null)
+  const [nextStar, setNextStar] = useState('')
   const [clearing, setClearing] = useState<StudyRow | null>(null)
   const [params, setParams] = useSearchParams()
   const tab: 'studies' | 'sessions' = params.get('tab') === 'sessions' ? 'sessions' : 'studies'
-  const setTab = (t: 'studies' | 'sessions') => setParams(t === 'sessions' ? { tab: 'sessions' } : {}, { replace: true })
   const only = MODULE_PARAM[params.get('module') ?? params.get('kind') ?? ''] ?? null
+  // Tabs keep the module: ?module=gaze&tab=sessions is Eye tracking's Participant paths, not every module's.
+  const setTab = (t: 'studies' | 'sessions') => setParams(researchTabParams(only, t), { replace: true })
   const live = project ? liveOf(project)?.config ?? null : null
   const on = (m: StudyModule) => !!live?.modules[m]
   const load = () => { if (project && cloud) void listStudies(project.id).then(setRows).catch((e: Error) => { setRows([]); toast(`Couldn’t load studies: ${e.message}`, 'error') }) }
@@ -124,7 +127,12 @@ export function Research() {
         {s.runs > 0 && <button className="lp-btn sm ghost" onClick={() => setClearing(s)}><Eraser size={13} /> Clear results</button>}
         <button className="lp-btn sm ghost" onClick={() => void saveStudy(project.id, { ...s, status: s.status === 'open' ? 'closed' : 'open' }).then(load)}>{s.status === 'open' ? 'Pause' : 'Resume'}</button>
         <span className="lp-grow" />
-        <button className="lp-btn sm ghost" onClick={() => setConfirm(s)} aria-label={`Delete ${s.name}`}><Trash2 size={13} /></button>
+        {(() => {
+          // A module that is on keeps one study (enforced on the server too): its only ★ can be paused, not deleted.
+          const last = s.is_default && on(studyModule(s)) && !(rows ?? []).some((o) => o.id !== s.id && studyModule(o) === studyModule(s))
+          const tip = last ? 'Each module keeps one study. Pause it instead.' : `Delete ${s.name}`
+          return <span title={tip}><button className="lp-btn sm ghost" disabled={last} onClick={() => { setNextStar(''); setConfirm(s) }} aria-label={tip} data-delete-study=""><Trash2 size={13} /></button></span>
+        })()}
       </div>
       {link?.id === s.id && (
         <div className="up-linkbox">
@@ -142,7 +150,7 @@ export function Research() {
         <div><h1>{tab === 'sessions' ? 'Participant paths' : only ? MODULES.find((m) => m.id === only)!.title : 'Research'}</h1><p>{only ? <>{MODULES.find((m) => m.id === only)!.help} <Link to="/app/research">All modules</Link></> : 'One default study (★) per module collects automatically. Add more studies for separate rounds; they are reached only through their own link. Nobody is recorded without agreeing first.'}</p></div>
       </div>
       {cloud && <div className="seg rs-tabs" role="tablist"><button role="tab" aria-selected={tab === 'studies'} aria-pressed={tab === 'studies'} onClick={() => setTab('studies')}>Studies</button><button role="tab" aria-selected={tab === 'sessions'} aria-pressed={tab === 'sessions'} onClick={() => setTab('sessions')}>Participant paths</button></div>}
-      {tab === 'sessions' ? <Sessions studies={rows ?? []} /> : <>
+      {tab === 'sessions' ? <Sessions studies={(rows ?? []).filter((r) => !only || studyModule(r) === only)} scoped={!!only} /> : <>
       {!cloud && <p className="up-warn"><TriangleAlert size={13} /> Demo: studies live in your site’s own browser storage. Adding more studies, links and full results need the server.</p>}
       {!shown.some((m) => on(m.id)) && !only && <section className="up-card rs-empty"><FlaskConical size={22} /><h2>No research module is on</h2><p className="up-muted">Turn on Heatmap, Eye tracking, 5-second test or Usability test in <Link to="/app/products">Products</Link>; each gets its default study automatically.</p></section>}
       {shown.filter((m) => on(m.id) || only === m.id || (rows ?? []).some((s) => studyModule(s) === m.id)).map((m) => {
@@ -173,10 +181,22 @@ export function Research() {
         <Modal title={`Clear the results of “${clearing.name}”?`} description={`${clearing.runs} ${clearing.runs === 1 ? 'person’s run is' : 'people’s runs are'} deleted: tasks, answers, clicks and gaze, so its heatmap starts empty. The study and its link stay. This can’t be undone.`} onClose={() => setClearing(null)}
           footer={<><button className="btn" onClick={() => setClearing(null)}>Keep them</button><button className="btn primary" onClick={() => void clearStudyResults(clearing.id).then(() => { toast('Results cleared'); setClearing(null); load() }).catch((e: Error) => toast(`Couldn’t clear: ${e.message}`, 'error'))}>Clear results</button></>} />
       )}
-      {confirm && (
-        <Modal title={`Delete “${confirm.name}”?`} description={`Its link, every participant’s run and their clicks are deleted. This can’t be undone.${confirm.is_default ? ' It is the default: until you make another study the default (or update your site again), this module collects nothing from the widget.' : ''}`} onClose={() => setConfirm(null)}
-          footer={<><button className="btn" onClick={() => setConfirm(null)}>Keep it</button><button className="btn primary" onClick={() => void deleteStudy(confirm.id).then(() => { toast('Study deleted'); setConfirm(null); load() })}>Delete</button></>} />
-      )}
+      {confirm && (() => {
+        const others = (rows ?? []).filter((o) => o.id !== confirm.id && studyModule(o) === studyModule(confirm)).sort((a, b) => b.created_at.localeCompare(a.created_at))
+        const pick = nextStar || others[0]?.id || ''
+        return (
+          <Modal title={`Delete “${confirm.name}”?`} description={`Its link, every participant’s run and their clicks are deleted. This can’t be undone.${confirm.is_default && others.length ? ' It is the default (★): choose which study gets the widget’s traffic from now on.' : confirm.is_default ? ' It is the default and this module is off, so nothing collects for it after this.' : ''}`} onClose={() => setConfirm(null)}
+            footer={<><button className="btn" onClick={() => setConfirm(null)}>Keep it</button><button className="btn primary" onClick={() => void deleteStudy(confirm.id, confirm.is_default ? pick || undefined : undefined).then(() => { toast(confirm.is_default && others.length ? `Study deleted. “${others.find((o) => o.id === pick)?.name}” is now the default` : 'Study deleted'); setConfirm(null); load() }).catch((e: Error) => { toast(e.message, 'error'); setConfirm(null) })}>Delete</button></>}>
+            {confirm.is_default && others.length > 0 && (
+              <label className="lp-field">New default (★)
+                <select value={pick} onChange={(e) => setNextStar(e.target.value)} data-next-default="">
+                  {others.map((o, i) => <option key={o.id} value={o.id}>{o.name}{i === 0 ? ' (newest)' : ''}</option>)}
+                </select>
+              </label>
+            )}
+          </Modal>
+        )
+      })()}
     </div>
   )
 }
@@ -479,10 +499,17 @@ function PathList({ ev }: { ev: EventRow[] }) {
   )
 }
 
-function Sessions({ studies }: { studies: StudyRow[] }) {
+function Sessions({ studies, scoped = false }: { studies: StudyRow[]; scoped?: boolean }) {
   const { project } = usePanel()
   const { toast } = useStore()
-  const [data, setData] = useState<{ runs: (RunRow & { study_id: string })[]; events: EventRow[] } | null>(null)
+  const [all, setData] = useState<{ runs: (RunRow & { study_id: string })[]; events: EventRow[] } | null>(null)
+  // On a module's page, only that module's studies' runs.
+  const data = useMemo(() => {
+    if (!all || !scoped) return all
+    const ids = new Set(studies.map((s) => s.id))
+    const runs = all.runs.filter((r) => ids.has(r.study_id)), keep = new Set(runs.map((r) => r.id))
+    return { runs, events: all.events.filter((e) => keep.has(e.run_id)) }
+  }, [all, scoped, studies])
   const [open, setOpen] = useState<string | null>(null)
   const [only, setOnly] = useState<'all' | 'frustrated'>('all')
   useEffect(() => { if (project) void projectSessions(project.id).then(setData).catch((e: Error) => toast(`Couldn’t load sessions: ${e.message}`, 'error')) }, [project?.id]) // eslint-disable-line react-hooks/exhaustive-deps

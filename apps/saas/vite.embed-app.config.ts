@@ -27,6 +27,9 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(sb.url),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(sb.key),
       'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(sb.turnstile),
+      // gaze.js is fetched as gaze.js?v=<this build>: a cached gaze.js from an older deploy can never be
+      // paired with a newer widget (the cause of the pre-check's dead "Start calibration").
+      'import.meta.env.VITE_BUILD_ID': JSON.stringify(Date.now().toString(36)),
     },
     build: {
       // Never publish source maps: they would hand out the original source (docs/SECURITY.md).

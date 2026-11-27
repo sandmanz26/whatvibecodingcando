@@ -54,3 +54,30 @@ test('page keys: ids fold below the top level; top-level pages never become /:id
   assert.equal(pageOf('/1234567'), '/:id')
   assert.equal(pageOf('/'), '/')
 })
+
+test('participants: numbered in start order, reviewer names, grades, pages and duration', async () => {
+  const { participantsOf, participantPath, sampleGaze } = await import('../src/saas/gaze-report.ts')
+  const s = sampleGaze()
+  const ps = participantsOf([...s.runs].reverse(), s.events)
+  assert.equal(ps.length, 14)
+  assert.deepEqual(ps.map((p) => p.n), ps.map((_, i) => i + 1))
+  assert.equal(ps[0].id, 'sample-0')
+  assert.ok(ps[2].label.includes('reviewer') && ps[1].label === 'Participant 2')
+  assert.ok(ps.every((p) => p.pages >= 1 && p.ms > 0 && p.grade))
+  const path = participantPath(s.events, 'sample-0')
+  assert.equal(path.steps[0].page, '/')
+  assert.ok(path.steps.every((x) => x.ms >= 0))
+  const clicks = s.events.filter((e) => e.run_id === 'sample-0' && e.kind === 'click').length
+  assert.equal(path.looks.length, clicks)
+  assert.ok(path.looks.every((l) => l.lookMs == null || l.lookMs >= 0))
+})
+
+test('page table: 600 pages stay one bounded page of rows, searchable and sortable', async () => {
+  const { pageTable } = await import('../src/saas/gaze-report.ts')
+  const rows = Array.from({ length: 600 }, (_, i) => ({ page: `/p/${i}`, people: i % 37, fixations: i, top: i === 5 ? 'button Buy' : null, layouts: [] }))
+  const v = pageTable(rows, { per: 25 })
+  assert.equal(v.rows.length, 25); assert.equal(v.pages, 24); assert.equal(v.rows[0].people, 36)
+  assert.equal(pageTable(rows, { q: 'buy' }).total, 1)
+  assert.equal(pageTable(rows, { sort: 'page', desc: false }).rows[0].page, '/p/0')
+  assert.equal(pageTable(rows, { page: 999 }).page, 23)
+})

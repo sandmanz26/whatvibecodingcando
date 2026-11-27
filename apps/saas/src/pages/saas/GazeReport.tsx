@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Eye, ExternalLink, Flame, TriangleAlert } from 'lucide-react'
-import { gazeReport, pageRows, GOOD_ACC, MIN_PEOPLE, type GazeEvent, type GazeRun, type PageReport } from '../../saas/gaze-report'
+import { gazeReport, pageRows, pageTable, participantPath, participantsOf, GOOD_ACC, MIN_PEOPLE, type GazeEvent, type GazeRun, type PageReport } from '../../saas/gaze-report'
 import type { Interval } from '../../core/heatstats'
 import type { Snap } from './SnapshotHeat'
 
@@ -60,22 +60,33 @@ function SnapNote({ has, sw }: { has: boolean; sw?: SnapshotsSwitch }) {
 }
 
 export function GazeReport({ runs, events, sample, onView, snapFor, snapshots }: { runs: GazeRun[]; events: GazeEvent[]; sample?: boolean; onView?: (page: string, kind: 'click' | 'gaze') => void; snapFor?: (page: string) => Snap | null; snapshots?: SnapshotsSwitch }) {
-  const r = useMemo(() => gazeReport(runs, events), [runs, events])
+  // Who the whole report is about: everyone, or one participant (panel only; visitors never see results).
+  const people = useMemo(() => participantsOf(runs, events), [runs, events])
+  const [who, setWho] = useState<string>('all')
+  const one = people.find((x) => x.id === who) ?? null
+  const fRuns = useMemo(() => (one ? runs.filter((x) => x.id === one.id) : runs), [runs, one])
+  const fEvents = useMemo(() => (one ? events.filter((e) => e.run_id === one.id) : events), [events, one])
+  const r = useMemo(() => gazeReport(fRuns, fEvents), [fRuns, fEvents])
   const rowsAll = useMemo(() => pageRows(r.pages), [r])
+  const path = useMemo(() => (one ? participantPath(events, one.id) : null), [events, one])
   const [pick, setPick] = useState<string | null>(null)
   const [lay, setLay] = useState(0)
   const [sort, setSort] = useState<{ k: SortKey; desc: boolean }>({ k: 'people', desc: true })
-  if (!r.participants && !r.pages.length) return null
-  const rows = [...rowsAll].sort((a, b) => {
-    const d = sort.k === 'page' ? a.page.localeCompare(b.page) : sort.k === 'people' ? a.people - b.people || a.fixations - b.fixations : a.fixations - b.fixations
-    return sort.desc ? -d : d
-  })
-  const row = rowsAll.find((x) => x.page === pick) ?? rows[0]
+  const [q, setQ] = useState('')
+  const [pg, setPg] = useState(0)
+  const [showPeople, setShowPeople] = useState(false)
+  if (!r.participants && !r.pages.length && !people.length) return null
+  // 25 rows a page, searchable: usable with 500+ pages (the table never becomes a long scroll).
+  const view = pageTable(rowsAll, { q, sort: sort.k, desc: sort.desc, page: pg, per: 25 })
+  const rows = view.rows
+  const row = rowsAll.find((x) => x.page === pick) ?? rows[0] ?? rowsAll[0]
   const page = row ? row.layouts[Math.min(lay, row.layouts.length - 1)] : undefined
-  const accN = runs.filter((x) => x.gaze_accuracy != null).length
+  const accN = fRuns.filter((x) => x.gaze_accuracy != null).length
+  const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–')
+  const dur = (ms: number) => (ms < 60_000 ? `${Math.round(ms / 1000)} s` : `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`)
   const th = (k: SortKey, label: string, title?: string) => (
     <th aria-sort={sort.k === k ? (sort.desc ? 'descending' : 'ascending') : 'none'} title={title}>
-      <button type="button" className="gz-sort" onClick={() => setSort(sort.k === k ? { k, desc: !sort.desc } : { k, desc: k !== 'page' })}>{label}{sort.k === k ? (sort.desc ? ' ↓' : ' ↑') : ''}</button>
+      <button type="button" className="gz-sort" onClick={() => { setSort(sort.k === k ? { k, desc: !sort.desc } : { k, desc: k !== 'page' }); setPg(0) }}>{label}{sort.k === k ? (sort.desc ? ' ↓' : ' ↑') : ''}</button>
     </th>
   )
   const snap = page ? snapFor?.(page.page) ?? null : null
@@ -83,16 +94,61 @@ export function GazeReport({ runs, events, sample, onView, snapFor, snapshots }:
     <section className="up-card gz" data-gaze-report="">
       <div className="up-row"><h2 className="lp-grow"><Eye size={16} /> Eye tracking</h2><span className="up-badge st-ongoing">Labs</span>{sample && <span className="up-badge pending">Sample data</span>}</div>
       <p className="up-muted">Webcam eye tracking is an estimate: read areas, not exact points. Only people who agreed and calibrated. {sample ? 'These numbers are made up, to show what the report looks like; a real study replaces them.' : ''}</p>
-      <div className="gz-sum" data-gz-summary="">
-        <span><b>{r.participants}</b> {r.participants === 1 ? 'person' : 'people'} with eye tracking</span>
-        <span title={accN ? `95% range ${range(r.goodShare)}` : undefined}><b>{accN ? pct(r.goodShare.p) : '–'}</b> good calibration {accN ? <small className="up-muted">({r.good} of {accN}, ≤ {GOOD_ACC} px)</small> : <small className="up-muted">(not measured)</small>}</span>
-        <span><b>{r.medianAcc == null ? '–' : `${Math.round(r.medianAcc)} px`}</b> median accuracy</span>
-        <span><b>{r.corrected}</b> drift-corrected with their clicks</span>
-        <span><b>{rowsAll.length}</b> {rowsAll.length === 1 ? 'page' : 'pages'}</span>
+      <div className="up-row wrap gz-who">
+        <label className="gz-whopick">Show
+          <select value={one ? one.id : 'all'} onChange={(e) => { setWho(e.target.value); setPick(null); setPg(0) }} data-gz-who="">
+            <option value="all">All participants ({people.length})</option>
+            {people.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+          </select>
+        </label>
+        <button type="button" className="lp-btn sm ghost" aria-expanded={showPeople} onClick={() => setShowPeople(!showPeople)} data-gz-people-toggle="">{showPeople ? 'Hide participants' : 'Participants list'}</button>
       </div>
-      {r.participants > 0 && r.participants < MIN_PEOPLE && <p className="up-warn"><TriangleAlert size={13} /> Fewer than {MIN_PEOPLE} people: treat this as anecdotes, not results.</p>}
-
+      {showPeople && (
+        <div className="gz-people" data-gz-people-list="">
+          <table className="db-table">
+            <thead><tr><th>Who</th><th>Started</th><th>Device</th><th title="Calibration accuracy on dots it hadn’t seen">Calibration</th><th>Pages</th><th>Duration</th></tr></thead>
+            <tbody>{people.slice(0, 200).map((x) => (
+              <tr key={x.id} className={x.id === one?.id ? 'on' : ''}>
+                <td><button type="button" className="gz-pagelink" onClick={() => { setWho(x.id); setPick(null); setPg(0) }}>{x.label}</button></td>
+                <td>{when(x.started)}</td><td>{x.device ?? '–'}</td>
+                <td>{x.accuracy == null ? '–' : <>{x.accuracy} px <span className={`gz-grade ${x.grade}`}>{x.grade}</span></>}</td>
+                <td>{x.pages}</td><td>{dur(x.ms)}</td>
+              </tr>))}</tbody>
+          </table>
+          {people.length > 200 && <p className="up-muted">The first 200 of {people.length}, in start order. Pick anyone from the menu above.</p>}
+        </div>
+      )}
+      <div className="gz-sum" data-gz-summary="">
+        {one ? <>
+          <span><b>{one.label}</b> · {when(one.started)} · {one.device ?? 'device unknown'}</span>
+          <span><b>{one.accuracy == null ? '–' : `${one.accuracy} px`}</b> calibration{one.grade ? ` (${one.grade})` : ''}</span>
+          <span><b>{one.pages}</b> {one.pages === 1 ? 'page' : 'pages'}</span>
+          <span><b>{dur(one.ms)}</b></span>
+        </> : <>
+          <span><b>{r.participants}</b> {r.participants === 1 ? 'person' : 'people'} with eye tracking</span>
+          <span title={accN ? `95% range ${range(r.goodShare)}` : undefined}><b>{accN ? pct(r.goodShare.p) : '–'}</b> good calibration {accN ? <small className="up-muted">({r.good} of {accN}, ≤ {GOOD_ACC} px)</small> : <small className="up-muted">(not measured)</small>}</span>
+          <span><b>{r.medianAcc == null ? '–' : `${Math.round(r.medianAcc)} px`}</b> median accuracy</span>
+          <span><b>{r.corrected}</b> drift-corrected</span>
+          <span><b>{rowsAll.length}</b> {rowsAll.length === 1 ? 'page' : 'pages'}</span>
+        </>}
+      </div>
+      {!one && r.participants > 0 && r.participants < MIN_PEOPLE && <p className="up-warn"><TriangleAlert size={13} /> Fewer than {MIN_PEOPLE} people: treat this as anecdotes, not results.</p>}
+      {one && path && (
+        <div className="gz-journey" data-gz-journey="">
+          <div>
+            <h4>Pages, in order</h4>
+            <ol className="gz-steps">{path.steps.slice(0, 40).map((x, i) => <li key={i}><button type="button" className="gz-pagelink" onClick={() => { setPick(x.page); setLay(0) }}><code>{x.page}</code></button> <small className="up-muted">at {dur(x.at)} · {dur(x.ms)}</small></li>)}</ol>
+            {path.steps.length > 40 && <p className="up-muted">And {path.steps.length - 40} more.</p>}
+          </div>
+          <div>
+            <h4>Look, then click</h4>
+            {path.looks.length ? <ul className="gz-looks">{path.looks.slice(0, 20).map((x, i) => <li key={i}><b>{x.label}</b> <small className="up-muted">on <code>{x.page}</code> · {x.lookMs == null ? 'clicked without being seen looking at it first' : `looked ${secs(x.lookMs)} before clicking`}</small></li>)}</ul> : <p className="up-muted">No clicks in this visit.</p>}
+          </div>
+        </div>
+      )}
       <div className="gz-split">
+        <div className="gz-listwrap">
+          <div className="up-row gz-search"><input type="search" placeholder={`Search ${rowsAll.length} pages`} aria-label="Search pages" value={q} onChange={(e) => { setQ(e.target.value); setPg(0) }} data-gz-search="" /></div>
         <div className="gz-list">
           <table className="db-table gz-pagetable" data-gz-pages="">
             <thead><tr><th aria-label="Preview" />{th('page', 'Page')}{th('people', 'People', 'Different people (runs) with eye tracking on this page, all layouts')}{th('fixations', 'Fixations')}<th>Most looked at</th></tr></thead>
@@ -105,11 +161,20 @@ export function GazeReport({ runs, events, sample, onView, snapFor, snapshots }:
                 <td className="gz-top">{x.top ?? '–'}</td>
               </tr>))}</tbody>
           </table>
+          {!rows.length && <p className="up-muted gz-none">No page matches “{q}”.</p>}
+        </div>
+          {view.pages > 1 && (
+            <div className="up-row gz-pager" data-gz-pager="">
+              <button type="button" className="lp-btn sm ghost" disabled={view.page === 0} onClick={() => setPg(view.page - 1)}>Previous</button>
+              <span className="up-muted lp-grow">{view.page * 25 + 1}–{Math.min(view.total, view.page * 25 + 25)} of {view.total}</span>
+              <button type="button" className="lp-btn sm ghost" disabled={view.page >= view.pages - 1} onClick={() => setPg(view.page + 1)}>Next</button>
+            </div>
+          )}
         </div>
 
         {page && row && (
           <div className="gz-detail" data-gz-detail={row.page}>
-            <div className="up-row wrap"><h3 className="lp-grow"><code>{row.page}</code> · {page.people} {page.people === 1 ? 'person' : 'people'}{page.corrected ? ` · ${page.corrected} drift-corrected` : ''}</h3>
+            <div className="up-row wrap"><h3 className="lp-grow"><code>{row.page}</code> · {one ? one.label : `${page.people} ${page.people === 1 ? 'person' : 'people'}`}{page.corrected ? ` · ${page.corrected} drift-corrected` : ''}</h3>
               {onView && <><button className="lp-btn sm" onClick={() => onView(page.page, 'gaze')} data-view-heat="gaze"><Eye size={13} /> Gaze heatmap <ExternalLink size={12} /></button><button className="lp-btn sm ghost" onClick={() => onView(page.page, 'click')} data-view-heat="click"><Flame size={13} /> Clicks <ExternalLink size={12} /></button></>}
             </div>
             {row.layouts.length > 1 && (

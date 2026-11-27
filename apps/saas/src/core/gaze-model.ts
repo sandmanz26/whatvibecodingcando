@@ -413,15 +413,30 @@ export function stableFrames(frames: { t: number; f: Features }[], t0: number, m
  */
 export const AUTO_SETTLE_MS = 450
 export const AUTO_MIN_MS = 1100
-export const AUTO_MAX_MS = 3200
+/** A dot never waits longer than this: at the timeout it keeps whatever frames it has. */
+export const AUTO_MAX_MS = 2500
 export const AUTO_MIN_FRAMES = 15
+/** Fewer usable frames than this and the dot counts as unseen (it is retried once, then skipped). */
+export const DOT_MIN_FRAMES = 3
+/**
+ * Is this dot done? Steadiness is judged against the window's own measured noise (stableFrames keeps
+ * frames within 3 × the median deviation of this dot's frames), so a jittery webcam is not held to a
+ * steadier one's standard. Done early when enough steady frames are in; at AUTO_MAX_MS it always
+ * returns: the steady frames, or else every frame after the settle time (possibly none: unseen).
+ */
 export function dotDone(frames: { t: number; f: Features }[], t0: number, now: number): Features[] | null {
-  const after = frames.filter((x) => x.t - t0 >= AUTO_SETTLE_MS).length
+  const post = frames.filter((x) => x.t - t0 >= AUTO_SETTLE_MS)
   if (now - t0 < AUTO_MIN_MS) return null
-  const kept = stableFrames(frames, t0, 5, AUTO_SETTLE_MS)
-  if (kept.length >= AUTO_MIN_FRAMES && kept.length >= 0.75 * after) return kept
-  if (now - t0 >= AUTO_MAX_MS) return kept
+  const kept = stableFrames(frames, t0, DOT_MIN_FRAMES, AUTO_SETTLE_MS)
+  if (kept.length >= AUTO_MIN_FRAMES && kept.length >= 0.75 * post.length) return kept
+  if (now - t0 >= AUTO_MAX_MS) return kept.length ? kept : post.map((x) => x.f)
   return null
+}
+/** The same, when the participant clicks the dot: done at once (after a short settle), with what is there. */
+export function dotClicked(frames: { t: number; f: Features }[], t0: number, now: number): Features[] | null {
+  if (now - t0 < SETTLE_MS) return null
+  const kept = stableFrames(frames, t0, DOT_MIN_FRAMES, SETTLE_MS)
+  return kept.length ? kept : frames.filter((x) => x.t - t0 >= SETTLE_MS).map((x) => x.f)
 }
 
 /* ---------- the pre-check (camera preview, before calibration) ---------- */
@@ -435,12 +450,49 @@ export type PrecheckIssue = 'noface' | 'left' | 'right' | 'up' | 'down' | 'close
 export function precheck(p: { face: { cx: number; cy: number } | null; irisW?: number | null; brightness?: number | null }): PrecheckIssue[] {
   if (!p.face) return ['noface']
   const out: PrecheckIssue[] = []
+  // Tolerant on purpose (owner's laptop test): a face a little off-centre, a laptop's usual 40–80 cm
+  // (the iris estimate reads far on wide-angle webcams, so only the extremes count), and backlight from
+  // a window behind the person (the frame's mean is bright while the face is fine) all pass.
   const mx = 1 - p.face.cx
-  if (mx > 0.62) out.push('left'); else if (mx < 0.38) out.push('right')
-  if (p.face.cy < 0.28) out.push('down'); else if (p.face.cy > 0.68) out.push('up')
-  if (p.irisW) { const cm = distanceCm(p.irisW); if (cm < 40) out.push('close'); else if (cm > 80) out.push('far') }
-  if (p.brightness != null) { if (p.brightness < 60) out.push('dark'); else if (p.brightness > 225) out.push('bright') }
+  if (mx > 0.72) out.push('left'); else if (mx < 0.28) out.push('right')
+  if (p.face.cy < 0.18) out.push('down'); else if (p.face.cy > 0.8) out.push('up')
+  // Close is judged as a 60° camera sees it, far as a wide 78° laptop camera does: either way only real extremes.
+  if (p.irisW) { if (distanceCm(p.irisW, 60) <= 35) out.push('close'); else if (distanceCm(p.irisW, 78) >= 90) out.push('far') }
+  if (p.brightness != null) { if (p.brightness < 30) out.push('dark'); else if (p.brightness > 248) out.push('bright') }
   return out
+}
+/** The three rows the pre-check screen shows, and which issues each one covers. */
+export const PRECHECK_ROWS: { key: 'face' | 'distance' | 'light'; ok: string; issues: PrecheckIssue[] }[] = [
+  { key: 'face', ok: 'Face in the middle', issues: ['noface', 'left', 'right', 'up', 'down'] },
+  { key: 'distance', ok: 'About an arm’s length away', issues: ['close', 'far'] },
+  { key: 'light', ok: 'Enough light on your face', issues: ['dark', 'bright'] },
+]
+/** How long the shown checks must stay green before "Start calibration" turns on (well under 1 s). */
+export const PRECHECK_READY_MS = 300
+/**
+ * The pre-check's state over time: what to show, and whether Start is on. The rows and the button
+ * read the SAME smoothed list, so the screen can never show three ✓ with the button off. An issue is
+ * shown only when it is in at least 3 of the last 5 frames (one noisy frame neither shows a warning nor
+ * resets the timer); `ready` once nothing has been shown for PRECHECK_READY_MS.
+ */
+export class PrecheckGate {
+  private hist: PrecheckIssue[][] = []
+  private okSince: number | null = null
+  issues: PrecheckIssue[] | null = null
+  ready = false
+  push(list: PrecheckIssue[], now: number): { issues: PrecheckIssue[] | null; ready: boolean } {
+    this.hist.push(list); if (this.hist.length > 5) this.hist.shift()
+    // The first frames: nothing judged yet ("Checking…" on screen, Start off).
+    if (this.hist.length < 3) { this.issues = null; this.ready = false; return { issues: null, ready: false } }
+    const all = [...new Set(this.hist.flat())]
+    let issues = all.filter((i) => this.hist.filter((h) => h.includes(i)).length >= 3)
+    // No face hides the other rows' warnings (they can't be measured), never the other way round.
+    if (issues.includes('noface')) issues = ['noface']
+    if (issues.length) this.okSince = null; else this.okSince ??= now
+    this.issues = issues
+    this.ready = this.okSince != null && now - this.okSince >= PRECHECK_READY_MS
+    return { issues, ready: this.ready }
+  }
 }
 export const PRECHECK_TEXT: Record<PrecheckIssue, string> = {
   noface: 'We can’t see your face. Sit in front of the camera.',

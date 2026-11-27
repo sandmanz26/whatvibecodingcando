@@ -234,6 +234,8 @@ function LinkNotice({ why, onClose }: { why: string; onClose: () => void }) {
   )
 }
 
+/** gaze.js beside the script, pinned to this build (never a stale cached copy from an older deploy). */
+const gazeHref = (src?: string) => { if (!src) return ''; const u = new URL('gaze.js', src); const v = import.meta.env.VITE_BUILD_ID as string | undefined; if (v) u.searchParams.set('v', v); return u.href }
 const sameOrigin = (src: string) => { try { return new URL(src).origin === window.location.origin } catch { return true } }
 const tipKey = (p: string) => `${NS}tip-panel:${p}`
 const tipSeen = (p: string) => { try { return localStorage.getItem(tipKey(p)) === '1' } catch { return false } }
@@ -302,7 +304,7 @@ export async function boot(given?: HTMLScriptElement | null) {
   const project = /^[\w-]{1,64}$/.test(d.project ?? '') ? d.project! : (window.location.hostname || 'local').replace(/[^\w-]/g, '-')
   window.__vibeCollab = { version: VERSION, project }
   const demo = isHostedDemo(script)
-  const gazeUrl = script?.src ? new URL('gaze.js', script.src).href : ''
+  const gazeUrl = gazeHref(script?.src)
   const SESSION_EVENT = 'vibe-collab:session'
 
   // The review link's token, taken off the address at once (so it isn't left in history or shared on).
@@ -328,7 +330,7 @@ export async function boot(given?: HTMLScriptElement | null) {
     }
     if (study && study.phase !== 'declined') {
       const file = await server.fetchSettings(project)
-      mountAlone(<Participant project={project} initial={study as RunState} accent={file.live?.config.theme.accent ?? '#e8590c'} doorsOn={!!file.live?.config.modules.doors} version={file.live?.config.version ?? ''} gazeUrl={script?.src ? new URL('gaze.js', script.src).href : ''} />)
+      mountAlone(<Participant project={project} initial={study as RunState} accent={file.live?.config.theme.accent ?? '#e8590c'} doorsOn={!!file.live?.config.modules.doors} version={file.live?.config.version ?? ''} gazeUrl={gazeHref(script?.src)} />)
       return
     }
   }

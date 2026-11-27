@@ -183,7 +183,7 @@ test('pre-check: centred, distance, light', () => {
   assert.deepEqual(precheck({ face: { cx: 0.5, cy: 0.45 }, irisW: 0.017, brightness: 130 }), [])
   assert.ok(precheck({ face: { cx: 0.2, cy: 0.45 } }).includes('left'))   // raw left = mirrored right → move left
   assert.ok(precheck({ face: { cx: 0.5, cy: 0.45 }, irisW: 0.04 }).includes('close'))
-  assert.ok(precheck({ face: { cx: 0.5, cy: 0.45 }, brightness: 30 }).includes('dark'))
+  assert.ok(precheck({ face: { cx: 0.5, cy: 0.45 }, brightness: 20 }).includes('dark'))
 })
 
 test('replay harness: a downloaded diagnostics file refits both ways', () => {
