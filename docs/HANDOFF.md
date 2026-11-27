@@ -99,6 +99,11 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 
 ## 4. Log perubahan (terbaru di atas)
 
+### 27 Nov 2026 — siap pindah ke Cloudflare Pages
+- Build sekarang juga menulis `dist/_headers` dan `dist/_redirects` (format Cloudflare Pages) dari `vercel.json` lewat `scripts/cloudflare-config.mjs`. `vercel.json` tetap satu-satunya tempat mengedit header/CSP/redirect; Vercel tetap berjalan seperti biasa.
+- Panduan migrasi: lihat pesan di chat 27 Nov (ringkas: buat project Pages dari GitHub, build `npm run install:all && npm run build`, output `dist`, env `NODE_VERSION=22` + semua `VITE_*`, preview branch = none, tes di `*.pages.dev`, lalu pindah DNS).
+- **Belum diverifikasi di Cloudflare**: header `/embed/*` (CSP harus hilang) dan `/embed/session.html` (CSP khususnya). Cek dengan `curl -I` setelah deploy pertama.
+
 ### 2 Des 2026 — eye tracking: akurasi kalibrasi, layar persiapan, cek kepala, laporan ringkas
 **Penyebab yang ditemukan (dengan bukti, `apps/saas/tests/gaze-calib.test.ts`, simulator webcam realistis `tests/gaze-sim.ts`)**
 1. **Frame dibaca setelah klik (penyebab terbesar).** Dulu titik diklik, lalu 1 detik frame dibaca *sesudah* klik. Sekitar separuh orang sudah memindahkan mata mencari titik berikutnya → model belajar titik yang salah. Simulasi: 163 px → 49 px hanya dengan memperbaiki cara mengambil sampel (model sama).
