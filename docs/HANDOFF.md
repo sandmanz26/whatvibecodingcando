@@ -62,6 +62,7 @@ Semua file aman dijalankan ulang kecuali disebut lain. Admin: `insert into publi
 - ⬜ Turnstile CAPTCHA (README Supabase langkah 4).
 - ⬜ 2FA: GitHub, Vercel, Supabase, Resend, PostHog, registrar domain, email.
 - ⬜ Supabase Pro (backup harian).
+- ⬜ **Vercel Pro (±$20/bulan)** sebelum promosi publik atau menyalakan pembayaran: paket Hobby hanya untuk penggunaan non-komersial (risiko project ditangguhkan = situs dan script pelanggan mati). Tidak ada perubahan kode.
 - ⬜ Rotasi kunci yang pernah tampil di chat/screenshot.
 
 ### Lainnya
